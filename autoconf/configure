@@ -594,12 +594,11 @@ OPAM_REPO_OFFICIAL_REMOTE
 OPAM_REPO
 ROOTDIR
 PROJECTURE_ARGS
-OCAML_PKG_lru
+OCAML_PKG_re_str
+OCAML_PKG_ocp_build
 OCAML_PKG_geoip
 OCAML_PKG_ocplib_endian
 OCAML_PKG_sodium
-OCAML_PKG_zarith
-OCAML_PKG_nocrypto
 OCAML_PKG_ezjsonm
 OCAML_PKG_base64
 OCAML_PKG_cohttp_lwt_unix
@@ -5366,68 +5365,6 @@ if test "$OCAML_PKG_ezjsonm" = "no"; then
 $as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'ezjsonm'." >&2;}
 fi
 
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package nocrypto" >&5
-$as_echo_n "checking for OCaml findlib package nocrypto... " >&6; }
-
-  unset found
-  unset pkg
-  found=no
-  for pkg in nocrypto  ; do
-    if $OCAMLFIND query $pkg >/dev/null 2>/dev/null; then
-      OCAML_PKG_nocrypto=$pkg
-      ocaml_pkg_version=$($OCAMLFIND query -l $pkg|grep version: | awk '{ print $2}')
-      OCAML_PKG_nocrypto_VERSION=$ocaml_pkg_version
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ocaml_pkg_version" >&5
-$as_echo "$ocaml_pkg_version" >&6; }
-      found=yes
-      break
-    fi
-  done
-  if test "$found" = "no" ; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
-$as_echo "not found" >&6; }
-    OCAML_PKG_nocrypto=no
-  fi
-
-
-
-if test "$OCAML_PKG_nocrypto" = "no"; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: BEFORE ERROR: Please install OCaml package 'nocrypto'." >&5
-$as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'nocrypto'." >&2;}
-fi
-
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package zarith" >&5
-$as_echo_n "checking for OCaml findlib package zarith... " >&6; }
-
-  unset found
-  unset pkg
-  found=no
-  for pkg in zarith  ; do
-    if $OCAMLFIND query $pkg >/dev/null 2>/dev/null; then
-      OCAML_PKG_zarith=$pkg
-      ocaml_pkg_version=$($OCAMLFIND query -l $pkg|grep version: | awk '{ print $2}')
-      OCAML_PKG_zarith_VERSION=$ocaml_pkg_version
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ocaml_pkg_version" >&5
-$as_echo "$ocaml_pkg_version" >&6; }
-      found=yes
-      break
-    fi
-  done
-  if test "$found" = "no" ; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
-$as_echo "not found" >&6; }
-    OCAML_PKG_zarith=no
-  fi
-
-
-
-if test "$OCAML_PKG_zarith" = "no"; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: BEFORE ERROR: Please install OCaml package 'zarith'." >&5
-$as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'zarith'." >&2;}
-fi
-
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package sodium" >&5
 $as_echo_n "checking for OCaml findlib package sodium... " >&6; }
 
@@ -5521,17 +5458,17 @@ if test "$OCAML_PKG_geoip" = "no"; then
 $as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'geoip'." >&2;}
 fi
 
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package lru" >&5
-$as_echo_n "checking for OCaml findlib package lru... " >&6; }
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package ocp-build" >&5
+$as_echo_n "checking for OCaml findlib package ocp-build... " >&6; }
 
   unset found
   unset pkg
   found=no
-  for pkg in lru  ; do
+  for pkg in ocp-build  ; do
     if $OCAMLFIND query $pkg >/dev/null 2>/dev/null; then
-      OCAML_PKG_lru=$pkg
+      OCAML_PKG_ocp_build=$pkg
       ocaml_pkg_version=$($OCAMLFIND query -l $pkg|grep version: | awk '{ print $2}')
-      OCAML_PKG_lru_VERSION=$ocaml_pkg_version
+      OCAML_PKG_ocp_build_VERSION=$ocaml_pkg_version
 
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ocaml_pkg_version" >&5
 $as_echo "$ocaml_pkg_version" >&6; }
@@ -5542,14 +5479,45 @@ $as_echo "$ocaml_pkg_version" >&6; }
   if test "$found" = "no" ; then
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
 $as_echo "not found" >&6; }
-    OCAML_PKG_lru=no
+    OCAML_PKG_ocp_build=no
   fi
 
 
 
-if test "$OCAML_PKG_lru" = "no"; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: BEFORE ERROR: Please install OCaml package 'lru'." >&5
-$as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'lru'." >&2;}
+if test "$OCAML_PKG_ocp_build" = "no"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: BEFORE ERROR: Please install OCaml package 'ocp-build'." >&5
+$as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 'ocp-build'." >&2;}
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OCaml findlib package re.str" >&5
+$as_echo_n "checking for OCaml findlib package re.str... " >&6; }
+
+  unset found
+  unset pkg
+  found=no
+  for pkg in re.str  ; do
+    if $OCAMLFIND query $pkg >/dev/null 2>/dev/null; then
+      OCAML_PKG_re_str=$pkg
+      ocaml_pkg_version=$($OCAMLFIND query -l $pkg|grep version: | awk '{ print $2}')
+      OCAML_PKG_re_str_VERSION=$ocaml_pkg_version
+
+      { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ocaml_pkg_version" >&5
+$as_echo "$ocaml_pkg_version" >&6; }
+      found=yes
+      break
+    fi
+  done
+  if test "$found" = "no" ; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
+$as_echo "not found" >&6; }
+    OCAML_PKG_re_str=no
+  fi
+
+
+
+if test "$OCAML_PKG_re.str" = "no"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: BEFORE ERROR: Please install OCaml package 're.str'." >&5
+$as_echo "$as_me: WARNING: BEFORE ERROR: Please install OCaml package 're.str'." >&2;}
 fi
 if test "$OCAML_PKG_ocplib_json_typed" = "no"; then
    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
@@ -5655,18 +5623,6 @@ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "Missing dependencies (see warnings above).
 See \`config.log' for more details" "$LINENO" 5; }
 fi
-if test "$OCAML_PKG_nocrypto" = "no"; then
-   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "Missing dependencies (see warnings above).
-See \`config.log' for more details" "$LINENO" 5; }
-fi
-if test "$OCAML_PKG_zarith" = "no"; then
-   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "Missing dependencies (see warnings above).
-See \`config.log' for more details" "$LINENO" 5; }
-fi
 if test "$OCAML_PKG_sodium" = "no"; then
    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
@@ -5685,7 +5641,13 @@ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "Missing dependencies (see warnings above).
 See \`config.log' for more details" "$LINENO" 5; }
 fi
-if test "$OCAML_PKG_lru" = "no"; then
+if test "$OCAML_PKG_ocp_build" = "no"; then
+   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Missing dependencies (see warnings above).
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+if test "$OCAML_PKG_re.str" = "no"; then
    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "Missing dependencies (see warnings above).

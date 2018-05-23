@@ -174,14 +174,6 @@ AC_CHECK_OCAML_PKG(ezjsonm)
 if test "$OCAML_PKG_ezjsonm" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'ezjsonm'.])
 fi
-AC_CHECK_OCAML_PKG(nocrypto)
-if test "$OCAML_PKG_nocrypto" = "no"; then
-   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'nocrypto'.])
-fi
-AC_CHECK_OCAML_PKG(zarith)
-if test "$OCAML_PKG_zarith" = "no"; then
-   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'zarith'.])
-fi
 AC_CHECK_OCAML_PKG(sodium)
 if test "$OCAML_PKG_sodium" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'sodium'.])
@@ -194,9 +186,13 @@ AC_CHECK_OCAML_PKG(geoip)
 if test "$OCAML_PKG_geoip" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'geoip'.])
 fi
-AC_CHECK_OCAML_PKG(lru)
-if test "$OCAML_PKG_lru" = "no"; then
-   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'lru'.])
+AC_CHECK_OCAML_PKG(ocp-build)
+if test "$OCAML_PKG_ocp_build" = "no"; then
+   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'ocp-build'.])
+fi
+AC_CHECK_OCAML_PKG(re.str)
+if test "$OCAML_PKG_re.str" = "no"; then
+   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 're.str'.])
 fi
 if test "$OCAML_PKG_ocplib_json_typed" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
@@ -233,12 +229,6 @@ fi
 if test "$OCAML_PKG_ezjsonm" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
-if test "$OCAML_PKG_nocrypto" = "no"; then
-   AC_MSG_FAILURE([Missing dependencies (see warnings above).])
-fi
-if test "$OCAML_PKG_zarith" = "no"; then
-   AC_MSG_FAILURE([Missing dependencies (see warnings above).])
-fi
 if test "$OCAML_PKG_sodium" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
@@ -248,7 +238,10 @@ fi
 if test "$OCAML_PKG_geoip" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
-if test "$OCAML_PKG_lru" = "no"; then
+if test "$OCAML_PKG_ocp_build" = "no"; then
+   AC_MSG_FAILURE([Missing dependencies (see warnings above).])
+fi
+if test "$OCAML_PKG_re.str" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
 OPAM_REPO=/home/lefessan/GIT/ocp-public/opam-repository
