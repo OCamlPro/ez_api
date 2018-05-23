@@ -64,7 +64,7 @@ OCaml.library("ez-api-js", ocaml+
       "ez-api-session-client";
       "ezjsonm";
       "js_of_ocaml";
-      "jsutils";
+      "ocplib-utils-js";
     ];
   });
 
