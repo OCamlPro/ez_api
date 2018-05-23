@@ -1,0 +1,16 @@
+(****************************************************************************
+#
+#          This file is managed by ocp-autoconf.
+#
+#  Remove it from `manage_files` in 'ocp-autoconf.config' if you want to
+#  modify it manually.
+#
+ ****************************************************************************)
+
+Sys = { file_exists = Sys_file_exists };
+
+include "autoconf/config.ocp2gen";
+ocaml.version = autoconf.package_version;
+
+filename_ocp2 = "ocp-autoconf.d/build.ocp2inc";
+if( Sys.file_exists(filename_ocp2) ){ include filename_ocp2; }

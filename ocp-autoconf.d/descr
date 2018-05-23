@@ -1,0 +1,5 @@
+A library to easy the creation of API servers
+
+ez-api is a simple interface over ocplib-resto/ocplib-directory/cohttp
+on the server-side, and curl, cohttp and xhr (javascript) on the
+client side.

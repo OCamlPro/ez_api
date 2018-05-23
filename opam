@@ -1,0 +1,52 @@
+(**************************************************************)
+(*                                                            *)
+(*      This file is managed by ocp-autoconf                  *)
+(*  Remove it from `manage_files` in 'ocp-autoconf.config'    *)
+(*  if you want to modify it manually (or use 'opam.trailer') *)
+(*                                                            *)
+(**************************************************************)
+
+opam-version: "1.2"
+maintainer: "OCamlPro <contact@ocamlpro.com>"
+authors: [
+  "Cagdas Bozman <cagdas.bozman@ocamlpro.com>"
+  "Michael Laporte <michael.laporte@ocamlpro.com>"
+  "Fabrice Le Fessant <fabrice.le_fessant@ocamlpro.com>"
+]
+homepage: "http://tezos.ocamlpro.com/"
+dev-repo: "https://github.com/OCamlPro/ez-api.git"
+bug-reports: "https://github.com/OCamlPro/ez-api/issues"
+build: [
+  [     "./configure"
+    "--prefix"
+    "%{prefix}%"
+  ]
+  [ make ]
+]
+install: [
+  [ make "install" ]
+]
+remove: [
+]
+available: [ocaml-version >= "3.12.1"]
+depends: [
+     "base64"
+     "camlp4"
+     "cohttp-lwt" {>= "0.99.0" }
+     "cohttp-lwt-unix"
+     "ezjsonm"
+     "geoip"
+     "js_of_ocaml"
+     "js_of_ocaml-camlp4"
+     "js_of_ocaml-ppx"
+     "js_of_ocaml-tyxml"
+     "lru"
+     "nocrypto"
+     "ocamlfind"
+     "ocplib-endian"
+     "ocplib-json-typed"
+     "ocurl"
+     "omd"
+     "sodium"
+     "zarith"
+]

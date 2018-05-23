@@ -1,0 +1,18 @@
+#!/bin/sh
+
+#############################################################################
+#
+#          This file is managed by ocp-autoconf.
+#
+#  Remove it from `manage_files` in 'ocp-autoconf.config' if you want to
+#  modify it manually.
+#
+#############################################################################
+
+if ! test -e ./autoconf/configure; then
+    echo ./autoconf/configure not present: running ocp-autoconf
+    ocp-autoconf
+fi
+
+cd autoconf
+./configure $*

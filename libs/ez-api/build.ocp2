@@ -1,0 +1,92 @@
+
+OCaml.library("ez-api", ocaml+
+  {
+    files = [
+    (* Until we upgrade to ocplib-resto new version *)
+      "resto1.ml";
+      "restoDirectory1.ml";
+      
+      "ezDebug.ml";
+      "ezUrl.ml";
+      "ezAPI.ml";
+      "ezEncoding.ml";
+      "ezRequest.ml";
+      "ezSession.ml";
+    ];
+    requires = [
+      "lwt";
+      "ocplib-json-typed";
+      "ezjsonm";
+      "ocplib-compat";
+    ];
+  });
+
+OCaml.library("ez-api-server", ocaml+
+  {
+    files = [
+      "gMTime.ml";
+      "timings.ml";
+      "ezCookieServer.ml";
+      "ezAPIServer.ml";
+      "ezSessionServer.ml";
+    ];
+    requires = [
+      "re.str";
+      "lwt";
+      "cohttp";
+      "cohttp-lwt-unix";
+      "ocplib-json-typed";
+      "geoip";
+      "ez-api";
+    ];
+  });
+
+
+OCaml.library("ez-api-session-client", ocaml+
+  {
+    files = [
+      "ezSessionClient.ml"
+      ];
+    requires = [
+      "ez-api";
+    ];
+  });
+
+OCaml.library("ez-api-js", ocaml+
+  {
+    files = [
+      "ezDebugJS.ml";
+      "ezEncodingJS.ml", { pp = camlp4_js  };
+      "ezXhr.ml", { pp = camlp4_js };
+      "ezJS.ml";
+      ];
+    requires = [
+      "ez-api-session-client";
+      "ezjsonm";
+      "js_of_ocaml";
+      "jsutils";
+    ];
+  });
+
+OCaml.library("ez-api-curl", ocaml+
+  {
+    files = [
+      "ezCurl.ml";
+      ];
+    requires = [
+      "ez-api";
+      "curl";
+    ];
+  });
+
+OCaml.library("ez-api-cohttp", ocaml+
+  {
+    files = [
+      "ezCohttp.ml";
+      ];
+    requires = [
+      "ez-api";
+      "cohttp-lwt-unix";
+    ];
+  });
+

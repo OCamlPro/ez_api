@@ -1,0 +1,19 @@
+
+
+OCaml.library("ez-api-test",
+  {
+    files = [ "test.ml" ];
+    requires = [ "ez-api-server"; "ez-api-session-client" ];
+  });
+
+OCaml.program("ez-api-test-curl",
+  {
+    files = [ "main_curl.ml" ];
+    requires = [ "ez-api-test"; "ez-api-curl" ];
+  });
+
+OCaml.program("ez-api-test-cohttp",
+  {
+    files = [ "main_cohttp.ml" ];
+    requires = [ "ez-api-test"; "ez-api-cohttp" ];
+  });
