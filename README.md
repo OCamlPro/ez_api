@@ -1,3 +1,5 @@
+[![Travis-CI Build Status](https://travis-ci.org/OCamlPro/ez-api.svg?branch=master)](https://travis-ci.org/OCamlPro/ez-api)
+
 # ez-api : a simple library to write client/server web APIs
 
 ez-api is based on ocplib-resto and cohttp on the server side, and
