@@ -13,4 +13,4 @@ include "autoconf/config.ocp2gen";
 ocaml.version = autoconf.package_version;
 
 filename_ocp2 = "ocp-autoconf.d/build.ocp2inc";
-if( Sys.file_exists(filename_ocp2) ){ include filename_ocp2; }
+if( Sys.file_exists(dirname + "/" + filename_ocp2) ){ include filename_ocp2; }
