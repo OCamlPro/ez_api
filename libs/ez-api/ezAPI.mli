@@ -144,6 +144,11 @@ val find_params : param -> request -> string list option
 val section_name : section -> string
 val id : _ service -> int
 val nservices : unit -> int
+val services_map : (service_doc -> 'a) -> 'a list
+val service_to_readable : service_doc ->
+  (int * string * string *
+   (string * string * string * string) list)
+val services : unit -> string array
 val services : unit -> string array
 
 exception ResultNotfound
