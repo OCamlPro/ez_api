@@ -399,18 +399,22 @@ let section_name s = s.section_name
 let nservices () = !nservices
 let id s = s.doc.doc_id
 
-let services_map f = List.map f @@ List.rev !services
+let services_doc_map f = List.rev_map f !services
+
+let string_of_param_type = function
+  | PARAM_INT -> "int"
+  | PARAM_STRING -> "string"
+  | PARAM_BOOL -> "bool"
 
 let service_to_readable s =
   let unopt = function
     | None -> "N/A"
     | Some x -> x in
-  ( s.doc_id, unopt s.doc_name, string_of_path s.doc_path,
-    List.map (fun p -> (p.param_value, unopt p.param_name, unopt p.param_descr,
-                        match p.param_type with
-                        | PARAM_INT -> "int"
-                        | PARAM_STRING -> "string"
-                        | PARAM_BOOL -> "bool")) s.doc_params)
+  ( s.doc_id, unopt s.doc_name, string_of_path s.doc_path, s.doc_registered,
+    List.map (fun p ->
+        (p.param_value, unopt p.param_name, unopt p.param_descr,
+         string_of_param_type p.param_type))
+      s.doc_params)
 
 (* let path s = string_of_path s.doc.doc_path *)
 let services () =
