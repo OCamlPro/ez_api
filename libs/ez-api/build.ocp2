@@ -8,8 +8,8 @@ OCaml.library("ez-api", ocaml+
       
       "ezDebug.ml";
       "ezUrl.ml";
-      "ezAPI.ml";
       "ezEncoding.ml";
+      "ezAPI.ml";
       "ezRequest.ml";
       "ezSession.ml";
     ];
@@ -29,6 +29,7 @@ OCaml.library("ez-api-server", ocaml+
       "ezCookieServer.ml";
       "ezAPIServer.ml";
       "ezSessionServer.ml";
+      "ezSwagger.ml";
     ];
     requires = [
       "re.str";

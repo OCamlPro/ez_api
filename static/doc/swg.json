@@ -1,0 +1,1539 @@
+{
+  "swagger" : "2.0",
+  "info" : {
+    "description" : "BETA Tezos API, this may change frequently",
+    "version" : "0.0.2",
+    "title" : "TezosAPI",
+    "termsOfService" : "http://swagger.io/terms/",
+    "contact" : {
+      "email" : "office@bitfly.at"
+    },
+    "license" : {
+      "name" : "Apache 2.0",
+      "url" : "http://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "host" : "betaapi.tezex.info",
+  "basePath" : "/v2",
+  "tags" : [ {
+    "name" : "Block",
+    "description" : "Everything about Blocks",
+    "externalDocs" : {
+      "description" : "Find out more",
+      "url" : "http://beta.tezex.info"
+    }
+  }, {
+    "name" : "Transaction",
+    "description" : "Access to Transactions, also see Operations"
+  }, {
+    "name" : "Endorsement",
+    "description" : "Information about Endorsements"
+  }, {
+    "name" : "Origination",
+    "description" : "Access to Originations, also see Operations"
+  }, {
+    "name" : "Delegation",
+    "description" : "Access to Delegations, also see Operations"
+  }, {
+    "name" : "Account",
+    "description" : "Get Accounts / Address Information"
+  }, {
+    "name" : "Operation",
+    "description" : "Operations include Contract executions and transactions"
+  }, {
+    "name" : "Network",
+    "description" : "Information about the Tezos Network"
+  }, {
+    "name" : "Blockchain",
+    "description" : "Information about the Tezos Network"
+  }, {
+    "name" : "Market",
+    "description" : "Price Information"
+  }, {
+    "name" : "Stats",
+    "description" : "Statistics"
+  } ],
+  "schemes" : [ "http" ],
+  "paths" : {
+    "/account/{account}" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Account",
+        "description" : "Get Acccount",
+        "operationId" : "getAccount",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Account",
+            "schema" : {
+              "$ref" : "#/definitions/Account"
+            }
+          }
+        }
+      }
+    },
+    "/account/{account}/delegated" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Delegations to this account",
+        "description" : "Get that have been made to this Account",
+        "operationId" : "getDelegationsToAccount",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account to which delegations have been made",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "before",
+          "in" : "query",
+          "description" : "Only Return Delegations before this blocklevel",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Delegations",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Delegation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/{account}/delegations" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Delegations of this account",
+        "description" : "Get Delegations this Account has made",
+        "operationId" : "getDelegationsForAccount",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account for which to retrieve Delegations",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "before",
+          "in" : "query",
+          "description" : "Only Return Delegations before this blocklevel",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Delegations",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Delegation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/{account}/endorsements" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Endorsements this Account has made",
+        "description" : "Get Endorsements this Account has made",
+        "operationId" : "getEndorsementsForAccount",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account for which to retrieve Endorsements",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "before",
+          "in" : "query",
+          "description" : "Only Return Delegations before this blocklevel",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Endorsements",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Endorsement"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/{account}/transactions/incomming" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Transaction",
+        "description" : "Get incoming Transactions for a specific Account",
+        "operationId" : "getTransactionForAccountIncomming",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account for which to retrieve incomming Transactions",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "before",
+          "in" : "query",
+          "description" : "Only Return transactions before this blocklevel",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Transactions",
+            "schema" : {
+              "$ref" : "#/definitions/Transactions"
+            }
+          }
+        }
+      }
+    },
+    "/account/{account}/transactions/outgoing" : {
+      "get" : {
+        "tags" : [ "Account" ],
+        "summary" : "Get Transaction",
+        "description" : "Get outgoing Transactions for a specific Account",
+        "operationId" : "getTransactionForAccountOutgoing",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "account",
+          "in" : "path",
+          "description" : "The account for which to retrieve outgoing Transactions",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "before",
+          "in" : "query",
+          "description" : "Only return transactions before this blocklevel",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Transactions",
+            "schema" : {
+              "$ref" : "#/definitions/Transactions"
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get Block By Blockhash",
+        "description" : "Get a block by its hash",
+        "operationId" : "getBlock",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "The hash of the Block to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Block",
+            "schema" : {
+              "$ref" : "#/definitions/Block"
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}/operations" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get operations of a block, sorted",
+        "description" : "Get the maximum Level we have seen, Blocks at this level may become abandoned Blocks later on",
+        "operationId" : "getBlockOperationsSorted",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "The hash of the Block to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Block",
+            "schema" : {
+              "$ref" : "#/definitions/BlockOperationsSorted"
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}/operations/delegations" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get Delegations of a Block",
+        "description" : "Get all Delegations of a specific Block",
+        "operationId" : "getBlockDelegations",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "Blockhash",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Delegations",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Delegation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}/operations/endorsements" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get Endorsements of a Block",
+        "description" : "Get all Endorsements of a specific Block",
+        "operationId" : "getBlockEndorsements",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "Blockhash",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Endorsements",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Endorsement"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}/operations/originations" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get Originations of a Block",
+        "description" : "Get all Originations of a spcific Block",
+        "operationId" : "getBlockOriginations",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "Blockhash",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Originations",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Origination"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/block/{blockhash}/operations/transactions" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get Transactions of Block",
+        "description" : "Get all Transactions of a spcific Block",
+        "operationId" : "getBlockTransaction",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "blockhash",
+          "in" : "path",
+          "description" : "Blockhash",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Transactions",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Transaction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/all" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get All Blocks ",
+        "description" : "Get all Blocks",
+        "operationId" : "BlocksAll",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "description" : "Pagination, 200 tx per page max",
+          "required" : false,
+          "type" : "number"
+        }, {
+          "name" : "order",
+          "in" : "query",
+          "description" : "ASC or DESC",
+          "required" : false,
+          "type" : "string",
+          "enum" : [ "ASC", "DESC" ]
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "description" : "Results per Page",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Blocks",
+            "schema" : {
+              "$ref" : "#/definitions/BlocksAll"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/recent" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "returns the last 25 blocks",
+        "description" : "Get all Blocks for a specific Level",
+        "operationId" : "recentBlocks",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the 25 latest Blocks",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/{level}" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get All Blocks for a specific Level",
+        "description" : "Get all Blocks for a specific Level",
+        "operationId" : "BlocksByLevel",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "level",
+          "in" : "path",
+          "description" : "The level of the Blocks to retrieve, includes abandoned",
+          "required" : true,
+          "type" : "number"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Blocks",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/{startlevel}/{stoplevel}" : {
+      "get" : {
+        "tags" : [ "Block" ],
+        "summary" : "Get All Blocks for a specific Level-Range",
+        "description" : "Get all Blocks for a specific Level-Range",
+        "operationId" : "BlocksByLevelRange",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "startlevel",
+          "in" : "path",
+          "description" : "lowest blocklevel to return",
+          "required" : true,
+          "type" : "number"
+        }, {
+          "name" : "stoplevel",
+          "in" : "path",
+          "description" : "highest blocklevel to return",
+          "required" : true,
+          "type" : "number"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Blocks",
+            "schema" : {
+              "$ref" : "#/definitions/BlockRange"
+            }
+          }
+        }
+      }
+    },
+    "/delegation/{delegation_hash}" : {
+      "get" : {
+        "tags" : [ "Delegation" ],
+        "summary" : "Get Delegation",
+        "description" : "Get a specific Delegation",
+        "operationId" : "getDelegation",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "delegation_hash",
+          "in" : "path",
+          "description" : "The hash of the Origination to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Delegation",
+            "schema" : {
+              "$ref" : "#/definitions/Delegation"
+            }
+          }
+        }
+      }
+    },
+    "/endorsement/for/{block_hash}" : {
+      "get" : {
+        "tags" : [ "Endorsement" ],
+        "summary" : "Get Endorsement",
+        "description" : "Get a specific Endorsement",
+        "operationId" : "getEndorsementForBlock",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "block_hash",
+          "in" : "path",
+          "description" : "blockhash",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Endorsements",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Endorsement"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/endorsement/{endorsement_hash}" : {
+      "get" : {
+        "tags" : [ "Endorsement" ],
+        "summary" : "Get Endorsement",
+        "description" : "Get a specific Endorsement",
+        "operationId" : "getEndorsement",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "endorsement_hash",
+          "in" : "path",
+          "description" : "The hash of the Endorsement to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Endorsement",
+            "schema" : {
+              "$ref" : "#/definitions/Endorsement"
+            }
+          }
+        }
+      }
+    },
+    "/maxLevel" : {
+      "get" : {
+        "tags" : [ "Blockchain" ],
+        "summary" : "Get Max Blockheight",
+        "description" : "Get the maximum Level we have seen",
+        "operationId" : "blockheight",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the max Blockheight",
+            "schema" : {
+              "$ref" : "#/definitions/Level"
+            }
+          }
+        }
+      }
+    },
+    "/network" : {
+      "get" : {
+        "tags" : [ "Network" ],
+        "summary" : "Get Network Information",
+        "description" : "Get Network Information",
+        "operationId" : "network",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns NetworkInfo",
+            "schema" : {
+              "$ref" : "#/definitions/NetworkInfo"
+            }
+          }
+        }
+      }
+    },
+    "/operation/{operation_hash}" : {
+      "get" : {
+        "tags" : [ "Operation" ],
+        "summary" : "Get Operation",
+        "description" : "Get a specific Operation",
+        "operationId" : "getOperation",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "operation_hash",
+          "in" : "path",
+          "description" : "The hash of the Operation to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Operation",
+            "schema" : {
+              "$ref" : "#/definitions/Operation"
+            }
+          }
+        }
+      }
+    },
+    "/origination/{origination_hash}" : {
+      "get" : {
+        "tags" : [ "Origination" ],
+        "summary" : "Get Origination",
+        "description" : "Get a specific Origination",
+        "operationId" : "getOrigination",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "origination_hash",
+          "in" : "path",
+          "description" : "The hash of the Origination to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Origination",
+            "schema" : {
+              "$ref" : "#/definitions/Origination"
+            }
+          }
+        }
+      }
+    },
+    "/price/{denominator}/{numerator}/{period}" : {
+      "get" : {
+        "tags" : [ "Market" ],
+        "summary" : "Candlestick Data",
+        "description" : "Returns CandleStick Prices",
+        "operationId" : "candlestick",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "denominator",
+          "in" : "path",
+          "description" : "which currency",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "numerator",
+          "in" : "path",
+          "description" : "to which currency",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "period",
+          "in" : "path",
+          "description" : "Timeframe of one candle",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns Candlestick Data",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Candlestick"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats/overview" : {
+      "get" : {
+        "tags" : [ "Stats" ],
+        "summary" : "Returns some basic Info",
+        "operationId" : "getStatsOverview",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns prices and some network info",
+            "schema" : {
+              "$ref" : "#/definitions/StatsOverview"
+            }
+          }
+        }
+      }
+    },
+    "/stats/{group}/{stat}/{period}" : {
+      "get" : {
+        "tags" : [ "Stats" ],
+        "summary" : "Get Statistics",
+        "description" : "Get Statistics",
+        "operationId" : "getStatistics",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "group",
+          "in" : "path",
+          "description" : "Block, Transaction, etc",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "stat",
+          "in" : "path",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "period",
+          "in" : "path",
+          "required" : true,
+          "type" : "string"
+        }, {
+          "name" : "start_time",
+          "in" : "query",
+          "required" : false,
+          "type" : "string",
+          "format" : "date-time"
+        }, {
+          "name" : "end_time",
+          "in" : "query",
+          "required" : false,
+          "type" : "string",
+          "format" : "date-time"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Values",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Stats"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ticker/{numerator}" : {
+      "get" : {
+        "tags" : [ "Market" ],
+        "summary" : "Get Ticker for a specific Currency",
+        "description" : "Returns BTC, USD, EUR and CNY Prices",
+        "operationId" : "ticker",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "numerator",
+          "in" : "path",
+          "description" : "The level of the Blocks to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Blocks",
+            "schema" : {
+              "$ref" : "#/definitions/Ticker"
+            }
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_hash}" : {
+      "get" : {
+        "tags" : [ "Transaction" ],
+        "summary" : "Get Transaction",
+        "description" : "Get a specific Transaction",
+        "operationId" : "getTransaction",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "transaction_hash",
+          "in" : "path",
+          "description" : "The hash of the Transaction to retrieve",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns the matching Transaction",
+            "schema" : {
+              "$ref" : "#/definitions/Transaction"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/all" : {
+      "get" : {
+        "tags" : [ "Transaction" ],
+        "summary" : "Get All Transactions",
+        "description" : "Get all Transactions",
+        "operationId" : "TransactionsAll",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "description" : "Pagination, 200 tx per page max",
+          "required" : false,
+          "type" : "number"
+        }, {
+          "name" : "order",
+          "in" : "query",
+          "description" : "ASC or DESC",
+          "required" : false,
+          "type" : "string",
+          "enum" : [ "ASC", "DESC" ]
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "description" : "Results per Page",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Transactions",
+            "schema" : {
+              "$ref" : "#/definitions/TransactionRange"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/recent" : {
+      "get" : {
+        "tags" : [ "Transaction" ],
+        "summary" : "Returns the last 50 Transactions",
+        "operationId" : "getTransactionsRecent",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ ],
+        "responses" : {
+          "default" : {
+            "description" : "Returns latest 50 Transactions",
+            "schema" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/definitions/Transaction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/{startlevel}/{stoplevel}" : {
+      "get" : {
+        "tags" : [ "Transaction" ],
+        "summary" : "Get All Transactions for a specific Level-Range",
+        "description" : "Get all Transactions for a specific Level-Range",
+        "operationId" : "TransactionsByLevelRange",
+        "consumes" : [ "application/json", "application/xml" ],
+        "produces" : [ "application/xml", "application/json" ],
+        "parameters" : [ {
+          "name" : "startlevel",
+          "in" : "path",
+          "description" : "lowest blocklevel to return",
+          "required" : true,
+          "type" : "number"
+        }, {
+          "name" : "stoplevel",
+          "in" : "path",
+          "description" : "highest blocklevel to return",
+          "required" : true,
+          "type" : "number"
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "description" : "Pagination, 200 tx per page max",
+          "required" : false,
+          "type" : "number"
+        }, {
+          "name" : "order",
+          "in" : "query",
+          "description" : "ASC or DESC",
+          "required" : false,
+          "type" : "string",
+          "enum" : [ "ASC", "DESC" ]
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "description" : "Results per Page",
+          "required" : false,
+          "type" : "integer"
+        } ],
+        "responses" : {
+          "405" : {
+            "description" : "Invalid input"
+          },
+          "default" : {
+            "description" : "Returns the matching Transactions",
+            "schema" : {
+              "$ref" : "#/definitions/TransactionRange"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions" : {
+    "Block" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "net_id" : {
+          "type" : "string"
+        },
+        "protocol" : {
+          "type" : "string"
+        },
+        "level" : {
+          "type" : "integer"
+        },
+        "proto" : {
+          "type" : "string"
+        },
+        "successors" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/ChainStatus"
+          }
+        },
+        "predecessor" : {
+          "type" : "string"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        },
+        "validation_pass" : {
+          "type" : "string"
+        },
+        "data" : {
+          "type" : "string"
+        },
+        "chain_status" : {
+          "type" : "string"
+        },
+        "operations_count" : {
+          "type" : "integer"
+        },
+        "operations_hash" : {
+          "type" : "string"
+        },
+        "baker" : {
+          "type" : "string"
+        },
+        "seed_nonce_hash" : {
+          "type" : "string"
+        },
+        "proof_of_work_nonce" : {
+          "type" : "string"
+        },
+        "signature" : {
+          "type" : "string"
+        },
+        "priority" : {
+          "type" : "integer"
+        },
+        "operations" : {
+          "$ref" : "#/definitions/BlockOperationsSorted"
+        }
+      }
+    },
+    "ChainStatus" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "chain_status" : {
+          "type" : "string"
+        },
+        "level" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "Level" : {
+      "type" : "object",
+      "properties" : {
+        "level" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "NetworkInfo" : {
+      "type" : "object",
+      "properties" : {
+        "max_level" : {
+          "type" : "integer"
+        },
+        "blocktime" : {
+          "type" : "string"
+        },
+        "transactions_24h" : {
+          "type" : "integer"
+        },
+        "oeprations_24h" : {
+          "type" : "string"
+        }
+      }
+    },
+    "BlockOperationsSorted" : {
+      "type" : "object",
+      "properties" : {
+        "transactions" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Transaction"
+          }
+        },
+        "originations" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Origination"
+          }
+        },
+        "delegations" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Delegation"
+          }
+        },
+        "endorsements" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Endorsement"
+          }
+        }
+      }
+    },
+    "Operation" : {
+      "type" : "object",
+      "properties" : {
+        "transaction" : {
+          "$ref" : "#/definitions/Transaction"
+        },
+        "origination" : {
+          "$ref" : "#/definitions/Origination"
+        },
+        "delegation" : {
+          "$ref" : "#/definitions/Delegation"
+        }
+      }
+    },
+    "Transaction" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "branch" : {
+          "type" : "string"
+        },
+        "source" : {
+          "type" : "string"
+        },
+        "public_key" : {
+          "type" : "string"
+        },
+        "level" : {
+          "type" : "integer"
+        },
+        "block_hash" : {
+          "type" : "string"
+        },
+        "counter" : {
+          "type" : "integer"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        },
+        "operations" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/TransactionOperation"
+          }
+        }
+      }
+    },
+    "TransactionOperation" : {
+      "type" : "object",
+      "properties" : {
+        "kind" : {
+          "type" : "string"
+        },
+        "amount" : {
+          "type" : "integer"
+        },
+        "destination" : {
+          "type" : "string"
+        },
+        "parameters" : {
+          "$ref" : "#/definitions/TezosScript"
+        }
+      }
+    },
+    "TezosScript" : {
+      "type" : "object",
+      "properties" : {
+        "int" : {
+          "type" : "string"
+        },
+        "string" : {
+          "type" : "string"
+        },
+        "prim" : {
+          "type" : "string"
+        },
+        "args" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/TezosScript"
+          }
+        }
+      }
+    },
+    "Transactions" : {
+      "type" : "array",
+      "items" : {
+        "$ref" : "#/definitions/Transaction"
+      }
+    },
+    "Origination" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "branch" : {
+          "type" : "string"
+        },
+        "source" : {
+          "type" : "string"
+        },
+        "public_key" : {
+          "type" : "string"
+        },
+        "fee" : {
+          "type" : "integer"
+        },
+        "counter" : {
+          "type" : "integer"
+        },
+        "operations" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/OriginationOperation"
+          }
+        },
+        "level" : {
+          "type" : "integer"
+        },
+        "block_hash" : {
+          "type" : "string"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      }
+    },
+    "OriginationOperation" : {
+      "type" : "object",
+      "properties" : {
+        "kind" : {
+          "type" : "string"
+        },
+        "manager_pubkey" : {
+          "type" : "string"
+        },
+        "balance" : {
+          "type" : "integer"
+        },
+        "spendable" : {
+          "type" : "boolean"
+        },
+        "delegateable" : {
+          "type" : "boolean"
+        },
+        "delegate" : {
+          "type" : "string"
+        },
+        "script" : {
+          "$ref" : "#/definitions/TezosScript"
+        },
+        "storage" : {
+          "$ref" : "#/definitions/TezosScript"
+        }
+      }
+    },
+    "Ticker" : {
+      "type" : "object",
+      "properties" : {
+        "BTC" : {
+          "type" : "string"
+        },
+        "CNY" : {
+          "type" : "string"
+        },
+        "USD" : {
+          "type" : "string"
+        },
+        "EUR" : {
+          "type" : "string"
+        }
+      }
+    },
+    "Candlestick" : {
+      "type" : "object",
+      "properties" : {
+        "o" : {
+          "type" : "string"
+        },
+        "h" : {
+          "type" : "string"
+        },
+        "l" : {
+          "type" : "string"
+        },
+        "c" : {
+          "type" : "string"
+        },
+        "vol" : {
+          "type" : "string"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      }
+    },
+    "Delegation" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "branch" : {
+          "type" : "string"
+        },
+        "source" : {
+          "type" : "string"
+        },
+        "public_key" : {
+          "type" : "string"
+        },
+        "fee" : {
+          "type" : "integer"
+        },
+        "counter" : {
+          "type" : "integer"
+        },
+        "delegate" : {
+          "type" : "string"
+        },
+        "level" : {
+          "type" : "integer"
+        },
+        "block_hash" : {
+          "type" : "string"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      }
+    },
+    "Endorsement" : {
+      "type" : "object",
+      "properties" : {
+        "hash" : {
+          "type" : "string"
+        },
+        "source" : {
+          "type" : "string"
+        },
+        "level" : {
+          "type" : "integer"
+        },
+        "block" : {
+          "type" : "string"
+        },
+        "endorsed_block" : {
+          "type" : "string"
+        },
+        "slot" : {
+          "type" : "integer"
+        },
+        "time" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      }
+    },
+    "BlockRange" : {
+      "type" : "object",
+      "properties" : {
+        "maxBlockLevel" : {
+          "type" : "integer"
+        },
+        "blocks" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Block"
+          }
+        }
+      }
+    },
+    "TransactionRange" : {
+      "type" : "object",
+      "properties" : {
+        "maxBlockLevel" : {
+          "type" : "integer"
+        },
+        "transactions" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Transaction"
+          }
+        },
+        "total_results" : {
+          "type" : "integer"
+        },
+        "current_page" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "BlocksAll" : {
+      "type" : "object",
+      "properties" : {
+        "maxBlockLevel" : {
+          "type" : "integer"
+        },
+        "blocks" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/Block"
+          }
+        },
+        "total_results" : {
+          "type" : "integer"
+        },
+        "current_page" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "StatsOverview" : {
+      "type" : "object",
+      "properties" : {
+        "price_usd" : {
+          "type" : "string"
+        },
+        "price_btc" : {
+          "type" : "string"
+        },
+        "block_time" : {
+          "type" : "integer",
+          "description" : "Blocktime in seconds"
+        },
+        "priority" : {
+          "type" : "number"
+        }
+      },
+      "description" : "stats aggregated over the last 25 blocks"
+    },
+    "Stats" : {
+      "type" : "object",
+      "properties" : {
+        "stat_group" : {
+          "type" : "string"
+        },
+        "stat" : {
+          "type" : "string"
+        },
+        "value" : {
+          "type" : "string"
+        },
+        "start" : {
+          "type" : "string",
+          "format" : "date-time"
+        },
+        "end" : {
+          "type" : "string",
+          "format" : "date-time"
+        }
+      },
+      "description" : "See StatsDescription for all valid Endpoints"
+    },
+    "Account" : {
+      "type" : "object",
+      "properties" : {
+        "address" : {
+          "type" : "string"
+        },
+        "operation_count" : {
+          "type" : "integer"
+        },
+        "sent_transaction_count" : {
+          "type" : "integer"
+        },
+        "recv_transaction_count" : {
+          "type" : "integer"
+        },
+        "origination_count" : {
+          "type" : "integer"
+        },
+        "delegation_count" : {
+          "type" : "integer"
+        },
+        "delegated_count" : {
+          "type" : "integer"
+        },
+        "endorsement_count" : {
+          "type" : "integer"
+        },
+        "first_seen" : {
+          "type" : "string",
+          "format" : "date-time"
+        },
+        "last_seen" : {
+          "type" : "string",
+          "format" : "date-time"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "balance" : {
+          "type" : "string"
+        },
+        "total_sent" : {
+          "type" : "string"
+        },
+        "total_received" : {
+          "type" : "string"
+        },
+        "baked_blocks" : {
+          "type" : "integer"
+        },
+        "image_url" : {
+          "type" : "string"
+        }
+      },
+      "description" : "Account Information"
+    }
+  }
+}
