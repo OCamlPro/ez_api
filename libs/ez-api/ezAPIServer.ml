@@ -340,11 +340,17 @@ let dispatch s (io, _conn) req body =
     (fun () ->
       if path = ["debug"] then
         reply_json 200
-                   (`A
-                     (Cohttp.Request.headers req
-                      |> Header.to_lines
-                      |> List.map
-                           (fun s -> `String s)))
+                   (`O
+                     ["headers", `A
+                       (Cohttp.Request.headers req
+                        |> Header.to_lines
+                        |> List.map (fun s -> `String s));
+                      "params", `O
+                                 (List.map (fun (arg,list) ->
+                                      arg, `A (List.map (fun s -> `String s) list)
+                                    ) req_params)
+                     ]
+                   )
       else
         match s.server_kind, meth with
         | API dir, `OPTIONS ->

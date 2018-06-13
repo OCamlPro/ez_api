@@ -87,9 +87,9 @@ module Path : sig
 end
 
 module Param : sig
-  val string : ?name:string -> ?descr:string -> string -> param
-  val int : ?name:string -> ?descr:string -> string -> param
-  val bool : ?name:string -> ?descr:string -> string -> param
+  val string : ?name:string -> ?descr:string -> ?required:bool -> string -> param
+  val int : ?name:string -> ?descr:string -> ?required:bool -> string -> param
+  val bool : ?name:string -> ?descr:string -> ?required:bool -> string -> param
 end
 
 val arg_string : ?descr:string -> string -> string Resto.Arg.arg
@@ -99,6 +99,7 @@ val arg_int : ?descr:string -> string -> int Resto.Arg.arg
 val service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+  ?descr: string ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
   ('b, 'c) p ->
@@ -107,6 +108,7 @@ val service :
 val post_service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+  ?descr: string ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
@@ -166,3 +168,8 @@ val encode_args :
 
 val service_input : (_, _, 'input, _) service -> 'input Json_encoding.encoding
 val service_output : (_, _, _, 'output) service -> 'output Json_encoding.encoding
+
+(* swagger *)
+val paths_of_sections : section list ->
+                        (string * Ezjsonm.value) list
+                        * (string * Ezjsonm.value) list

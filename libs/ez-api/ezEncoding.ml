@@ -14,20 +14,6 @@ end
 
 exception DestructError
 
-let int64 =
-  union [
-    case
-      int32
-      (fun i ->
-         let j = Int64.to_int32 i in
-         if Int64.equal (Int64.of_int32 j) i then Some j else None)
-      Int64.of_int32 ;
-    case
-      string
-      (fun i -> Some (Int64.to_string i))
-      Int64.of_string
-  ]
-
 (* Default behavior to destruct a json value *)
 let destruct encoding buf =
   try
@@ -401,3 +387,34 @@ let obj24
     )
 
 let init () = ()
+
+(* for swagger *)
+
+let defs = ref []
+
+let int64 =
+  union [
+    case
+      int32
+      (fun i ->
+         let j = Int64.to_int32 i in
+         if Int64.equal (Int64.of_int32 j) i then Some j else None)
+      Int64.of_int32 ;
+    case
+      string
+      (fun i -> Some (Int64.to_string i))
+      Int64.of_string
+  ]
+
+let register ?name ?(descr="") o =
+  match name with
+  | None -> ()
+  | Some name ->
+    let sch = lazy ( Json_encoding.schema o ) in
+    defs := (name, (descr, sch)) :: !defs;
+    ()
+
+let merge_objs ?name ?descr o1 o2 =
+  let o = Json_encoding.merge_objs o1 o2 in
+  register ?name ?descr o;
+  o
