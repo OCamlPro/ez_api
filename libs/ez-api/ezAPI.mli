@@ -144,6 +144,17 @@ val find_params : param -> request -> string list option
 val section_name : section -> string
 val id : _ service -> int
 val nservices : unit -> int
+
+val services_doc_map : (service_doc -> 'a) -> 'a list
+
+(* [service_to_readable service_doc] gives the information contained in the
+   service_doc under usual types format: ie (id, name, path, registered, params)
+   where params is a list of the params given under the string format:
+   (value, name. descr, type) *)
+val service_to_readable : service_doc ->
+  (int * string * string * bool *
+   (string * string * string * string) list)
+
 val services : unit -> string array
 
 exception ResultNotfound
