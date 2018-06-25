@@ -355,7 +355,7 @@ let dispatch s (io, _conn) req body =
             "access-control-allow-origin" "*")
          [
            ("access-control-allow-headers", "Accept, Content-Type");
-           ("access-control-allow-methods", "GET, OPTIONS")
+           ("access-control-allow-methods", "POST, GET, OPTIONS")
       ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
   let body, headers = match reply with

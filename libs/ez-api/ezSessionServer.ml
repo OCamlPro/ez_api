@@ -228,7 +228,21 @@ end = struct
         Queue.add challenge_id challenge_queue;
         AuthNeeded (challenge_id, challenge)
 
-    let request_auth () =
+    let add_auth_header ?cookie req =
+      match S.token_kind with
+      | `Cookie name ->
+        begin match cookie with
+          | None -> ()
+          | Some cookie ->
+            EzCookieServer.set req ~name ~value:cookie
+        end
+      | `CSRF header ->
+        req.rep_headers <-
+          ("access-control-allow-headers", header) ::
+          req.rep_headers
+
+    let request_auth req =
+      add_auth_header req;
       EzAPIServer.return (new_challenge ())
 
     let return_auth req ?cookie ~login user_info =
@@ -238,24 +252,20 @@ end = struct
            s.session_cookie
         | Some cookie -> cookie
       in
-      begin match S.token_kind with
-      | `Cookie name ->
-         EzCookieServer.set req ~name ~value:cookie
-      | `CSRF _header -> ()
-      end;
+      add_auth_header ~cookie req;
       EzAPIServer.return
         (AuthOK (login, cookie, user_info))
 
     let connect req () =
       match get_request_session req with
       | None ->
-         request_auth ()
+         request_auth req
       | Some { session_cookie = cookie;
                session_login = login;
                _ } ->
          match find_user ~login with
          | None ->
-            request_auth ()
+            request_auth req
          | Some (_pwhash, user_info) ->
             return_auth req ~cookie ~login user_info
 
@@ -264,13 +274,13 @@ end = struct
       | None ->
          if verbose > 1 then
            EzDebug.printf "/login: could not find user %S\n%!" login_user;
-         request_auth ()
+         request_auth req
       | Some (pwhash, user_info) ->
          match Hashtbl.find challenges login_challenge_id with
          | exception Not_found ->
             if verbose > 1 then
               EzDebug.printf "/login: could not find challenge\n%!";
-            request_auth ()
+            request_auth req
          | (challenge, _t0) ->
             let expected_reply =
               EzSession.Hash.challenge
@@ -279,7 +289,7 @@ end = struct
             if expected_reply <> login_challenge_reply then begin
                 if verbose > 1 then
                   EzDebug.printf "/login: challenge failed\n%!";
-                request_auth ()
+                request_auth req
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
                 return_auth req ~login:login_user user_info
@@ -288,10 +298,10 @@ end = struct
     let logout req () =
       match get_request_session req with
       | None ->
-         request_auth ()
+         request_auth req
       | Some { session_login=login; session_cookie = cookie; _ } ->
          remove_session ~login ~cookie;
-         request_auth ()
+         request_auth req
   end
 
   let register_handlers dir =
