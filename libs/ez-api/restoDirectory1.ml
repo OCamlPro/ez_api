@@ -25,10 +25,10 @@ module Internal = struct
     | S : ('t, 'g, 'b * 's, 'rt, 'f, 'r) conv ->
       ('t * 'b, 'g, 's, 'a * 'rt, 'a -> 'f, 'r) conv
   let reverse
-    : type a b c d e f. (a, c, unit, d, e, f) conv -> a -> c
+    : type a _b c d e f. (a, c, unit, d, e, f) conv -> a -> c
     = fun c v ->
       let rec reverse
-        : type a b c d e f g. (a, c, d, e, f, g) conv -> a -> d -> c
+        : type a _b c d e f g. (a, c, d, e, f, g) conv -> a -> d -> c
         = fun c v acc ->
           match c, v with
           | Z, _ -> acc
@@ -46,7 +46,7 @@ module Internal = struct
 
 end
 
-let descr x = x.Arg.descr
+(* let descr x = x.Arg.descr *)
 
 module Answer = struct
 
@@ -71,7 +71,7 @@ module Answer = struct
   let ok_stream st = { code = 200 ; body = Stream st }
   let return_stream st = Lwt.return { code = 200 ; body = Stream st }
 
-  let map (type a) (type b) (f:a -> b) (({ code ; body } as ans) : a answer) : b answer =
+  let map (type a) (type b) (f:a -> b) (({ code ; body = _ } as ans) : a answer) : b answer =
     match ans.body with
     | Empty -> { code ; body = Empty }
     | Single body -> { code ; body = Single (f body) }
@@ -86,9 +86,17 @@ end
 
 open Answer
 
-type step =
+module Step = struct
+
+  type step =
+    | Static of string
+    | Dynamic of Arg.descr
+end
+
+type step = Step.step =
   | Static of string
   | Dynamic of Arg.descr
+
 
 type conflict =
   | CService
@@ -109,7 +117,7 @@ module Make(Repr : Json_repr.Repr) = struct
   type 'key directory =
     | Map :
         ('key -> 'inner_key) * 'inner_key directory -> 'key directory
-    | Static : 'key static_directory -> 'key directory
+    | StaticD : 'key static_directory -> 'key directory
     | Dynamic :
         string option * ('key -> 'key directory Lwt.t) -> 'key directory
     | Custom :
@@ -137,7 +145,7 @@ module Make(Repr : Json_repr.Repr) = struct
                        (Repr.value option -> Repr.value answer Lwt.t)
     | CustomDirectory of Description.directory_descr
 
-  let empty = Static { service = None ; subdirs = None }
+  let empty = StaticD { service = None ; subdirs = None }
 
   let rec map_directory
     : type a b.
@@ -151,8 +159,8 @@ module Make(Repr : Json_repr.Repr) = struct
       | Dynamic (descr, builder) ->
           let builder a = builder (f a) >|= map_directory f in
           Dynamic (descr, builder)
-      | Static dir ->
-          Static (map_static_directory f dir)
+      | StaticD dir ->
+          StaticD (map_static_directory f dir)
 
   and map_static_directory
     : type a b.
@@ -172,7 +180,7 @@ module Make(Repr : Json_repr.Repr) = struct
           let dir = map_directory (fun (a, x) -> f a, x) dir in
           Arg (arg, dir)
   and map_registred_service
-    : type a b pr.
+    : type a b _pr.
       (a -> b) -> b registred_service -> a registred_service
     = fun f t ->
       match t with
@@ -188,13 +196,13 @@ module Make(Repr : Json_repr.Repr) = struct
         : type k pr. (pr, k) Resto1.Internal.rpath -> k directory -> pr directory
         = fun path dir ->
           match path with
-          | Root -> dir
-          | Static (path, name) ->
+          | Resto1.Internal.Root -> dir
+          | Resto1.Internal.Static (path, name) ->
               let subdirs = Suffixes (StringMap.singleton name dir) in
-              prefix path (Static { subdirs = Some subdirs ; service = None })
-          | Dynamic (path, arg) ->
+              prefix path (StaticD { subdirs = Some subdirs ; service = None })
+          | Resto1.Internal.Dynamic (path, arg) ->
               let subdirs = Arg (arg, dir) in
-              prefix path (Static { subdirs = Some subdirs ; service = None }) in
+              prefix path (StaticD { subdirs = Some subdirs ; service = None }) in
       match Resto1.Internal.to_path path with
       | Path path -> prefix path dir
       | MappedPath (path, map, _) -> prefix path (map_directory map dir)
@@ -210,10 +218,10 @@ module Make(Repr : Json_repr.Repr) = struct
           merge path (map_directory f x) t
       | t, Map (f, x) ->
           merge path t (map_directory f x)
-      | Static { subdirs = None ; service = None } , t
-      | t, Static { subdirs = None ; service = None } -> t
-      | Static n1, Static n2 ->
-          Static (merge_static_directory path n1 n2)
+      | StaticD { subdirs = None ; service = None } , t
+      | t, StaticD { subdirs = None ; service = None } -> t
+      | StaticD n1, StaticD n2 ->
+          StaticD (merge_static_directory path n1 n2)
       | Dynamic _, _
       | _, Dynamic _ -> conflict path CBuilder
       | Custom _, _
@@ -235,12 +243,12 @@ module Make(Repr : Json_repr.Repr) = struct
                     (fun n t m ->
                        let st =
                          try StringMap.find n m with Not_found -> empty in
-                       StringMap.add n (merge (Static n :: path) st t) m) in
+                       StringMap.add n (merge (Step.Static n :: path) st t) m) in
                 Some (Suffixes (merge m1 m2))
             | Arg (arg1, subt1), Arg (arg2, subt2) ->
                 begin
                   try let Ty.Eq = Ty.eq arg1.id arg2.id in
-                    let subt = merge (Dynamic arg1.descr :: path) subt1 subt2 in
+                    let subt = merge (Step.Dynamic arg1.descr :: path) subt1 subt2 in
                     Some (Arg (arg1, subt))
                   with Ty.Not_equal ->
                     conflict path (CTypes (arg1.descr, arg2.descr))
@@ -262,7 +270,7 @@ module Make(Repr : Json_repr.Repr) = struct
   let merge x y = merge [] x y
 
   let rec describe_directory
-    : type a p. ?recurse:bool -> ?arg:a -> a directory -> Description.directory_descr Lwt.t
+    : type a _p. ?recurse:bool -> ?arg:a -> a directory -> Description.directory_descr Lwt.t
     = fun ?(recurse = true) ?arg dir ->
       match dir with
       | Map (_, dir) -> describe_directory ~recurse dir
@@ -273,14 +281,14 @@ module Make(Repr : Json_repr.Repr) = struct
           | Some arg ->
               builder arg >>= fun dir -> describe_directory ~recurse dir
         end
-      | Custom (descr, lookup) ->
+      | Custom (descr, _lookup) ->
           Lwt.return (Description.Dynamic descr)
-      | Static dir ->
+      | StaticD dir ->
           describe_static_directory recurse arg dir >>= fun dir ->
           Lwt.return (Description.Static dir)
 
   and describe_static_directory
-    : type a p.
+    : type a _p.
       bool -> a option -> a static_directory ->
       Description.static_directory_descr Lwt.t
     = fun recurse arg dir ->
@@ -298,7 +306,7 @@ module Make(Repr : Json_repr.Repr) = struct
       Lwt.return ({ Description.service ; Description.subdirs })
 
   and describe_static_subdirectories
-    : type a p.
+    : type a _p.
       a option -> a static_subdirectories ->
       Description.static_subdirectories_descr Lwt.t
     = fun arg dir ->
@@ -315,7 +323,7 @@ module Make(Repr : Json_repr.Repr) = struct
           Lwt.return (Description.Arg (arg.descr, dir))
 
   and describe_service
-    : type a p.
+    : type a _p.
       a registred_service -> Description.service_descr
     = fun service ->
       match service with
@@ -337,7 +345,7 @@ module Make(Repr : Json_repr.Repr) = struct
       Dir: 'a directory * 'a -> resolved_directory
 
   let rec resolve
-    : type a p.
+    : type a _p.
       string list -> a directory -> a -> string list -> resolved_directory Lwt.t
     = fun prefix dir args path ->
       match path, dir with
@@ -347,25 +355,27 @@ module Make(Repr : Json_repr.Repr) = struct
       | _, Custom(descr, lookup) ->
           let lookup () _ = lookup args path in
           Lwt.return (Dir (Custom (descr, lookup), ()))
-      | [], Static _ -> Lwt.return (Dir (dir, args))
-      | name :: path, Static { subdirs = None } -> raise Not_found
-      | name :: path, Static { subdirs = Some (Suffixes static) } ->
+      | [], StaticD _ -> Lwt.return (Dir (dir, args))
+      | _name :: _path, StaticD { subdirs = None ; service = _ } -> raise Not_found
+      | name :: path, StaticD { subdirs = Some (Suffixes static) ;
+                                service = _ } ->
           resolve
             (name :: prefix) (StringMap.find name static) args path
-      | name :: path, Static { subdirs = Some (Arg (arg, dir)) } ->
+      | name :: path, StaticD { subdirs = Some (Arg (arg, dir));
+                                service = _ } ->
           match arg.destruct name with
           | Ok x -> resolve (name :: prefix) dir (args, x) path
           | Error msg ->
               raise (Cannot_parse (arg.descr, msg, name :: prefix))
 
   let lookup
-    : type a p.
+    : type a _p.
       a directory -> a -> string list ->
       (Repr.value option -> Repr.value answer Lwt.t) Lwt.t
     = fun dir args path ->
       resolve [] dir args path >>= fun (Dir (dir, args)) ->
       match dir with
-      | Static dir -> begin
+      | StaticD dir -> begin
           match dir.service with
           | None -> raise Not_found
           | Some (RegistredService (_, input, output, handler)) ->
@@ -373,7 +383,7 @@ module Make(Repr : Json_repr.Repr) = struct
                 match json with
                 | None -> begin
                     match destruct input (Repr.repr (`O [])) with
-                    | exception exn ->
+                    | exception _exn ->
                         Lwt.return { code = 405 ; body = Empty }
                     | input ->
                         Lwt.map
@@ -409,7 +419,7 @@ module Make(Repr : Json_repr.Repr) = struct
         end
 
   let describe_directory
-    : type a p.
+    : type a _p.
       ?recurse:bool -> a directory -> a -> string list -> Description.directory_descr Lwt.t
     = fun ?recurse dir args path ->
       resolve [] dir args path >>= fun (Dir (dir, arg)) ->
@@ -425,9 +435,9 @@ module Make(Repr : Json_repr.Repr) = struct
     : type p rk. (rk, p) rpath -> step list -> step list
     = fun path acc ->
       match path with
-      | Root -> acc
-      | Static (path, name) -> step_of_path path (Static name :: acc)
-      | Dynamic (path, arg) -> step_of_path path (Dynamic arg.descr :: acc)
+      | Resto1.Internal.Root -> acc
+      | Resto1.Internal.Static (path, name) -> step_of_path path (Step.Static name :: acc)
+      | Resto1.Internal.Dynamic (path, arg) -> step_of_path path (Step.Dynamic arg.descr :: acc)
   let step_of_path p = step_of_path p []
 
   let conflict path kind = raise (Conflict (step_of_path path, kind))
@@ -438,17 +448,17 @@ module Make(Repr : Json_repr.Repr) = struct
     = fun path dir ->
       match path with
       | Root -> dir, (fun x -> x)
-      | Static (subpath, name) -> begin
+      | Resto1.Internal.Static (subpath, name) -> begin
           let subdir, rebuild = insert subpath dir in
           let dirmap, service =
             match subdir with
             | Map _ -> failwith "Not implemented"
-            | Static { subdirs = None ; service } ->
+            | StaticD { subdirs = None ; service } ->
                 StringMap.empty, service
-            | Static { subdirs = Some (Suffixes m) ;
+            | StaticD { subdirs = Some (Suffixes m) ;
                        service } ->
                 m, service
-            | Static { subdirs = Some (Arg (arg, _)) } ->
+            | StaticD { subdirs = Some (Arg (arg, _)); service = _ } ->
                 conflict path (CType (arg.descr, [name]))
             | Custom _ -> conflict path CCustom
             | Dynamic _ -> conflict path CBuilder in
@@ -457,17 +467,17 @@ module Make(Repr : Json_repr.Repr) = struct
           let rebuild s =
             let subdirs =
               Some (Suffixes (StringMap.add name s dirmap)) in
-            rebuild (Static { subdirs ; service }) in
+            rebuild (StaticD { subdirs ; service }) in
           dir, rebuild
         end
-      | Dynamic (subpath, arg) -> begin
+      | Resto1.Internal.Dynamic (subpath, arg) -> begin
           let subdir, rebuild = insert subpath dir in
           let dir, service =
             match subdir with
             | Map _ -> failwith "Not implemented"
-            | Static { subdirs = None ; service } ->
+            | StaticD { subdirs = None ; service } ->
                 empty, service
-            | Static { subdirs = Some (Arg (arg', dir)) ;
+            | StaticD { subdirs = Some (Arg (arg', dir)) ;
                        service } -> begin
                 try
                   let Ty.Eq = Ty.eq arg.id arg'.id in
@@ -475,14 +485,14 @@ module Make(Repr : Json_repr.Repr) = struct
                 with Ty.Not_equal ->
                   conflict path (CTypes (arg.descr, arg'.descr))
               end
-            | Static { subdirs = Some (Suffixes m) } ->
+            | StaticD { subdirs = Some (Suffixes m); service = _ } ->
                 conflict path
                   (CType (arg.descr, List.map fst (StringMap.bindings m)))
             | Dynamic _ -> conflict path CBuilder
             | Custom _ -> conflict path CCustom in
           let rebuild s =
             let subdirs = Some (Arg (arg, s)) in
-            rebuild (Static { subdirs ; service }) in
+            rebuild (StaticD { subdirs ; service }) in
           dir, rebuild
         end
 
@@ -500,9 +510,9 @@ module Make(Repr : Json_repr.Repr) = struct
             Some (RegistredService (s.description, s.input, s.output, handler)) in
           match dir with
           | Map _ -> failwith "Not implemented"
-          | Static ({ service = None } as dir) ->
-              insert (Static { dir with service })
-          | Static _ -> conflict path CService
+          | StaticD ({ service = None ; subdirs = _ } as dir) ->
+              insert (StaticD { dir with service })
+          | StaticD _ -> conflict path CService
           | Custom _ -> conflict path CCustom
           | Dynamic _ -> conflict path CBuilder in
       match s.path with
@@ -522,10 +532,10 @@ module Make(Repr : Json_repr.Repr) = struct
           let dir, insert = insert path root in
           match dir with
           | Map _ -> failwith "Not implemented"
-          | Static ({ service = None ; subdirs = None }) ->
+          | StaticD ({ service = None ; subdirs = None }) ->
               insert (Dynamic (descr, builder))
-          | Static ({ service = Some _ }) -> conflict path CService
-          | Static ({ subdirs = Some _ }) -> conflict path CDir
+          | StaticD ({ service = Some _ ; subdirs = _ }) -> conflict path CService
+          | StaticD ({ subdirs = Some _ ; service = _ }) -> conflict path CDir
           | Custom _ -> conflict path CCustom
           | Dynamic _ -> conflict path CBuilder in
       match path with
@@ -549,10 +559,10 @@ module Make(Repr : Json_repr.Repr) = struct
           let dir, insert = insert path root in
           match dir with
           | Map _ -> failwith "Not implemented"
-          | Static ({ service = None ; subdirs = None }) ->
+          | StaticD ({ service = None ; subdirs = None }) ->
               insert (Custom (descr, lookup))
-          | Static ({ service = Some _ }) -> conflict path CService
-          | Static ({ subdirs = Some _ }) -> conflict path CDir
+          | StaticD ({ service = Some _ ; subdirs = _ }) -> conflict path CService
+          | StaticD ({ subdirs = Some _ ; service = _ }) -> conflict path CDir
           | Custom _ -> conflict path CCustom
           | Dynamic _ -> conflict path CBuilder in
       match path with
@@ -598,28 +608,28 @@ module Make(Repr : Json_repr.Repr) = struct
 
   open Internal
 
-  let register0 root s f = register root s Resto1.(curry Z f)
-  let register1 root s f = register root s Resto1.(curry (S Z) f)
-  let register2 root s f = register root s Resto1.(curry (S (S Z)) f)
-  let register3 root s f = register root s Resto1.(curry (S (S (S Z))) f)
-  let register4 root s f = register root s Resto1.(curry (S (S (S (S Z)))) f)
-  let register5 root s f = register root s Resto1.(curry (S (S (S (S (S Z))))) f)
+  let register0 root s f = register root s (curry Z f)
+  let register1 root s f = register root s (curry (S Z) f)
+  let register2 root s f = register root s (curry (S (S Z)) f)
+  let register3 root s f = register root s (curry (S (S (S Z))) f)
+  let register4 root s f = register root s (curry (S (S (S (S Z)))) f)
+  let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f)
 
-  let register_dynamic_directory0 ?descr root s f =
-    register_dynamic_directory ?descr root s Resto1.(curry Z f)
+(*  let register_dynamic_directory0 ?descr root s f =
+    register_dynamic_directory ?descr root s (curry Z f) *)
   let register_dynamic_directory1 ?descr root s f =
-    register_dynamic_directory ?descr root s Resto1.(curry (S Z) f)
+    register_dynamic_directory ?descr root s (curry (S Z) f)
   let register_dynamic_directory2 ?descr root s f =
-    register_dynamic_directory ?descr root s Resto1.(curry (S (S Z)) f)
+    register_dynamic_directory ?descr root s (curry (S (S Z)) f)
   let register_dynamic_directory3 ?descr root s f =
-    register_dynamic_directory ?descr root s Resto1.(curry (S (S (S Z))) f)
+    register_dynamic_directory ?descr root s (curry (S (S (S Z))) f)
 
   let register_custom_lookup1 ?descr root s f =
-    register_custom_lookup ?descr root s Resto1.(curry (S Z) f)
+    register_custom_lookup ?descr root s (curry (S Z) f)
   let register_custom_lookup2 ?descr root s f =
-    register_custom_lookup ?descr root s Resto1.(curry (S (S Z)) f)
+    register_custom_lookup ?descr root s (curry (S (S Z)) f)
   let register_custom_lookup3 ?descr root s f =
-    register_custom_lookup ?descr root s Resto1.(curry (S (S (S Z))) f)
+    register_custom_lookup ?descr root s (curry (S (S (S Z))) f)
 
   end
 
