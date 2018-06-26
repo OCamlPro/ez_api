@@ -10,10 +10,6 @@
 
 
 module StringMap = Map.Make(String)
-let map_option f = function
-  | None -> None
-  | Some x -> Some (f x)
-
 
 module Internal = struct
 
@@ -94,14 +90,14 @@ module Arg = struct
   }
   type 'a arg = 'a Internal.arg
 
-  let eq a b = Ty.eq a.id b.id
+  (*  let eq a b = Ty.eq a.id b.id *)
 
-  let make ?descr ~name ~destruct ~construct () =
+  let make ?descr name destruct construct () =
     let id = Ty.new_id () in
     let descr = { name ; descr } in
-    { descr ; id ; construct ; destruct }
+    { Internal.descr ; id ; construct ; destruct }
 
-  let descr (ty: 'a arg) = ty.descr
+  let descr (ty: 'a arg) = ty.Internal.descr
 
   let descr_encoding =
     let open Json_encoding in
@@ -135,6 +131,9 @@ module Arg = struct
         Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
     make "int64" int64_of_string Int64.to_string ()
 
+  let make ?descr ~name ~destruct ~construct () =
+    make ?descr name destruct construct ()
+
 end
 
 module Path = struct
@@ -160,9 +159,10 @@ module Path = struct
                     (fun (x, y) -> (map x, y)),
                     (fun (x, y) -> (rmap x, y)))
 
+  (*
   let add_context :
     type a p. a Arg.arg -> p context -> (p * a) context =
-    fun arg path ->
+    fun _arg path ->
       match path with
       | Path Root -> Path Root
       | MappedPath (Root, map, rmap) ->
@@ -170,6 +170,7 @@ module Path = struct
                       (fun (x, y) -> (map x, y)),
                       (fun (x, y) -> (rmap x, y)))
       | _ -> failwith "Resto.Path.prefix: cannot prefix non-root path."
+*)
 
   let map map rmap = function
     | Path p -> MappedPath (p, map, rmap)
@@ -193,12 +194,10 @@ module Path = struct
 
   let (/) = add_suffix
   let (/:) = add_arg
-  let ( **/ ) = add_context
+  (*  let ( **/ ) = add_context *)
 
 
 end
-
-open Path
 
 type ('prefix, 'params, 'input, 'output) service =
   ('prefix, 'params, 'input, 'output) Internal.iservice
@@ -215,13 +214,12 @@ module Make(Repr : Json_repr.Repr) = struct
 
   type json = Repr.value
 
-  let rec forge_request_args
-    : type p. (unit, p) path -> p -> string list
+  let forge_request_args
+    : type p. (unit, p) Path.path -> p -> string list
     = fun path args ->
       let rec forge_request_args
-        : type k. (unit, k) rpath -> k -> string list -> string list
+        : type k. (unit, k) Path.rpath -> k -> string list -> string list
         = fun path args acc ->
-          let open Path in
           match path, args with
           | Root, _ ->
               acc
@@ -255,33 +253,39 @@ include Make(Json_repr.Ezjsonm)
 
 module Description = struct
 
-  type service_descr = {
-    description: string option ;
-    input: Json_schema.schema ;
-    output: Json_schema.schema ;
-  }
+  module TYPES = struct
+    type service_descr = {
+      description: string option ;
+      input: Json_schema.schema ;
+      output: Json_schema.schema ;
+    }
+
+    type directory_descr =
+      | Static of static_directory_descr
+      | Dynamic of string option
+
+    and static_directory_descr = {
+      service: service_descr option ;
+      subdirs: static_subdirectories_descr option ;
+    }
+
+    and static_subdirectories_descr =
+      | Suffixes of directory_descr Map.Make(String).t
+      | Arg of Arg.descr * directory_descr
+
+  end
+
+  include TYPES
 
   let service_descr_encoding =
     let open Json_encoding in
     conv
-      (fun {description; input; output} -> (description, input, output))
+      (fun {TYPES.description; input; output} -> (description, input, output))
       (fun (description, input, output) -> {description; input; output})
       (obj3 (opt "description" string)
          (req "input" any_schema)
          (req "output" any_schema))
 
-  type directory_descr =
-    | Static of static_directory_descr
-    | Dynamic of string option
-
-  and static_directory_descr = {
-    service: service_descr option ;
-    subdirs: static_subdirectories_descr option ;
-  }
-
-  and static_subdirectories_descr =
-    | Suffixes of directory_descr Map.Make(String).t
-    | Arg of Arg.descr * directory_descr
 
   let directory_descr_encoding =
     let open Json_encoding in
@@ -310,10 +314,10 @@ module Description = struct
            (opt "subdirs" static_subdirectories_descr_encoding)) in
     union [
       case (obj1 (req "static" static_directory_descr_encoding))
-        (function Static descr -> Some descr | _ -> None)
-        (fun descr -> Static descr) ;
+        (function TYPES.Static descr -> Some descr | _ -> None)
+        (fun descr -> TYPES.Static descr) ;
       case (obj1 (req "dynamic" (option string)))
-        (function Dynamic descr -> Some descr | _ -> None)
+        (function TYPES.Dynamic descr -> Some descr | _ -> None)
         (fun descr -> Dynamic descr) ;
     ]
 
@@ -332,7 +336,7 @@ module Description = struct
   let rec pp_print_directory_descr ppf =
     let open Format in
     function
-    | Static dir ->
+    | TYPES.Static dir ->
         fprintf ppf "@[%a@]" pp_print_static_directory_descr dir
     | Dynamic None ->
         fprintf ppf "<dyntree>"
@@ -372,9 +376,9 @@ module Description = struct
   and pp_print_dispatch_service_descr ppf =
     let open Format in
     function
-    | { description = None} ->
+    | { description = None ; input = _ ; output = _ } ->
         fprintf ppf "<service>"
-    | { description = Some descr} ->
+    | { description = Some descr ; input = _ ; output = _ } ->
         fprintf ppf "<service> : %s" descr
 
 end
