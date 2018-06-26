@@ -297,8 +297,7 @@ end = struct
 
     let logout req () =
       match get_request_session req with
-      | None ->
-         request_auth req
+      | None -> EzAPIServer.return_error 403
       | Some { session_login=login; session_cookie = cookie; _ } ->
          remove_session ~login ~cookie;
          request_auth req

@@ -302,12 +302,13 @@ module MakeClient(S : sig end) = struct
                       (string_of_test r);
                     Session.logout
                       api
+                      ~token:u.auth_token
                       (function
                        | Error _ ->
                           Printf.eprintf "Error in logout\n%!";
                           exit 2
-                       | Ok () ->
-                          Printf.eprintf "logout OK\n%!";
+                       | Ok bool ->
+                          Printf.eprintf "logout OK %b\n%!" bool;
                           end_request ()
                   ))
       ))

@@ -25,7 +25,8 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
     password:string -> (* password *)
     ((auth, exn) result -> unit) -> unit
 
-  val logout : EzAPI.base_url -> ((unit, exn) result -> unit) -> unit
+  val logout : EzAPI.base_url -> token:string ->
+    ((bool, exn) result -> unit) -> unit
 
   (* Tell the network layer that we think that the session has ended
      (a request probably returned an error status for missing auth).

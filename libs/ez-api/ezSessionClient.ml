@@ -27,7 +27,9 @@ module Make(S: SessionArg) : sig
     password:string -> (* password *)
     ((auth, exn) result -> unit) -> unit
 
-  val logout : EzAPI.base_url -> ((unit, exn) result -> unit) -> unit
+  val logout :
+    EzAPI.base_url ->
+    token:string -> ((bool, exn) result -> unit) -> unit
 
   (* Tell the network layer that we think that the session has ended
      (a request probably returned an error status for missing auth).
@@ -122,8 +124,9 @@ module Make(S: SessionArg) : sig
                    if u.auth_login <> u_login then
                      logout
                        api
+                       ~token:u.auth_token
                        (function
-                          Ok () ->
+                          Ok _ ->
                           login_rec (ntries-1) api u_login u_password f
                         | Error _ as err ->
                            f err )
@@ -131,8 +134,10 @@ module Make(S: SessionArg) : sig
                      f (Ok u))
     | User u ->
        if u.auth_login <> u_login then
-         logout api (function
-                     | Ok () ->
+         logout api
+           ~token:u.auth_token
+           (function
+                     | Ok _ ->
                         login_rec (ntries-1) api u_login u_password f
                      | Error _ as err ->
                         f err
@@ -170,23 +175,24 @@ module Make(S: SessionArg) : sig
   and login api ~login:u_login ~password:u_password f =
     login_rec 4 api u_login u_password f
 
-  and logout api f =
+  and logout api ~token f =
     remove_cookie ();
     match !state with
     | Disconnected
-      | Connected _
-      -> (try f (Ok ()) with _ -> ())
+    | Connected _
+      -> (try f (Ok false) with _ -> ())
     | User u ->
        EzRequest.ANY.get0
          api
          Service.logout "logout"
          ~error:(fun _n -> f (Error (Failure "Error")))
          ~params:[]
+         ~headers:(auth_headers ~token)
          (function
           | AuthNeeded (challenge_id, challenge) ->
              remove_cookie u.auth_token;
              state := Connected (challenge_id, challenge);
-             f (Ok ())
+             f (Ok true)
           | AuthOK (auth_login, auth_token, auth_user) ->
              let u = { auth_login; auth_token; auth_user } in
              state := User u;
