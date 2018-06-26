@@ -10,7 +10,7 @@
 AC_INIT(ez-api,0.1)
 PROJECTURE_ARGS=$*
 AC_COPYRIGHT(Copyright 2018-2018 OCamlPro SAS)
-OCAML_MINIMAL_VERSION=4.02.3
+OCAML_MINIMAL_VERSION=4.03.0
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_ARG_ENABLE(version-check,
@@ -174,10 +174,6 @@ AC_CHECK_OCAML_PKG(ezjsonm)
 if test "$OCAML_PKG_ezjsonm" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'ezjsonm'.])
 fi
-AC_CHECK_OCAML_PKG(sodium)
-if test "$OCAML_PKG_sodium" = "no"; then
-   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'sodium'.])
-fi
 AC_CHECK_OCAML_PKG(ocplib-endian)
 if test "$OCAML_PKG_ocplib_endian" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'ocplib-endian'.])
@@ -227,9 +223,6 @@ if test "$OCAML_PKG_base64" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
 if test "$OCAML_PKG_ezjsonm" = "no"; then
-   AC_MSG_FAILURE([Missing dependencies (see warnings above).])
-fi
-if test "$OCAML_PKG_sodium" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
 if test "$OCAML_PKG_ocplib_endian" = "no"; then

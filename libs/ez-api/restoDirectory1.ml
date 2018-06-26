@@ -269,15 +269,15 @@ module Make(Repr : Json_repr.Repr) = struct
       | Dynamic (descr, builder) -> begin
           match arg with
           | None ->
-              Lwt.return (Dynamic descr : Description.directory_descr)
+              Lwt.return (Description.Dynamic descr)
           | Some arg ->
               builder arg >>= fun dir -> describe_directory ~recurse dir
         end
       | Custom (descr, lookup) ->
-          Lwt.return (Dynamic descr : Description.directory_descr)
+          Lwt.return (Description.Dynamic descr)
       | Static dir ->
           describe_static_directory recurse arg dir >>= fun dir ->
-          Lwt.return (Static dir : Description.directory_descr)
+          Lwt.return (Description.Static dir)
 
   and describe_static_directory
     : type a p.
@@ -295,7 +295,7 @@ module Make(Repr : Json_repr.Repr) = struct
               Lwt.return (Some dirs)
         else Lwt.return_none
       end >>= fun subdirs ->
-      Lwt.return ({ service ; subdirs } : Description.static_directory_descr)
+      Lwt.return ({ Description.service ; Description.subdirs })
 
   and describe_static_subdirectories
     : type a p.
@@ -309,11 +309,10 @@ module Make(Repr : Json_repr.Repr) = struct
               describe_directory ~recurse:true ?arg dir >>= fun dir ->
               Lwt.return (StringMap.add key dir map))
             map (Lwt.return StringMap.empty) >>= fun map ->
-          Lwt.return (Suffixes map : Description.static_subdirectories_descr)
+          Lwt.return (Description.Suffixes map)
       | Arg (arg, dir) ->
           describe_directory ~recurse:true dir >>= fun dir ->
-          Lwt.return (Arg (arg.descr, dir)
-                      : Description.static_subdirectories_descr)
+          Lwt.return (Description.Arg (arg.descr, dir))
 
   and describe_service
     : type a p.
@@ -321,7 +320,7 @@ module Make(Repr : Json_repr.Repr) = struct
     = fun service ->
       match service with
       | RegistredService (description,input,output,_) ->
-          { description ;
+          { Description.description ;
             input = Json_encoding.schema input ;
             output = Json_encoding.schema output }
 
@@ -570,7 +569,7 @@ module Make(Repr : Json_repr.Repr) = struct
       let { description ; path ; output ; input } =
         Resto1.Internal.to_service service in
       let descr : Description.service_descr = {
-        description ;
+        Description.description ;
         input = Json_encoding.schema input ;
         output = Json_encoding.schema output ;
       } in

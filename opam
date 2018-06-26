@@ -28,7 +28,7 @@ install: [
 ]
 remove: [
 ]
-available: [ocaml-version >= "4.02.3"]
+available: [ocaml-version >= "4.03.0"]
 depends: [
      "base64"
      "camlp4"
@@ -47,5 +47,4 @@ depends: [
      "ocurl"
      "omd"
      "re"
-     "sodium"
 ]
