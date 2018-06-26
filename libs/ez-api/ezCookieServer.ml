@@ -12,18 +12,18 @@ open StringCompat
     port            =  "$Port" [ "=" <"> value <"> ]
   *)
 
-let cookie_re = Re_str.regexp "[;,][ \t]*"
-let equals_re = Re_str.regexp_string "="
+let cookie_re = Re.Str.regexp "[;,][ \t]*"
+let equals_re = Re.Str.regexp_string "="
 
 let get ( req : EzAPI.request ) =
   List.fold_left
     (fun acc header ->
-      let comps = Re_str.split_delim cookie_re header in
+      let comps = Re.Str.split_delim cookie_re header in
       (* We don't handle $Path, $Domain, $Port, $Version (or $anything
              $else) *)
       let cookies = List.filter (fun s -> s.[0] != '$') comps in
       let split_pair acc nvp =
-        match Re_str.bounded_split equals_re nvp 2 with
+        match Re.Str.bounded_split equals_re nvp 2 with
         | [] -> StringMap.add "" "" acc
         | n :: [] -> StringMap.add n "" acc
         | n :: v :: _ -> StringMap.add n v acc

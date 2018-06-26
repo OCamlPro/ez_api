@@ -18,6 +18,7 @@ OCaml.library("ez-api", ocaml+
       "ocplib-json-typed";
       "ezjsonm";
       "ocplib-compat";
+      "ocplib-lang";
     ];
   });
 

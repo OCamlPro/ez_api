@@ -71,11 +71,13 @@ let encode_args l =
                                         (String.concat ","
                                                        (List.map encode arg))) l)
 
+let split_on_char c s = OcpString.split s c
+
 let decode_args s =
-  let args = String.split_on_char '&' s in
+  let args = split_on_char '&' s in
   List.map (fun s ->
       let s, v = cut_at s '=' in
-      let v = String.split_on_char ',' v in
+      let v = split_on_char ',' v in
       let s = decode s in
       let v = List.map decode v in
       s, v

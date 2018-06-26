@@ -143,7 +143,7 @@ let reply_none code = Lwt.return (code, ReplyNone)
 let reply_json code json = Lwt.return (code, ReplyJson json)
 let reply_raw_json code json = Lwt.return (code, ReplyString ("application/javascript",json))
 let reply_answer
-      (RestoDirectory1.Answer.({ code; body })) =
+      { RestoDirectory1.Answer.code; RestoDirectory1.Answer.body } =
   match body with
   | RestoDirectory1.Answer.Empty ->
      reply_none code
@@ -152,8 +152,10 @@ let reply_answer
   | RestoDirectory1.Answer.Stream _ ->
      reply_none 500
 
+let split_on_char c s = OcpString.split s c
+
 let rev_extensions filename =
-  List.rev (String.split_on_char '.'
+  List.rev (split_on_char '.'
                                  (String.lowercase
                                     (Filename.basename filename)))
 
@@ -235,7 +237,7 @@ let rec reply_file ?default root path =
           raise Not_found
        | Some file ->
           reply_file root
-                     (String.split_on_char '/' file)
+                     (split_on_char '/' file)
 
 (* Resolve handler matching request and run it *)
 let dispatch s (io, _conn) req body =
@@ -268,7 +270,7 @@ let dispatch s (io, _conn) req body =
   in
   let path =
     local_path
-    |> String.split_on_char '/'
+    |> split_on_char '/'
     |> list_trim
   in
   let req_params = req |> Request.uri |> Uri.query in
