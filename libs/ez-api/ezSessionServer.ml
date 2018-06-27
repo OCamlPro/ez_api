@@ -165,6 +165,12 @@ module Make(S: sig
 
   val get_request_session : EzAPI.request -> session option
 
+  val register :
+           ('arg, 'b, 'input, 'd) EzAPI.service ->
+           ('arg -> 'input -> 'd EzAPIServer.answer Lwt.t) ->
+           EzAPI.request EzAPIServer.directory ->
+           EzAPI.request EzAPIServer.directory
+
 end = struct
 
   let find_user = S.find_user
@@ -303,10 +309,20 @@ end = struct
          request_auth req
   end
 
+  let register service handler =
+    let options_headers =
+      match S.token_kind with
+      | `Cookie _name -> []
+      | `CSRF header ->
+          ["access-control-allow-headers", header]
+    in
+    EzAPIServer.register service handler
+      ~options_headers
+
   let register_handlers dir =
     dir
     |> EzAPIServer.register Service.connect Handler.connect
     |> EzAPIServer.register Service.login Handler.login
-    |> EzAPIServer.register Service.logout Handler.logout
+    |> register Service.logout Handler.logout
 
 end

@@ -25,6 +25,13 @@ module Make(S: sig
    to collect the user identity and session. *)
   val get_request_session : EzAPI.request -> session option
 
+  (* Use this one to be sure that OPTIONS requests are correctly replied to *)
+  val register :
+    ('arg, 'b, 'input, 'd) EzAPI.service ->
+    ('arg -> 'input -> 'd EzAPIServer.answer Lwt.t) ->
+    EzAPI.request EzAPIServer.directory ->
+    EzAPI.request EzAPIServer.directory
+
 end
 
 

@@ -2,10 +2,18 @@ open StringCompat
 open Lwt
 open EzAPI.TYPES
 
-type 'a directory = 'a RestoDirectory1.directory
+type 'a directory = {
+  meth_GET :'a RestoDirectory1.directory;
+  meth_OPTIONS :'a RestoDirectory1.directory;
+}
+
 type 'output answer = 'output RestoDirectory1.Answer.answer
 
-let empty = RestoDirectory1.empty
+let empty = {
+  meth_GET = RestoDirectory1.empty;
+  meth_OPTIONS = RestoDirectory1.empty;
+}
+
 let return x = RestoDirectory1.Answer.return x
 
 let verbose =
@@ -84,9 +92,10 @@ let register_ip ip =
       } in
     Hashtbl.add req_ips ip s
 
+exception EzReturnOPTIONS of (string * string) list
 
-let register service handler dir =
-  let handler a b =
+let register ?(options_headers=[]) service handler dir =
+  let handler_GET a b =
     try
       handler a b
     with
@@ -97,7 +106,7 @@ let register service handler dir =
       Lwt.fail EzAPI.ResultNotfound
   in
 
-  let handler a b =
+  let handler_GET a b =
     let t0 = req_time () in
     let add_timing_wrap b =
       let t1 = Unix.gettimeofday () in
@@ -105,7 +114,7 @@ let register service handler dir =
     in
     Lwt.catch
       (function () ->
-                handler a b >>=
+                handler_GET a b >>=
                 function res ->
                   add_timing_wrap true;
                   Lwt.return res)
@@ -117,7 +126,17 @@ let register service handler dir =
          add_timing_wrap false;
          Lwt.fail exn)
   in
-  RestoDirectory1.register dir (EzAPI.register service) handler
+  let handler_OPTIONS _a _b =
+    Lwt.fail (EzReturnOPTIONS options_headers)
+  in
+  let service_GET, service_OPTIONS = EzAPI.register service in
+  {
+      meth_GET =
+        RestoDirectory1.register dir.meth_GET service_GET handler_GET;
+      meth_OPTIONS =
+        RestoDirectory1.register dir.meth_OPTIONS service_OPTIONS
+          handler_OPTIONS;
+  }
 
 let json_root = function
   | `O ctns -> `O ctns
@@ -131,7 +150,7 @@ type reply =
   | ReplyString of (* content-type *) string * (* content *) string
 
 type server_kind =
-  | API of EzAPI.request RestoDirectory1.directory
+  | API of EzAPI.request directory
   | Root of string * string option
 
 type server = {
@@ -222,21 +241,27 @@ module FileString = struct
       raise e
 end
 
-let rec reply_file ?default root path =
+let rec reply_file ?(meth=`GET) ?default root path =
   let path = normalize_path path in
   let file = Filename.concat root (String.concat "/" path) in
   try
     let content_type = content_type_of_file file in
-    let content = FileString.read_file file in
-    Printf.eprintf "Returning file %S of len %d\n%!" file
-                   (String.length content);
-    Lwt.return (200, ReplyString (content_type, content))
+    match meth with
+    | `OPTIONS ->
+      if Sys.file_exists file then
+        Lwt.return (200, ReplyNone)
+      else raise Not_found
+    | _ ->
+      let content = FileString.read_file file in
+      Printf.eprintf "Returning file %S of len %d\n%!" file
+        (String.length content);
+      Lwt.return (200, ReplyString (content_type, content))
   with _exn ->
        match default with
        | None ->
           raise Not_found
        | Some file ->
-          reply_file root
+          reply_file ~meth root
                      (split_on_char '/' file)
 
 (* Resolve handler matching request and run it *)
@@ -310,6 +335,7 @@ let dispatch s (io, _conn) req body =
             Printf.eprintf "  %s: %s\n%!" s v;
           ) v
       ) headers;
+  let meth = Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
       if path = ["debug"] then
@@ -320,8 +346,12 @@ let dispatch s (io, _conn) req body =
                       |> List.map
                            (fun s -> `String s)))
       else
-        match s.server_kind with
-        | API dir ->
+        match s.server_kind, meth with
+        | API dir, `OPTIONS ->
+          RestoDirectory1.lookup dir.meth_OPTIONS request path
+          (* Note: this path always fails with EzReturnOPTIONS *)
+          >>= fun _handler -> reply_none 200
+        | API dir, _ ->
            let content =
              match request.req_body with
              | BodyString (Some "application/x-www-form-urlencoded", content) ->
@@ -334,12 +364,16 @@ let dispatch s (io, _conn) req body =
                   Some (Ezjsonm.from_string content)
                 with _ -> None
            in
-           RestoDirectory1.lookup dir request path >>= fun handler ->
+           RestoDirectory1.lookup dir.meth_GET request path >>= fun handler ->
            handler content
            >>= reply_answer
-        | Root (root, default) -> reply_file root ?default path
+        | Root (root, default), meth ->
+          reply_file ~meth root ?default path
     )
     (function
+      | EzReturnOPTIONS headers ->
+        request.rep_headers <- headers @ request.rep_headers;
+        reply_none 200
      | EzRawReturn s -> reply_raw_json 200 s
      | EzRawError code -> reply_none code
      | Not_found ->
