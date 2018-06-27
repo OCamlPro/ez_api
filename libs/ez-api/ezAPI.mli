@@ -157,8 +157,6 @@ val service_to_readable : service_doc ->
    (string * string * string * string) list)
 
 val services : unit -> string array
-val is_post : _ service -> bool
-val service_doc : _ service -> service_doc
 
 exception ResultNotfound
 

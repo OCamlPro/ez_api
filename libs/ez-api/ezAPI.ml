@@ -76,7 +76,6 @@ type service_doc = {
     doc_name : string option;
     doc_path : path;
     doc_params : param list;
-    doc_post : bool;
     mutable doc_registered : bool;
     mutable doc_sample : (base_url -> url);
   }
@@ -244,7 +243,6 @@ let rec string_of_path p =
 
 let post_service ?(section=default_section)
     ?name
-    ~post
     ~input
     ~output
     ?(params = []) (doc_path,path1,path2,sample) =
@@ -255,7 +253,6 @@ let post_service ?(section=default_section)
       doc_params = params;
       doc_registered = false;
       doc_name = name;
-      doc_post = post;
       doc_sample = (fun _ -> assert false);
       doc_id;
     } in
@@ -277,16 +274,9 @@ let post_service ?(section=default_section)
   service
 
 let service ?section ?name ~output ?params descr =
-  post_service ?section ?name ~post:false
+  post_service ?section ?name
     ~input:Json_encoding.empty
       ~output ?params descr
-
-let post_service ?section ?name ~input ~output ?params descr =
-  post_service ?section ?name
-    ~post:true
-    ~input ~output ?params descr
-
-let is_post s = s.doc.doc_post
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -435,4 +425,3 @@ let services () =
 
 let service_input s = s.enc_input
 let service_output s = s.enc_output
-let service_doc s = s.doc
