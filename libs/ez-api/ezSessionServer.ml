@@ -321,7 +321,7 @@ end = struct
 
   let register_handlers dir =
     dir
-    |> EzAPIServer.register Service.connect Handler.connect
+    |> register Service.connect Handler.connect
     |> EzAPIServer.register Service.login Handler.login
     |> register Service.logout Handler.logout
 

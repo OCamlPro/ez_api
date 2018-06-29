@@ -349,8 +349,9 @@ let dispatch s (io, _conn) req body =
         match s.server_kind, meth with
         | API dir, `OPTIONS ->
           RestoDirectory1.lookup dir.meth_OPTIONS request path
+          >>= fun handler -> handler None >>= fun answer ->
           (* Note: this path always fails with EzReturnOPTIONS *)
-          >>= fun _handler -> reply_none 200
+          reply_none 200
         | API dir, _ ->
            let content =
              match request.req_body with
@@ -376,9 +377,7 @@ let dispatch s (io, _conn) req body =
         reply_none 200
      | EzRawReturn s -> reply_raw_json 200 s
      | EzRawError code -> reply_none code
-     | Not_found ->
-        Printf.eprintf "reply_none 404\n%!";
-        reply_none 404
+     | Not_found -> reply_none 404
      | exn ->
         Printf.eprintf "In %s: exception %s\n%!"
                        local_path (Printexc.to_string exn);
