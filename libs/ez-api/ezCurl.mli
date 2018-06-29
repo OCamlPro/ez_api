@@ -1,6 +1,4 @@
 
-val init : unit -> unit
-
 (* Use EzRequest for queries *)
 
 (* Contrarily to EzXhr, EzCurl creates synchronous requests, i.e.

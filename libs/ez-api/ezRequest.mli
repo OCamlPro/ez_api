@@ -10,6 +10,8 @@ type error_handler = (int -> unit)
 use them from there. *)
 module type S = sig
 
+  val init : unit -> unit
+
 val get0 :
   EzAPI.base_url ->                 (* API url *)
   'output EzAPI.service0 ->         (* GET service *)
@@ -87,20 +89,25 @@ type rep =
   | CodeOk of string
   | CodeError of int
 
-val xhr_get :
-  (string -> string ->
-   ?headers:(string * string) list ->
-   (rep -> unit) -> unit)
-    ref
-val xhr_post :
-  (?content_type:string ->
-   ?content:string ->
-   string -> string ->
-   ?headers:(string * string) list ->
-   (rep -> unit) -> unit)
-    ref
+
 val log : (string -> unit) ref
 
 (* Engine independent implementation. Beware: if you use these calls,
 you must initialize an engine independantly.*)
 module ANY : S
+
+module Make(S : sig
+
+    val xhr_get :
+      string -> string ->
+      ?headers:(string * string) list ->
+      (rep -> unit) -> unit
+
+    val xhr_post :
+      ?content_type:string ->
+      ?content:string ->
+      string -> string ->
+      ?headers:(string * string) list ->
+      (rep -> unit) -> unit
+
+  end) : S
