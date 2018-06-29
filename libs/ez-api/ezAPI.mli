@@ -115,7 +115,8 @@ val post_service :
 
 val register :
   ('a, 'b, 'input, 'output) service ->
-    (request, 'a, 'input, 'output) Resto.service
+    (request, 'a, 'input, 'output) Resto.service *
+    (request, 'a, unit, 'output) Resto.service
 
 val all_services_registered : unit -> bool
 

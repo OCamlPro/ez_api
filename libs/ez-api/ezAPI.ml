@@ -89,6 +89,7 @@ type section = {
 type ('params, 'params2, 'input, 'output) service
   = {
     s : (request, 'params, 'input, 'output) Resto.service;
+    s_OPTIONS : (request, 'params, unit, 'output) Resto.service;
     s_internal : (unit, 'params2, unit, 'output) Resto.service;
     params : param list;
     doc : service_doc;
@@ -241,10 +242,10 @@ let rec string_of_path p =
      Printf.sprintf "%s/<%s>" (string_of_path p) arg.Resto.Arg.name
 
 let post_service ?(section=default_section)
-                 ?name
-                 ~input
-                 ~output
-                 ?(params = []) (doc_path,path1,path2,sample) =
+    ?name
+    ~input
+    ~output
+    ?(params = []) (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   incr nservices;
   let doc = {
@@ -259,6 +260,7 @@ let post_service ?(section=default_section)
   services := doc :: !services;
   let service = {
       s = Resto.service ~input ~output path1;
+      s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output path1;
       s_internal = Resto.service ~input:Json_encoding.empty ~output path2;
       params;
       doc;
@@ -273,8 +275,8 @@ let post_service ?(section=default_section)
 
 let service ?section ?name ~output ?params descr =
   post_service ?section ?name
-               ~input:Json_encoding.empty
-               ~output ?params descr
+    ~input:Json_encoding.empty
+      ~output ?params descr
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -378,7 +380,7 @@ let md_of_services ?section ?base_url list =
 
 let register service =
   service.doc.doc_registered <- true;
-  service.s
+  service.s, service.s_OPTIONS
 
 let all_services_registered () =
   let b = Buffer.create 1000 in

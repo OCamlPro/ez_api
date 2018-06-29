@@ -8,10 +8,11 @@ val return : 'a -> 'a answer Lwt.t
 exception EzRawReturn of string
 
 val register :
-           ('a, 'b, 'input, 'output) EzAPI.service ->
-           ('a -> 'input -> 'output answer Lwt.t) ->
-           EzAPI.request directory ->
-           EzAPI.request directory
+  ?options_headers:(string * string) list ->
+  ('a, 'b, 'input, 'output) EzAPI.service ->
+  ('a -> 'input -> 'output answer Lwt.t) ->
+  EzAPI.request directory ->
+  EzAPI.request directory
 
 
 
