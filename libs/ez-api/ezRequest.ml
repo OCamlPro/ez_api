@@ -4,6 +4,8 @@ type error_handler = (int -> unit)
 
 module type S = sig
 
+val init : unit -> unit
+
 val get0 :
   EzAPI.base_url ->                 (* API url *)
   'output EzAPI.service0 ->         (* GET service *)
@@ -78,40 +80,9 @@ type rep =
   CodeOk of string
 | CodeError of int
 
-let xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1)))
-let xhr_post = ref (fun ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
-                  f (CodeError (-1)))
-
 let log = ref prerr_endline
 
 let request_reply_hook = ref (fun () -> ())
-
-(* print warnings generated when building the URL before
-   sending the request *)
-let internal_get msg (URL url) ?headers ?error f =
-  EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-  !xhr_get msg url ?headers
-   (fun code ->
-     !request_reply_hook ();
-     match code with
-   | CodeOk res -> f res
-   | CodeError n ->
-      match error with
-      | None -> ()
-      | Some f -> f n)
-
-let internal_post ?content_type ?content
-         msg (URL url) ?headers ?error f =
-  EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-  !xhr_post ?content_type ?content ?headers msg url
-   (fun code ->
-     !request_reply_hook ();
-     match code with
-     | CodeOk res -> f res
-     | CodeError n ->
-        match error with
-        | None -> ()
-        | Some f -> f n)
 
 let before_xhr_hook = ref (fun () -> ())
 
@@ -124,7 +95,61 @@ let decode_result ?error encoding f res =
      | Some error ->
         error (-2)
 
-module ANY : S = struct
+
+let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1)))
+let any_xhr_post = ref (fun ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
+                  f (CodeError (-1)))
+
+module Make(S : sig
+
+    val xhr_get :
+      string -> string ->
+      ?headers:(string * string) list ->
+      (rep -> unit) -> unit
+
+    val xhr_post :
+      ?content_type:string ->
+       ?content:string ->
+      string -> string ->
+      ?headers:(string * string) list ->
+      (rep -> unit) -> unit
+
+    end) = struct
+
+  let init () =
+    any_xhr_get := S.xhr_get;
+    any_xhr_post := S.xhr_post;
+    ()
+
+  let () = init ()
+
+  (* print warnings generated when building the URL before
+   sending the request *)
+  let internal_get msg (URL url) ?headers ?error f =
+    EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
+    S.xhr_get msg url ?headers
+      (fun code ->
+         !request_reply_hook ();
+         match code with
+         | CodeOk res -> f res
+         | CodeError n ->
+           match error with
+           | None -> ()
+           | Some f -> f n)
+
+  let internal_post ?content_type ?content
+      msg (URL url) ?headers ?error f =
+    EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
+    S.xhr_post ?content_type ?content ?headers msg url
+      (fun code ->
+         !request_reply_hook ();
+         match code with
+         | CodeOk res -> f res
+         | CodeError n ->
+           match error with
+           | None -> ()
+           | Some f -> f n)
+
   let add_hook f =
     let old_hook = !before_xhr_hook in
     before_xhr_hook := (fun () -> old_hook (); f ())
@@ -211,3 +236,21 @@ module ANY : S = struct
   let post = internal_post
 
 end
+
+module ANY : S = Make(struct
+    let xhr_get msg url ?headers f =
+      !any_xhr_get msg url ?headers f
+    let xhr_post ?content_type ?content msg url ?headers f =
+      !any_xhr_post ?content_type ?content msg url ?headers f
+    end)
+
+module Default = Make(struct
+
+    let xhr_get _msg _url ?headers:_ f = f (CodeError (-1))
+    let xhr_post ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
+      =
+      f (CodeError (-1))
+
+    end)
+
+let () = Default.init ()

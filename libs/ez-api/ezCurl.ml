@@ -1,5 +1,7 @@
 open EzRequest
 
+include EzRequest.Make(struct
+
 let writer_callback a d =
   Buffer.add_string a d;
   String.length d
@@ -37,11 +39,11 @@ let make prepare url ~headers f =
   else
     try f (CodeError rc) with _ -> ()
 
-let get _msg url ?(headers=[]) f =
+let xhr_get _msg url ?(headers=[]) f =
   make ~headers (fun c ->
       Curl.set_post c false) url f
 
-let post ?(content_type = "application/json") ?(content="{}")
+let xhr_post ?(content_type = "application/json") ?(content="{}")
          _msg url ?(headers=[]) f =
   let headers = ("Content-Type", content_type) :: headers in
   make ~headers (fun c ->
@@ -50,11 +52,4 @@ let post ?(content_type = "application/json") ?(content="{}")
       Curl.set_postfieldsize c (String.length content);
     ) url f
 
-let init () =
-  EzRequest.xhr_get := get;
-  EzRequest.xhr_post := post;
-  ()
-
-let () = init ()
-
-include EzRequest.ANY
+end)

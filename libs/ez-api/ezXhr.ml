@@ -1,6 +1,8 @@
 open EzRequest
 
-let get msg url ?(headers=[]) f =
+include Make(struct
+
+let xhr_get msg url ?(headers=[]) f =
   if msg <> "" then
     Js_utils.log "[>%s GET %s]" msg url;
   let xhr = XmlHttpRequest.create () in
@@ -22,7 +24,7 @@ let get msg url ?(headers=[]) f =
       ) ;
   xhr##send (Js.null)
 
-let post ?(content_type="application/json") ?(content="{}") msg url
+let xhr_post ?(content_type="application/json") ?(content="{}") msg url
          ?(headers=[]) f =
   if msg <> "" then
     Js_utils.log "[>%s POST %s]" msg url;
@@ -46,17 +48,12 @@ let post ?(content_type="application/json") ?(content="{}") msg url
             f (CodeError status)
       ) ;
   xhr##send (Js.some @@ Js.string content)
+  end)
 
 (* Use our own version of Ezjsonm.from_string to avoid errors *)
 let init () =
   EzEncodingJS.init ();
   EzDebugJS.init ();
-  EzRequest.xhr_get := get;
-  EzRequest.xhr_post := post;
+  init ();
   EzRequest.log := (fun s -> Js_utils.log "%s" s);
   ()
-
-let () =
-  init ()
-
-include EzRequest.ANY
