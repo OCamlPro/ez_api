@@ -37,7 +37,7 @@ let make prepare url ~headers f =
   if rc = 200 then
     try f (CodeOk data) with _ -> ()
   else
-    try f (CodeError rc) with _ -> ()
+    try f (CodeError (rc, Some data)) with _ -> ()
 
 let xhr_get _msg url ?(headers=[]) f =
   make ~headers (fun c ->
