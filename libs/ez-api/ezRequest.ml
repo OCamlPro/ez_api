@@ -1,6 +1,6 @@
 open EzAPI.TYPES
 
-type error_handler = (int -> unit)
+type error_handler = (int -> string option -> unit)
 
 module type S = sig
 
@@ -78,7 +78,7 @@ end
 
 type rep =
   CodeOk of string
-| CodeError of int
+| CodeError of int * string option
 
 let log = ref prerr_endline
 
@@ -93,12 +93,12 @@ let decode_result ?error encoding f res =
      match error with
      | None -> ()
      | Some error ->
-        error (-2)
+        error (-2) (Some res)
 
 
-let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1)))
+let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1,None)))
 let any_xhr_post = ref (fun ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
-                  f (CodeError (-1)))
+                  f (CodeError (-1,None)))
 
 module Make(S : sig
 
@@ -132,10 +132,10 @@ module Make(S : sig
          !request_reply_hook ();
          match code with
          | CodeOk res -> f res
-         | CodeError n ->
+         | CodeError (n, body) ->
            match error with
            | None -> ()
-           | Some f -> f n)
+           | Some f -> f n body)
 
   let internal_post ?content_type ?content
       msg (URL url) ?headers ?error f =
@@ -145,10 +145,10 @@ module Make(S : sig
          !request_reply_hook ();
          match code with
          | CodeOk res -> f res
-         | CodeError n ->
+         | CodeError (n, body) ->
            match error with
            | None -> ()
-           | Some f -> f n)
+           | Some f -> f n body)
 
   let add_hook f =
     let old_hook = !before_xhr_hook in
@@ -246,10 +246,10 @@ module ANY : S = Make(struct
 
 module Default = Make(struct
 
-    let xhr_get _msg _url ?headers:_ f = f (CodeError (-1))
+    let xhr_get _msg _url ?headers:_ f = f (CodeError (-1,None))
     let xhr_post ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
       =
-      f (CodeError (-1))
+      f (CodeError (-1,None))
 
     end)
 

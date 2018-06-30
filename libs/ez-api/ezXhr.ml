@@ -20,7 +20,7 @@ let xhr_get msg url ?(headers=[]) f =
           if status = 200 then
             f (CodeOk (Js.to_string xhr##responseText))
           else
-            f (CodeError status)
+            f (CodeError (status,Js.to_string xhr##responseText))
       ) ;
   xhr##send (Js.null)
 
@@ -45,7 +45,7 @@ let xhr_post ?(content_type="application/json") ?(content="{}") msg url
           if status = 200 then
             f (CodeOk (Js.to_string xhr##responseText))
           else
-            f (CodeError status)
+            f (CodeError (status,Js.to_string xhr##responseText))
       ) ;
   xhr##send (Js.some @@ Js.string content)
   end)

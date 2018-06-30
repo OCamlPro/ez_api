@@ -4,7 +4,7 @@
 
 (* If the code is > 0, it is an HTTP reply code. Otherwise, it is an
   internal error (-1 connection, -2 decoding) *)
-type error_handler = (int -> unit)
+type error_handler = (int -> string option -> unit)
 
 (* This interface is exported by all engines, so that you can directly
 use them from there. *)
@@ -87,7 +87,7 @@ val request_reply_hook : (unit -> unit) ref
 
 type rep =
   | CodeOk of string
-  | CodeError of int
+  | CodeError of int * string option
 
 
 val log : (string -> unit) ref

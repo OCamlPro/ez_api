@@ -9,13 +9,13 @@ include EzRequest.Make(struct
         Cohttp_lwt_unix.Client.get ~headers
           (Uri.of_string url) >>= fun (resp, body) ->
         let code = resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         if code = 200 then begin
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          f (CodeOk body); Lwt.return_unit
+          f (CodeOk body);
         end else begin
-          f (CodeError code);
-          Lwt.return_unit
-        end
+          f (CodeError (code, Some body));
+        end;
+        Lwt.return_unit
       in
       Lwt.async r
 
@@ -30,13 +30,13 @@ include EzRequest.Make(struct
         Cohttp_lwt_unix.Client.post ~body ~headers
           (Uri.of_string url) >>= fun (resp, body) ->
         let code = resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         if code = 200 then begin
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          f (CodeOk body); Lwt.return_unit
+          f (CodeOk body);
         end else begin
-          f (CodeError code);
-          Lwt.return_unit
-        end
+          f (CodeError (code, Some body));
+        end;
+        Lwt.return_unit
       in
       Lwt.async r
 

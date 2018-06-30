@@ -93,7 +93,7 @@ module Make(S: SessionArg) : sig
          Service.connect "connect"
          ~post:true
          ?headers
-         ~error:(fun _n -> f (Error (Failure "Error connect")))
+         ~error:(fun _n _ -> f (Error (Failure "Error connect")))
          ~params:[]
          (function
           | AuthNeeded (challenge_id, challenge) ->
@@ -154,7 +154,7 @@ module Make(S: SessionArg) : sig
        EzRequest.ANY.post0
          api
          Service.login "login"
-         ~error:(fun _n -> f (Error (Failure "Error login")))
+         ~error:(fun _n _ -> f (Error (Failure "Error login")))
          ~params:[]
          ~input: {
            login_user = u_login;
@@ -185,7 +185,7 @@ module Make(S: SessionArg) : sig
        EzRequest.ANY.get0
          api
          Service.logout "logout"
-         ~error:(fun _n -> f (Error (Failure "Error")))
+         ~error:(fun _n _data -> f (Error (Failure "Error")))
          ~params:[]
          ~headers:(auth_headers ~token)
          (function
