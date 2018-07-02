@@ -349,7 +349,7 @@ let dispatch s (io, _conn) req body =
         match s.server_kind, meth with
         | API dir, `OPTIONS ->
           RestoDirectory1.lookup dir.meth_OPTIONS request path
-          >>= fun handler -> handler None >>= fun answer ->
+          >>= fun handler -> handler None >>= fun _answer ->
           (* Note: this path always fails with EzReturnOPTIONS *)
           reply_none 200
         | API dir, _ ->
