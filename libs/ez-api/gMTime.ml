@@ -14,7 +14,7 @@ let of_local local = local -. diff
 (* translate to localtime *)
 let to_local gmt = gmt +. diff
 
-let time () = of_local (Unix.gettimeofday ())
+let time () = Unix.gettimeofday ()
 
 let tm_of_date date = (* example: 2018-01-31T13:12:11Z *)
   let datelen = String.length date in
