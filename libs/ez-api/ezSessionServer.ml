@@ -2,6 +2,8 @@ open StringCompat
 open EzAPI.TYPES
 open EzSession.TYPES
 
+let (>>=) = Lwt.(>>=)
+
 let verbose = EzAPIServer.verbose
 
 (* WARNINGS:
@@ -36,8 +38,8 @@ let random_challenge () =
 
 module type SessionStore = sig
   val create_session : login:string -> session
-  val get_session : cookie:string -> session option
-  val remove_session : login:string -> cookie:string -> unit
+  val get_session : cookie:string -> session option Lwt.t
+  val remove_session : login:string -> cookie:string -> unit Lwt.t
 end
 
 module SessionStoreInMemory : SessionStore = struct
@@ -69,17 +71,18 @@ module SessionStoreInMemory : SessionStore = struct
   let get_session ~cookie =
     match Hashtbl.find session_by_cookie cookie with
     | exception Not_found ->
-       None
+       Lwt.return None
     | s ->
        s.session_last <- EzAPIServer.req_time ();
-       Some s
+       Lwt.return (Some s)
 
   let remove_session ~login ~cookie =
-    match get_session ~cookie with
-    | None -> ()
+    get_session ~cookie >>= function
+    | None -> Lwt.return ()
     | Some s ->
-       if s.session_login = login then
-         Hashtbl.remove session_by_cookie cookie
+      if s.session_login = login then
+        Hashtbl.remove session_by_cookie cookie;
+      Lwt.return ()
 
 end
 
@@ -90,7 +93,7 @@ module UserStoreInMemory(S : EzSession.TYPES.SessionArg) : sig
     ?pwhash:pwhash ->
     ?password:string -> login:string -> S.user_info -> unit
   val remove_user : login:string -> unit
-  val find_user : login:string -> (pwhash * S.user_info) option
+  val find_user : login:string -> (pwhash * S.user_info) option Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
          with type user_info = S.user_info
@@ -137,11 +140,12 @@ end = struct
     if verbose > 1 then
       EzDebug.printf "find_user %S ?" login;
     match Hashtbl.find users login with
-    | exception Not_found -> None
+    | exception Not_found ->
+      Lwt.return None
     | u ->
-       if verbose > 1 then
-         EzDebug.printf "find_user %S ok" login;
-       Some (u.pwhash, u.user_info)
+      if verbose > 1 then
+        EzDebug.printf "find_user %S ok" login;
+      Lwt.return ( Some (u.pwhash, u.user_info) )
 
 
   let remove_user ~login =
@@ -154,8 +158,8 @@ module Make(S: sig
                 module SessionArg : EzSession.TYPES.SessionArg
                 module SessionStore : SessionStore
                 val find_user : login:string ->
-                                         (string *
-                                            SessionArg.user_info) option
+                  (string *
+                   SessionArg.user_info) option Lwt.t
               end
            ) : sig
 
@@ -163,7 +167,7 @@ module Make(S: sig
     EzAPI.request EzAPIServer.directory ->
     EzAPI.request EzAPIServer.directory
 
-  val get_request_session : EzAPI.request -> session option
+  val get_request_session : EzAPI.request -> session option Lwt.t
 
   val register :
            ('arg, 'b, 'input, 'd) EzAPI.service ->
@@ -186,33 +190,33 @@ end = struct
   include M
 
   let get_request_session req =
-    match
+    begin
       match EzAPI.find_param Service.param_token req with
       | None ->
-         None
+        Lwt.return None
       | Some cookie ->
-         match get_session ~cookie with
-         | Some s -> Some s
-         | None -> None
-    with
-    | Some _ as res -> res
+        get_session ~cookie >>= function
+        | Some s -> Lwt.return (Some s)
+        | None -> Lwt.return None
+    end >>= function
+    | Some _ as res -> Lwt.return res
     | None ->
-       match token_kind with
-       | `Cookie name ->
-          begin
-            match StringMap.find name (EzCookieServer.get req) with
-            | exception Not_found ->
-               None
-            | cookie ->
-               get_session ~cookie
-          end
-       | `CSRF name ->
-          match StringMap.find name req.req_headers with
+      match token_kind with
+      | `Cookie name ->
+        begin
+          match StringMap.find name (EzCookieServer.get req) with
           | exception Not_found ->
-             None
-          | [] -> None
-          | cookie :: _ ->
-             get_session ~cookie
+            Lwt.return None
+          | cookie ->
+            get_session ~cookie
+        end
+      | `CSRF name ->
+        match StringMap.find name req.req_headers with
+        | exception Not_found ->
+          Lwt.return None
+        | [] -> Lwt.return None
+        | cookie :: _ ->
+          get_session ~cookie
 
   module Handler = struct
 
@@ -263,20 +267,20 @@ end = struct
         (AuthOK (login, cookie, user_info))
 
     let connect req () =
-      match get_request_session req with
+      get_request_session req >>= function
       | None ->
          request_auth req
       | Some { session_cookie = cookie;
                session_login = login;
                _ } ->
-         match find_user ~login with
+         find_user ~login >>= function
          | None ->
             request_auth req
          | Some (_pwhash, user_info) ->
             return_auth req ~cookie ~login user_info
 
     let login req { login_user; login_challenge_id; login_challenge_reply } =
-      match find_user ~login:login_user with
+      find_user ~login:login_user >>= function
       | None ->
          if verbose > 1 then
            EzDebug.printf "/login: could not find user %S\n%!" login_user;
@@ -302,10 +306,10 @@ end = struct
               end
 
     let logout req () =
-      match get_request_session req with
+       get_request_session req >>= function
       | None -> EzAPIServer.return_error 403
       | Some { session_login=login; session_cookie = cookie; _ } ->
-         remove_session ~login ~cookie;
+         remove_session ~login ~cookie >>= fun () ->
          request_auth req
   end
 

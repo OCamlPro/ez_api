@@ -2,8 +2,8 @@ open EzSession.TYPES
 
 module type SessionStore = sig
   val create_session : login:string -> session
-  val get_session : cookie:string -> session option
-  val remove_session : login:string -> cookie:string -> unit
+  val get_session : cookie:string -> session option Lwt.t
+  val remove_session : login:string -> cookie:string -> unit Lwt.t
 end
 
 module Make(S: sig
@@ -12,7 +12,7 @@ module Make(S: sig
                 val find_user :
                   login:string ->
                   (string * (* pwhash *)
-                     SessionArg.user_info) option
+                     SessionArg.user_info) option Lwt.t
               end) : sig
 
   (* User `register_handlers` to declare the handlers for the authentification
@@ -23,7 +23,7 @@ module Make(S: sig
 
  (* handlers that need authentification should use `get_request_session`
    to collect the user identity and session. *)
-  val get_request_session : EzAPI.request -> session option
+  val get_request_session : EzAPI.request -> session option Lwt.t
 
   (* Use this one to be sure that OPTIONS requests are correctly replied to *)
   val register :
@@ -46,7 +46,7 @@ module UserStoreInMemory(S : SessionArg) : sig
     ?pwhash:Digest.t ->
     ?password:string -> login:string -> S.user_info -> unit
   val remove_user : login:string -> unit
-  val find_user : login:string -> (string * S.user_info) option
+  val find_user : login:string -> (string * S.user_info) option Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
          with type user_info = S.user_info

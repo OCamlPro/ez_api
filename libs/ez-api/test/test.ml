@@ -1,4 +1,6 @@
 
+let (>>=) = Lwt.(>>=)
+
 let server_mode = ref true
 let api_port = ref 8887
 let root_port = ref 8888
@@ -135,7 +137,7 @@ module MakeServer(S : sig end) = struct
                                      query = r.user^r.hash; version = 1 }
 
     let test4 (req,s) r =
-      match Session.get_request_session req with
+      Session.get_request_session req >>= function
       | Some { session_login } ->
          EzAPIServer.return { name = "test4 for " ^ session_login;
                                      query = r.user^r.hash; version = 1 }
