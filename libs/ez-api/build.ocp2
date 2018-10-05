@@ -33,7 +33,7 @@ OCaml.library("ez-api-server", ocaml+
     ];
     requires = [
       "re.str";
-      "lwt";
+      "lwt_log";
       "cohttp";
       "cohttp-lwt-unix";
       "ocplib-json-typed";
