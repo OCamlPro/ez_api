@@ -44,11 +44,11 @@ let destruct encoding buf =
          field buf ;
        raise DestructError
 
-let construct encoding data =
+let construct ?(compact=true) encoding data =
     let ezjson =
       (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in
     Json_repr.pp
-      ~compact:true
+      ~compact
       ezjson
       Format.str_formatter
       (Json_encoding.construct encoding data) ;
@@ -69,3 +69,16 @@ let encoded_string =
                       ~expected:"encoded string"
           | Some s -> s)
       any_ezjson_value
+
+let () =
+  Printexc.register_printer (fun exn ->
+      match exn with
+      | Json_encoding.Cannot_destruct (path, exn) ->
+        let s = Printf.sprintf "Cannot destruct JSON (%s, %s)"
+            (Json_query.json_pointer_of_path path)
+            (Printexc.to_string exn)
+        in
+        Some s
+      | _ -> None)
+
+let init () = ()
