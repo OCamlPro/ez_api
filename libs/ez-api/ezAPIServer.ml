@@ -371,7 +371,9 @@ let dispatch s (io, _conn) req body =
         | Root (root, default), meth ->
           reply_file ~meth root ?default path
     )
-    (function
+    (fun exn ->
+       Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn);
+       match exn with
       | EzReturnOPTIONS headers ->
         request.rep_headers <- headers @ request.rep_headers;
         reply_none 200
@@ -393,15 +395,22 @@ let dispatch s (io, _conn) req body =
            ("access-control-allow-methods", "POST, GET, OPTIONS")
       ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
+  if verbose > 1 then
+    Printf.eprintf "Reply computed %d\n%!" code;
   let body, headers = match reply with
     | ReplyNone ->
        Cohttp_lwt__Body.empty, headers
     | ReplyJson json ->
-       Cohttp_lwt__Body.of_string (Ezjsonm.to_string (json_root json)),
-       Header.add headers "Content-Type" "application/json"
+      let content = Ezjsonm.to_string (json_root json) in
+      if verbose > 2 then
+        Printf.eprintf "Content:\n%s\n%!" content;
+      Cohttp_lwt__Body.of_string content,
+      Header.add headers "Content-Type" "application/json"
     | ReplyString (content_type, content) ->
-       Cohttp_lwt__Body.of_string content,
-       Header.add headers "Content-Type" content_type
+      if verbose > 2 then
+        Printf.eprintf "Content:\n%s\n%!" content;
+      Cohttp_lwt__Body.of_string content,
+      Header.add headers "Content-Type" content_type
   in
   Cohttp_lwt__Body.to_string body >>= fun body ->
   Server.respond_string ~headers ~status ~body ()
