@@ -18,3 +18,34 @@ val json_of_string : (string -> Json_repr.ezjsonm) ref
 val encoded_string : string Json_encoding.encoding
 
 val init : unit -> unit
+
+val obj11 :
+  'a Json_encoding.field ->
+  'b Json_encoding.field ->
+  'c Json_encoding.field ->
+  'd Json_encoding.field ->
+  'e Json_encoding.field ->
+  'f Json_encoding.field ->
+  'g Json_encoding.field ->
+  'h Json_encoding.field ->
+  'i Json_encoding.field ->
+  'j Json_encoding.field ->
+  'k Json_encoding.field ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k)
+    Json_encoding.encoding
+
+val obj12 :
+  'a Json_encoding.field ->
+  'b Json_encoding.field ->
+  'c Json_encoding.field ->
+  'd Json_encoding.field ->
+  'e Json_encoding.field ->
+  'f Json_encoding.field ->
+  'g Json_encoding.field ->
+  'h Json_encoding.field ->
+  'i Json_encoding.field ->
+  'j Json_encoding.field ->
+  'k Json_encoding.field ->
+  'l Json_encoding.field ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j * 'k * 'l)
+    Json_encoding.encoding

@@ -81,4 +81,39 @@ let () =
         Some s
       | _ -> None)
 
+let obj11 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),x11)
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),x11)
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj1 f11))
+
+let obj12 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj2 f11 f12)
+    )
+
 let init () = ()

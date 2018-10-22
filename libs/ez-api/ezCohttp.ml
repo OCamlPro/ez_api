@@ -17,7 +17,13 @@ include EzRequest.Make(struct
         end;
         Lwt.return_unit
       in
-      Lwt.async r
+      Lwt.async
+        (fun () ->
+           Lwt.catch r
+             (fun exn ->
+                f (CodeError(-1, Some (Printexc.to_string exn)));
+                Lwt.return_unit
+             ))
 
     let xhr_post ?(content_type = "application/json") ?(content="{}")
         _msg url ?(headers=[]) f =
