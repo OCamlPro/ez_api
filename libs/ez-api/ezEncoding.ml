@@ -116,4 +116,288 @@ let obj12 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 =
        (obj2 f11 f12)
     )
 
+let obj13 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj3 f11 f12 f13)
+    )
+
+let obj14 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj4 f11 f12 f13 f14)
+    )
+
+let obj15 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj5 f11 f12 f13 f14 f15)
+    )
+
+let obj16 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj6 f11 f12 f13 f14 f15 f16)
+    )
+
+let obj17 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj7 f11 f12 f13 f14 f15 f16 f17)
+    )
+
+let obj18 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17,x18))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17,x18))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18)
+    )
+    (merge_objs
+       (obj10
+          f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj8 f11 f12 f13 f14 f15 f16 f17 f18)
+    )
+
+let obj19 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17,x18,x19))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),(x11,x12,x13,x14,x15,x16,x17,x18,x19))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj9 f11 f12 f13 f14 f15 f16 f17 f18 f19)
+    )
+
+let obj20 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+         (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+       (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (obj10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20)
+    )
+
+let obj21
+    f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+    f11 f12 f13 f14 f15 f16 f17 f18 f19 f20
+    f21
+  =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+         (
+           (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+           (x21)
+         ))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+       ((x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+        (x21)
+       ))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (merge_objs
+          (obj10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20)
+          (obj1 f21)
+       )
+    )
+
+let obj22
+    f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+    f11 f12 f13 f14 f15 f16 f17 f18 f19 f20
+    f21 f22
+  =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+         (
+           (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+           (x21,x22)
+         ))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+       ((x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+        (x21,x22)
+       ))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (merge_objs
+          (obj10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20)
+          (obj2 f21 f22)
+       )
+    )
+
+let obj23
+    f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+    f11 f12 f13 f14 f15 f16 f17 f18 f19 f20
+    f21 f22 f23
+  =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22,x23)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+         (
+           (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+           (x21,x22,x23)
+         ))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+       ((x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+        (x21,x22,x23)
+       ))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22,x23)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (merge_objs
+          (obj10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20)
+          (obj3 f21 f22 f23)
+       )
+    )
+
+let obj24
+    f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+    f11 f12 f13 f14 f15 f16 f17 f18 f19 f20
+    f21 f22 f23 f24
+  =
+  conv
+    (fun
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22,x23,x24)
+      ->
+        ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+         (
+           (x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+           (x21,x22,x23,x24)
+         ))
+    )
+    (fun
+      ((x1,x2,x3,x4,x5,x6,x7,x8,x9,x10),
+       ((x11,x12,x13,x14,x15,x16,x17,x18,x19,x20),
+        (x21,x22,x23,x24)
+       ))
+      ->
+      (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,
+       x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,
+       x21,x22,x23,x24)
+    )
+    (merge_objs
+       (obj10 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10)
+       (merge_objs
+          (obj10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20)
+          (obj4 f21 f22 f23 f24)
+       )
+    )
+
 let init () = ()

@@ -89,11 +89,13 @@ let before_xhr_hook = ref (fun () -> ())
 let decode_result ?error encoding f res =
   match EzEncoding.destruct encoding res with
   | res -> f res
-  | exception _exn ->
+  | exception exn ->
      match error with
      | None -> ()
      | Some error ->
-        error (-2) (Some res)
+       let msg = Printf.sprintf "Decoding error: %s in\n%s"
+           (Printexc.to_string exn) res in
+        error (-2) (Some msg)
 
 
 let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1,None)))
