@@ -8,11 +8,11 @@ exception ResultNotfound
 module TYPES = struct
 
   type ip_info = {
-      ip_ip : string;
-      mutable ip_last : float;
-      mutable ip_nb : int;
-      ip_country : string * string;
-    }
+    ip_ip : string;
+    mutable ip_last : float;
+    mutable ip_nb : int;
+    ip_country : string * string;
+  }
 
   type http_version = HTTP_1_0 | HTTP_1_1
 
@@ -20,14 +20,13 @@ module TYPES = struct
     | BodyString of (* content-type *) string option * (* content *) string
 
   type request = {
-      req_version : http_version;
-      req_headers : string list StringMap.t;
-      mutable req_params : string list StringMap.t;
-      mutable req_body : request_body;
-      (* Modify this field if you want to send back specific headers. *)
-      mutable rep_headers : (string * string) list;
-    }
-
+    req_version : http_version;
+    req_headers : string list StringMap.t;
+    mutable req_params : string list StringMap.t;
+    mutable req_body : request_body;
+    (* Modify this field if you want to send back specific headers. *)
+    mutable rep_headers : (string * string) list;
+  }
 
   type arg_kind = REQUIRED of string | OPTIONAL of string
 
@@ -202,7 +201,7 @@ let forge1 url s params args =  forge url s ( (), params ) args
 let forge0 url s args = forge url s () args
 
 module Param = struct
-  let param param_type ?name ?descr ?(required=true) param_value =
+  let param param_type ?name ?descr ?(required=false) param_value =
     { param_value; param_name = name; param_descr = descr;
       param_type; param_required = required; }
   let string = param PARAM_STRING
@@ -243,8 +242,16 @@ let rec string_of_path p =
   | ENDARG (p, arg) ->
      Printf.sprintf "%s/<%s>" (string_of_path p) arg.Resto.Arg.name
 
+let rec update_service_list services doc = match services with
+  | [] -> [ doc ]
+  | h :: t when h.doc_path = doc.doc_path -> doc :: t
+  | h :: t -> h :: (update_service_list t doc)
+
+ let definitions_path = "/components/schemas/"
+
 let post_service ?(section=default_section)
     ?name
+    ?descr
     ~input
     ~output
     ?(params = []) (doc_path,path1,path2,sample) =
@@ -259,11 +266,11 @@ let post_service ?(section=default_section)
       doc_sample = (fun _ -> assert false);
       doc_id;
       doc_section = section;
-      doc_input = lazy (Json_encoding.schema input);
-      doc_output = lazy (Json_encoding.schema output);
+      doc_input = lazy (Json_encoding.schema ~definitions_path input);
+      doc_output = lazy (Json_encoding.schema ~definitions_path output);
     } in
-  section.section_docs <- doc :: section.section_docs;
-  services := doc :: !services;
+  section.section_docs <- update_service_list section.section_docs doc;
+  services := update_service_list !services doc;
   let service = {
       s = Resto.service ~input ~output path1;
       s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output path1;
@@ -377,7 +384,7 @@ let md_of_services ?section ?base_url list =
     | None -> "All", !services
     | Some s -> s.section_name, List.rev s.section_docs
   in
-  let map = List.fold_left (fun map (s1,s2) ->
+  let map = List.fold_left (fun map (s1, s2) ->
                 StringMap.add s1 s2 map) StringMap.empty list in
   let b = Buffer.create 10000 in
   Printf.bprintf b "# %s\n" title;
@@ -453,7 +460,8 @@ let get_path sd =
 module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
 
 
-let paths_of_sections sections =
+let paths_of_sections ?(docs=[]) sections =
+  let docs = List.map (fun (name, summary, descr) -> name, (summary, descr)) docs in
   let list = ref [] in
   let map = ref StringMap.empty in
   List.iter (fun s ->
@@ -467,26 +475,24 @@ let paths_of_sections sections =
     ) sections;
   let services = !list in
 
-
   let definitions_schema =
-    ref
-      (Json_schema.create (Json_schema.element Json_schema.Any))
+    ref (Json_schema.create (Json_schema.element Json_schema.Any))
   in
   let output_schemas =
     List.map (fun sd ->
         let output_schema = Lazy.force sd.doc_output in
-        let output_schema, updated = Json_schema.merge_definitions
-                                       (output_schema, !definitions_schema) in
+        let output_schema, updated =
+          Json_schema.merge_definitions
+            (output_schema, !definitions_schema) in
         definitions_schema := updated;
         Json_schema.root output_schema
       ) services
   in
-
   let schemas, definitions =
     let sch = Json_schema.update
-                (Json_schema.element
-                   (Json_schema.Array (output_schemas, Json_schema.array_specs)))
-                !definitions_schema
+        (Json_schema.element
+           (Json_schema.Array (output_schemas, Json_schema.array_specs)))
+        !definitions_schema
     in
     match JsonSchema.to_json sch with
     | `O [
@@ -494,95 +500,100 @@ let paths_of_sections sections =
         "type", `String "array";
         "items", `A schemas ;
         "additionalItems", _;
-        "definitions", `O definitions
+        "components", `O [ "schemas", `O definitions ] ;
       ] ->
-       schemas, definitions
+      schemas, definitions
     | `O [
-"$schema", _;
-"type", `String "array";
-"items", `A schemas ;
-"additionalItems", _;
-] ->
-       schemas, []
+        "$schema", _;
+        "type", `String "array";
+        "items", `A schemas ;
+        "additionalItems", _;
+      ] ->
+      schemas, []
     | `O fields ->
-       Printf.eprintf "%d\n%!" (List.length fields);
-       List.iter (fun (x,_) ->
-           Printf.eprintf "%S\n%!" x) fields;
-       assert false
+      Printf.eprintf "%d\n%!" (List.length fields);
+      List.iter (fun (x,_) ->
+          Printf.eprintf "%S\n%!" x) fields;
+      assert false
     | _ -> assert false
   in
 
   let paths = List.mapi (fun i sd ->
-                  let parameters =
-                    List.map (fun p ->
-                        let param_descr = match p.param_descr with
-                          | None -> ""
-                          | Some descr -> descr in
-                        let param_type = match p.param_type with
-                          | PARAM_STRING -> "string"
-                          | PARAM_INT -> "integer"
-                          | PARAM_BOOL -> "bool"
-                        in
-                        `O [
-                           "name", `String p.param_value;
-                           "in", `String "query";
-                           "description", `String param_descr;
-                           "required", `Bool p.param_required;
-                           "type", `String param_type;
-(* or "number", "integer"
-                                          sometimes: "enum" : [ "X"; "Y" ]
- *)
-                         ]
-                      ) sd.doc_params
-                  in
-                  let parameters =
-                    let rec iter path parameters =
-                      match path with
-                      | ROOT -> parameters
-                      | CONCAT (p,_s) -> iter p parameters
-                      | ENDARG (p,arg) ->
-                         let param_descr = match arg.Resto.Arg.descr with
-                           | None -> ""
-                           | Some descr -> descr in
-                         let param =
-                           `O [
-                              "name", `String arg.Resto.Arg.name;
-                              "in", `String "path";
-                              "description", `String param_descr;
-                              "required", `Bool true;
-                              "type", `String "???";
-(* or "number", "integer"
-                                          sometimes: "enum" : [ "X"; "Y" ]
- *)
-                            ]
-                         in
-                         iter p (param :: parameters)
-                    in
-                    iter sd.doc_path parameters
-                  in
-                  get_path sd,
-                  `O [
-                     "get", `O [
-                               "tags", `A [ `String sd.doc_section.section_name ];
-                               "summary", `String "Summary of service";
-                               "description", `String "Description of service";
-                               "operationId", `String (string_of_int sd.doc_id);
-                               "consumes", `A [ `String "application/json" ];
-                               "produces", `A [ `String "application/json" ];
-                               "parameters", `A parameters;
-                               "responses", `O [
-                                               "405",
-                                               `O [
-                                                  "description", `String
-                                                                  "Invalid input"
-                                                ];
-                                               "default",
-                                               `O [
-                                                  "schema", List.nth schemas i
-                                                ]
-                                             ];
-                             ]
-                   ]
-                ) services
+      let doc_infos =
+        match sd.doc_name with
+        | None -> None
+        | Some name -> List.assoc_opt name docs in
+      let summary, description = match doc_infos with
+        | None -> "Summary of service", "Description of service"
+        | Some (summary, description) -> summary, description in
+      let parameters =
+        List.map (fun p ->
+            let param_descr = match p.param_descr with
+              | None -> ""
+              | Some descr -> descr in
+            let param_type = match p.param_type with
+              | PARAM_STRING -> "string"
+              | PARAM_INT -> "integer"
+              | PARAM_BOOL -> "boolean"
+            in
+            `O [
+              "name", `String p.param_value;
+              "in", `String "query";
+              "description", `String param_descr;
+              "required", `Bool p.param_required;
+              "schema", `O [
+                "type", `String param_type
+              ]
+            ]
+          ) sd.doc_params
+      in
+      let parameters =
+        let rec iter path parameters =
+          match path with
+          | ROOT -> parameters
+          | CONCAT (p,_s) -> iter p parameters
+          | ENDARG (p,arg) ->
+            let param_descr = match arg.Resto.Arg.descr with
+              | None -> ""
+              | Some descr -> descr in
+            let param =
+              `O [
+                "name", `String arg.Resto.Arg.name;
+                "in", `String "path";
+                "description", `String param_descr;
+                "required", `Bool true;
+                "schema", `O [
+                  "type", `String "string" ];
+                (* or "number", "integer"
+                   sometimes: "enum" : [ "X"; "Y" ]
+                *)
+              ]
+            in
+            iter p (param :: parameters)
+        in
+        iter sd.doc_path parameters
+      in
+      get_path sd,
+      `O [
+        "get", `O [
+          "tags", `A [ `String sd.doc_section.section_name ];
+          "summary", `String summary;
+          "description", `String description;
+          "operationId", `String (string_of_int sd.doc_id);
+          "parameters", `A parameters;
+          "responses", `O [
+            "200",
+            `O [
+              "description", `String "Success";
+              "content", `O [
+                "application/json", `O [
+                  "schema", List.nth schemas i
+                ]
+              ]
+            ]
+          ];
+        ]
+      ]
+    ) services
   in
   paths, definitions

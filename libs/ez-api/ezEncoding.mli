@@ -330,6 +330,10 @@ val obj24 :
     Json_encoding.encoding
 
 val int64 : Int64.t Json_encoding.encoding
+val int : int Json_encoding.encoding
+val tup1_int : int Json_encoding.encoding
+val tup1_int64 : int64 Json_encoding.encoding
+val tup1_string : string Json_encoding.encoding
 
 val register :
   ?name:string ->

@@ -392,19 +392,45 @@ let init () = ()
 
 let defs = ref []
 
+let int_kind = Json_schema.(Integer numeric_specs)
+let int_element = Json_schema.element int_kind
+let tup1_int_kind = Json_schema.(Monomorphic_array (int_element, array_specs))
+let tup1_int_element = Json_schema.element tup1_int_kind
+let int64_element = {int_element with format = Some "int64"}
+let tup1_int64_kind = Json_schema.(Monomorphic_array (int64_element, array_specs))
+let tup1_int64_element = Json_schema.element tup1_int64_kind
+let string_kind = Json_schema.(String string_specs)
+let string_element = Json_schema.element string_kind
+let tup1_string_kind = Json_schema.(Monomorphic_array (string_element, array_specs))
+let tup1_string_element = Json_schema.element tup1_string_kind
+
 let int64 =
-  union [
-    case
-      int32
-      (fun i ->
-         let j = Int64.to_int32 i in
-         if Int64.equal (Int64.of_int32 j) i then Some j else None)
-      Int64.of_int32 ;
-    case
-      string
-      (fun i -> Some (Int64.to_string i))
-      Int64.of_string
-  ]
+  conv
+    (fun x -> x)
+    (fun x -> x)
+    ~schema:(Json_schema.create int64_element)
+    (union [
+        case
+          int32
+          (fun i ->
+             let j = Int64.to_int32 i in
+             if Int64.equal (Int64.of_int32 j) i then Some j else None)
+          Int64.of_int32 ;
+        case
+          string
+          (fun i -> Some (Int64.to_string i))
+          Int64.of_string
+      ])
+
+let int =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create int_element) int
+let tup1_int =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_int_element) (tup1 int)
+let tup1_int64 =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_int64_element) (tup1 int64)
+let tup1_string =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_string_element) (tup1 string)
+
 
 let register ?name ?(descr="") o =
   match name with
