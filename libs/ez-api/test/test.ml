@@ -65,7 +65,7 @@ end
 module MakeService(S : sig end) = struct
 
   let arg_test =
-    EzAPI.arg_string "arg-in-path", "example-of-value"
+    EzAPI.arg_string "arg-in-path" "example-of-value"
 
   let param_arg =
     EzAPI.Param.string ~name:"arg-string" ~descr:"An example argument" "arg"
