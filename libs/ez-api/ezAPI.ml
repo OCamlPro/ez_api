@@ -58,6 +58,7 @@ type param = {
     param_descr : string option;
     param_type : param_type;
     param_required : bool;
+    param_examples : string list;
   }
 
 type path =
@@ -67,9 +68,9 @@ type path =
 
 type ('a, 'b) p =
   path *
-    (request, 'a) Resto.Path.path *
-      (unit, 'b) Resto.Path.path *
-        'b
+  (request, 'a) Resto.Path.path *
+  (unit, 'b) Resto.Path.path *
+  'b
 
 type service_doc = {
     doc_id : int; (* uniq service identifier *)
@@ -110,21 +111,25 @@ type ('input,'output) post_service0 =
 type ('arg,'input,'output) post_service1 =
   (request * 'arg, unit * 'arg, 'input, 'output) service
 
-let arg_string ?descr name : string Resto.Arg.arg =
+let arg_string ?descr name example: string Resto.Arg.arg * string =
   Resto.Arg.make
     ~name
     ~destruct:( fun a -> Ok a : string -> (string, string) Result.result )
     ~construct:( fun s -> s : string -> string )
     ?descr
-    ()
+    ~example
+    (),
+  example
 
-let arg_int ?descr name : int Resto.Arg.arg =
+let arg_int ?descr name example: int Resto.Arg.arg * int =
   Resto.Arg.make
     ~name
     ~destruct:( fun a -> Ok (int_of_string a))
     ~construct:( fun s -> string_of_int s )
     ?descr
-    ()
+    ~example
+    (),
+  example
 
 let add_params req params =
   req.req_params <-
@@ -197,13 +202,13 @@ let forge url s params args =
   in
   add_end url (parts ^ args)
 
-let forge1 url s params args =  forge url s ( (), params ) args
+let forge1 url s params args =  forge url s ((), params) args
 let forge0 url s args = forge url s () args
 
 module Param = struct
-  let param param_type ?name ?descr ?(required=false) param_value =
+  let param param_type ?name ?descr ?(required=false) ?(examples=[]) param_value =
     { param_value; param_name = name; param_descr = descr;
-      param_type; param_required = required; }
+      param_type; param_required = required; param_examples = examples}
   let string = param PARAM_STRING
   let int = param  PARAM_INT
   let bool = param PARAM_BOOL
@@ -231,7 +236,7 @@ module Path = struct
     (ENDARG (s1, Resto.Arg.descr arg)),
     (Resto.Path.(/:) p1 arg),
     (Resto.Path.(/:) p2 arg),
-    (sample1,sample2)
+    (sample1, sample2)
 end
 
 let rec string_of_path p =
@@ -471,7 +476,7 @@ let paths_of_sections ?(docs=[]) sections =
               list := sv :: !list;
               map := StringMap.add id sv !map
             end
-        ) s.section_docs
+        ) (List.rev s.section_docs)
     ) sections;
   let services = !list in
 
@@ -556,18 +561,18 @@ let paths_of_sections ?(docs=[]) sections =
             let param_descr = match arg.Resto.Arg.descr with
               | None -> ""
               | Some descr -> descr in
+            let example = match arg.Resto.Arg.example with
+              | None -> []
+              | Some example -> [ "example", `String example ] in
             let param =
-              `O [
+              `O ([
                 "name", `String arg.Resto.Arg.name;
                 "in", `String "path";
                 "description", `String param_descr;
                 "required", `Bool true;
                 "schema", `O [
-                  "type", `String "string" ];
-                (* or "number", "integer"
-                   sometimes: "enum" : [ "X"; "Y" ]
-                *)
-              ]
+                  "type", `String "string"];
+              ] @ example)
             in
             iter p (param :: parameters)
         in

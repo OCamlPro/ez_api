@@ -58,6 +58,7 @@ type param = {
   param_descr : string option;
   param_type : TYPES.param_type;
   param_required : bool;
+  param_examples : string list
 }
 
 type service_doc = {
@@ -110,13 +111,16 @@ module Path : sig
 end
 
 module Param : sig
-  val string : ?name:string -> ?descr:string -> ?required:bool -> string -> param
-  val int : ?name:string -> ?descr:string -> ?required:bool -> string -> param
-  val bool : ?name:string -> ?descr:string -> ?required:bool -> string -> param
+  val string : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
+  val int : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
+  val bool : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
 end
 
-val arg_string : ?descr:string -> string -> string Resto.Arg.arg
-val arg_int : ?descr:string -> string -> int Resto.Arg.arg
+val arg_string : ?descr:string -> string -> string -> string Resto.Arg.arg * string
+val arg_int : ?descr:string -> string -> int -> int Resto.Arg.arg * int
 
 
 val service :

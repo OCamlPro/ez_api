@@ -40,6 +40,7 @@ module Internal = struct
   type descr = {
     name: string ;
     descr: string option ;
+    example: string option
   }
 
   type 'a arg = {
@@ -87,14 +88,18 @@ module Arg = struct
   type descr = Internal.descr = {
     name: string ;
     descr: string option ;
+    example: string option
   }
   type 'a arg = 'a Internal.arg
 
   (*  let eq a b = Ty.eq a.id b.id *)
 
-  let make ?descr name destruct construct () =
+  let make ?example ?descr name destruct construct () =
     let id = Ty.new_id () in
-    let descr = { name ; descr } in
+    let example = match example with
+      | None -> None
+      | Some example -> Some (construct example) in
+    let descr = { name ; descr; example } in
     { Internal.descr ; id ; construct ; destruct }
 
   let descr (ty: 'a arg) = ty.Internal.descr
@@ -102,9 +107,9 @@ module Arg = struct
   let descr_encoding =
     let open Json_encoding in
     conv
-      (fun {name; descr} -> (name, descr))
-      (fun (name, descr) -> {name; descr})
-      (obj2 (req "name" string) (opt "descr" string))
+      (fun {name; descr; example} -> (name, descr, example))
+      (fun (name, descr, example) -> {name; descr; example})
+      (obj3 (req "name" string) (opt "descr" string) (opt "example" string))
 
   let int =
     let int_of_string s =
@@ -131,8 +136,8 @@ module Arg = struct
         Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
     make "int64" int64_of_string Int64.to_string ()
 
-  let make ?descr ~name ~destruct ~construct () =
-    make ?descr name destruct construct ()
+  let make ?example ?descr ~name ~destruct ~construct () =
+    make ?example ?descr name destruct construct ()
 
 end
 

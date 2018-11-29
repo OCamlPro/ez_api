@@ -13,6 +13,7 @@ module Arg : sig
 
   type 'a arg
   val make:
+    ?example:'a ->
     ?descr:string ->
     name:string ->
     destruct:(string -> ('a, string) result) ->
@@ -22,6 +23,7 @@ module Arg : sig
   type descr = {
     name: string ;
     descr: string option ;
+    example: string option
   }
   val descr: 'a arg -> descr
 
