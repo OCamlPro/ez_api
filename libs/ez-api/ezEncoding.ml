@@ -14,20 +14,6 @@ end
 
 exception DestructError
 
-let int64 =
-  union [
-    case
-      int32
-      (fun i ->
-         let j = Int64.to_int32 i in
-         if Int64.equal (Int64.of_int32 j) i then Some j else None)
-      Int64.of_int32 ;
-    case
-      string
-      (fun i -> Some (Int64.to_string i))
-      Int64.of_string
-  ]
-
 (* Default behavior to destruct a json value *)
 let destruct encoding buf =
   try
@@ -401,3 +387,60 @@ let obj24
     )
 
 let init () = ()
+
+(* for swagger *)
+
+let defs = ref []
+
+let int_kind = Json_schema.(Integer numeric_specs)
+let int_element = Json_schema.element int_kind
+let tup1_int_kind = Json_schema.(Monomorphic_array (int_element, array_specs))
+let tup1_int_element = Json_schema.element tup1_int_kind
+let int64_element = {int_element with format = Some "int64"}
+let tup1_int64_kind = Json_schema.(Monomorphic_array (int64_element, array_specs))
+let tup1_int64_element = Json_schema.element tup1_int64_kind
+let string_kind = Json_schema.(String string_specs)
+let string_element = Json_schema.element string_kind
+let tup1_string_kind = Json_schema.(Monomorphic_array (string_element, array_specs))
+let tup1_string_element = Json_schema.element tup1_string_kind
+
+let int64 =
+  conv
+    (fun x -> x)
+    (fun x -> x)
+    ~schema:(Json_schema.create int64_element)
+    (union [
+        case
+          int32
+          (fun i ->
+             let j = Int64.to_int32 i in
+             if Int64.equal (Int64.of_int32 j) i then Some j else None)
+          Int64.of_int32 ;
+        case
+          string
+          (fun i -> Some (Int64.to_string i))
+          Int64.of_string
+      ])
+
+let int =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create int_element) int
+let tup1_int =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_int_element) (tup1 int)
+let tup1_int64 =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_int64_element) (tup1 int64)
+let tup1_string =
+  conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create tup1_string_element) (tup1 string)
+
+
+let register ?name ?(descr="") o =
+  match name with
+  | None -> ()
+  | Some name ->
+    let sch = lazy ( Json_encoding.schema o ) in
+    defs := (name, (descr, sch)) :: !defs;
+    ()
+
+let merge_objs ?name ?descr o1 o2 =
+  let o = Json_encoding.merge_objs o1 o2 in
+  register ?name ?descr o;
+  o

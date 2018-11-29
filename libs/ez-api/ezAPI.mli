@@ -4,19 +4,19 @@ open StringCompat
 
 module TYPES : sig
 
-type ip_info = {
+  type ip_info = {
     ip_ip : string;
     mutable ip_last : float;
     mutable ip_nb : int;
     ip_country : string * string;
   }
 
-type http_version = HTTP_1_0 | HTTP_1_1
+  type http_version = HTTP_1_0 | HTTP_1_1
 
-type request_body =
-  | BodyString of (* content-type *) string option * (* content *) string
+  type request_body =
+    | BodyString of (* content-type *) string option * (* content *) string
 
-type request = {
+  type request = {
     req_version : http_version;
     req_headers : string list StringMap.t;
     mutable req_params : string list StringMap.t;
@@ -25,16 +25,17 @@ type request = {
     mutable rep_headers : (string * string) list;
   }
 
-type arg_kind = REQUIRED of string | OPTIONAL of string
+  type arg_kind = REQUIRED of string | OPTIONAL of string
 
-type arg_value =
-  | I of int
-  | S of string
-  | LS of string list
+  type param_type = PARAM_INT | PARAM_STRING | PARAM_BOOL
 
-type base_url = BASE of string
-type url = URL of string
+  type arg_value =
+    | I of int
+    | S of string
+    | LS of string list
 
+  type base_url = BASE of string
+  type url = URL of string
 end
 
 open TYPES
@@ -46,11 +47,36 @@ type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
 
-type path
+type path =
+  | ROOT
+  | CONCAT of path * string
+  | ENDARG of path * Resto.Arg.descr
 
-type service_doc
-type param
+type param = {
+  param_value : string;
+  param_name : string option;
+  param_descr : string option;
+  param_type : TYPES.param_type;
+  param_required : bool;
+}
 
+type service_doc = {
+  doc_id : int; (* uniq service identifier *)
+  doc_name : string option;
+  doc_descr : string option;
+  doc_path : path;
+  doc_params : param list;
+  mutable doc_registered : bool;
+  mutable doc_sample : (base_url -> url);
+  doc_section : section;
+  doc_input : Json_schema.schema Lazy.t;
+  doc_output : Json_schema.schema Lazy.t;
+}
+
+and section = {
+  section_name : string;
+  mutable section_docs : service_doc list;
+}
 
 (* All our services use 'params' as 'prefix of the service, and
    'unit' as 'input of the service (i.e. no input) *)
@@ -66,9 +92,6 @@ type ('arg,'input,'output) post_service1 =
   (request * 'arg, unit * 'arg, 'input, 'output) service
 
 type ('a, 'b) p
-
-type section
-
 
 val request :
   ?version:http_version ->
@@ -87,9 +110,9 @@ module Path : sig
 end
 
 module Param : sig
-  val string : ?name:string -> ?descr:string -> string -> param
-  val int : ?name:string -> ?descr:string -> string -> param
-  val bool : ?name:string -> ?descr:string -> string -> param
+  val string : ?name:string -> ?descr:string -> ?required:bool -> string -> param
+  val int : ?name:string -> ?descr:string -> ?required:bool -> string -> param
+  val bool : ?name:string -> ?descr:string -> ?required:bool -> string -> param
 end
 
 val arg_string : ?descr:string -> string -> string Resto.Arg.arg
@@ -99,6 +122,7 @@ val arg_int : ?descr:string -> string -> int Resto.Arg.arg
 val service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+  ?descr: string ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
   ('b, 'c) p ->
@@ -107,6 +131,7 @@ val service :
 val post_service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+  ?descr: string ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
@@ -166,3 +191,8 @@ val encode_args :
 
 val service_input : (_, _, 'input, _) service -> 'input Json_encoding.encoding
 val service_output : (_, _, _, 'output) service -> 'output Json_encoding.encoding
+
+(* swagger *)
+val paths_of_sections : ?docs:((string * string * string) list) ->
+  section list ->
+  (string * Ezjsonm.value) list * (string * Ezjsonm.value) list
