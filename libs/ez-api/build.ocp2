@@ -5,7 +5,7 @@ OCaml.library("ez-api", ocaml+
     (* Until we upgrade to ocplib-resto new version *)
       "resto1.ml";
       "restoDirectory1.ml";
-      
+
       "ezDebug.ml";
       "ezUrl.ml";
       "ezEncoding.ml";
@@ -92,3 +92,13 @@ OCaml.library("ez-api-cohttp", ocaml+
     ];
   });
 
+OCaml.library("ez-recaptcha", ocaml+
+  {
+    files = [
+      "recaptcha.ml";
+      ];
+    requires = [
+      "ez-api-curl";
+      "calendar";
+    ];
+  });
