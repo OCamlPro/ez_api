@@ -34,7 +34,7 @@ module Encoding = struct
          (opt "action" string)
          (opt "challenge_ts" tsp)
          (opt "hostname" string)
-         (opt "error_codes" (list string)))
+         (opt "error-codes" (list string)))
 end
 
 let recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
