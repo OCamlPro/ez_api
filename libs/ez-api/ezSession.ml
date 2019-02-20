@@ -64,8 +64,12 @@ end
 module Make(S : SessionArg) = struct
 
   type s2c_message =
+    | AuthError of string
+
     (* Authentication failed, here is a new challenge *)
-    | AuthNeeded of (* challenge_id *) string * (* challenge *) string
+    | AuthNeeded of
+        (* challenge_id *) string *
+                           (* challenge *) string
     (* Authentication succeeded, here is user info *)
     | AuthOK of
         (* login *) string *
@@ -82,6 +86,10 @@ module Make(S : SessionArg) = struct
   module Encoding = struct
     open Json_encoding
 
+    let auth_error =
+      obj1
+        (req "msg" EzEncoding.encoded_string)
+
     let auth_needed =
       obj2
         (req "challenge_id" string)
@@ -96,6 +104,16 @@ module Make(S : SessionArg) = struct
 
     let s2c_message =
       union [
+
+          case
+            auth_error
+            (function
+             | AuthError msg ->
+                Some msg
+             | _ -> None)
+            (fun msg ->
+              AuthError msg
+            );
 
           case
             auth_needed

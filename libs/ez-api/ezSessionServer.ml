@@ -146,6 +146,10 @@ end = struct
       add_auth_header req;
       EzAPIServer.return (new_challenge ())
 
+    let request_error req msg =
+      add_auth_header req;
+      EzAPIServer.return (AuthError msg)
+
     let return_auth req ?cookie ~login user_id user_info =
       begin
         match cookie with
@@ -162,22 +166,22 @@ end = struct
     let connect req () =
       get_request_session req >>= function
       | None ->
-         request_auth req
+        request_auth req
       | Some { session_cookie = cookie;
                session_login = login;
                _ } ->
-         find_user ~login >>= function
-         | None ->
-            request_auth req
-         | Some (_pwhash, user_id, user_info) ->
-            return_auth req ~cookie ~login user_id user_info
+        find_user ~login >>= function
+        | None ->
+          request_error req "Session expired"
+        | Some (_pwhash, user_id, user_info) ->
+          return_auth req ~cookie ~login user_id user_info
 
     let login req { login_user; login_challenge_id; login_challenge_reply } =
       find_user ~login:login_user >>= function
       | None ->
          if verbose > 1 then
            EzDebug.printf "/login: could not find user %S\n%!" login_user;
-         request_auth req
+         request_error req "Bad user or password"
       | Some (pwhash, user_id, user_info) ->
          match Hashtbl.find challenges login_challenge_id with
          | exception Not_found ->
@@ -192,7 +196,7 @@ end = struct
             if expected_reply <> login_challenge_reply then begin
                 if verbose > 1 then
                   EzDebug.printf "/login: challenge failed\n%!";
-                request_auth req
+                request_error req "Bad user or password"
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
                 return_auth req ~login:login_user user_id user_info
