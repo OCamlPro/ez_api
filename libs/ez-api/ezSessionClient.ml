@@ -5,10 +5,11 @@ module Make(S: SessionArg) : sig
 
   module TYPES : sig
     type auth = {
-        auth_login : string;
-        auth_user : S.user_info;
-        auth_token : string;
-      }
+      auth_login : string;
+      auth_user_id : S.user_id;
+      auth_user : S.user_info;
+      auth_token : string;
+    }
   end
   open TYPES
 
@@ -46,10 +47,11 @@ module Make(S: SessionArg) : sig
 
   module TYPES = struct
     type auth = {
-        auth_login : string;
-        auth_user : S.user_info;
-        auth_token : string;
-      }
+      auth_login : string;
+      auth_user_id : S.user_id;
+      auth_user : S.user_info;
+      auth_token : string;
+    }
   end
   open TYPES
 
@@ -96,11 +98,14 @@ module Make(S: SessionArg) : sig
          ~error:(fun _n _ -> f (Error (Failure "Error connect")))
          ~params:[]
          (function
+           | AuthError msg ->
+             state := Disconnected;
+             f (Error (Failure msg))
           | AuthNeeded (challenge_id, challenge) ->
              state := Connected (challenge_id, challenge);
              f (Ok None)
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
+          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+             let u = { auth_login; auth_user_id; auth_token; auth_user } in
              state := User u;
              f (Ok (Some u))
          )
@@ -114,63 +119,65 @@ module Make(S: SessionArg) : sig
     if ntries = 0 then
       (try f (Error (Failure "too many login attempts")) with _ -> ())
     else
-    match !state with
-    | Disconnected ->
-       connect api
-               (function
-                | Error _ as err -> f err
-                | Ok None -> login_rec (ntries-1) api u_login u_password f
-                | Ok (Some u) ->
-                   if u.auth_login <> u_login then
-                     logout
-                       api
-                       ~token:u.auth_token
-                       (function
-                          Ok _ ->
-                          login_rec (ntries-1) api u_login u_password f
-                        | Error _ as err ->
-                           f err )
-                   else
-                     f (Ok u))
-    | User u ->
-       if u.auth_login <> u_login then
-         logout api
-           ~token:u.auth_token
-           (function
-                     | Ok _ ->
-                        login_rec (ntries-1) api u_login u_password f
-                     | Error _ as err ->
-                        f err
-                    )
-       else
-         f (Ok u)
-    | Connected (challenge_id, challenge) ->
-       let challenge_reply =
-         EzSession.Hash.challenge
-           ~challenge
-           ~pwhash:(EzSession.Hash.password ~login:u_login
-                                            ~password:u_password)
-       in
-       EzRequest.ANY.post0
-         api
-         Service.login "login"
-         ~error:(fun _n _ -> f (Error (Failure "Error login")))
-         ~params:[]
-         ~input: {
-           login_user = u_login;
-           login_challenge_id = challenge_id;
-           login_challenge_reply = challenge_reply;
-         }
-         (function
-          | AuthNeeded (challenge_id, challenge) ->
-             state := Connected (challenge_id, challenge);
-             login_rec (ntries-1) api u_login u_password f
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
-             set_cookie u.auth_token;
-             state := User u;
-             f (Ok u)
-         )
+      match !state with
+      | Disconnected ->
+        connect api
+          (function
+            | Error _ as err -> f err
+            | Ok None -> login_rec (ntries-1) api u_login u_password f
+            | Ok (Some u) ->
+              if u.auth_login <> u_login then
+                logout
+                  api
+                  ~token:u.auth_token
+                  (function
+                      Ok _ ->
+                      login_rec (ntries-1) api u_login u_password f
+                    | Error _ as err ->
+                      f err )
+              else
+                f (Ok u))
+      | User u ->
+        if u.auth_login <> u_login then
+          logout api
+            ~token:u.auth_token
+            (function
+              | Ok _ ->
+                login_rec (ntries-1) api u_login u_password f
+              | Error _ as err ->
+                f err
+            )
+        else
+          f (Ok u)
+      | Connected (challenge_id, challenge) ->
+        let challenge_reply =
+          EzSession.Hash.challenge
+            ~challenge
+            ~pwhash:(EzSession.Hash.password ~login:u_login
+                       ~password:u_password)
+        in
+        EzRequest.ANY.post0
+          api
+          Service.login "login"
+          ~error:(fun _n _ -> f (Error (Failure "Error login")))
+          ~params:[]
+          ~input: {
+            login_user = u_login;
+            login_challenge_id = challenge_id;
+            login_challenge_reply = challenge_reply;
+          }
+          (function
+            | AuthError msg ->
+              f (Error (Failure msg))
+            | AuthNeeded (challenge_id, challenge) ->
+              state := Connected (challenge_id, challenge);
+              login_rec (ntries-1) api u_login u_password f
+            | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+              let u = { auth_login; auth_user_id; auth_token; auth_user } in
+              set_cookie u.auth_token;
+              state := User u;
+              f (Ok u)
+          )
 
   and login api ~login:u_login ~password:u_password f =
     login_rec 4 api u_login u_password f
@@ -182,23 +189,25 @@ module Make(S: SessionArg) : sig
     | Connected _
       -> (try f (Ok false) with _ -> ())
     | User u ->
-       EzRequest.ANY.get0
-         api
-         Service.logout "logout"
-         ~error:(fun _n _data -> f (Error (Failure "Error")))
-         ~params:[]
-         ~headers:(auth_headers ~token)
-         (function
+      EzRequest.ANY.get0
+        api
+        Service.logout "logout"
+        ~error:(fun _n _data -> f (Error (Failure "Error")))
+        ~params:[]
+        ~headers:(auth_headers ~token)
+        (function
+          | AuthError msg ->
+            f (Error (Failure msg))
           | AuthNeeded (challenge_id, challenge) ->
-             remove_cookie u.auth_token;
-             state := Connected (challenge_id, challenge);
-             f (Ok true)
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
-             state := User u;
-             f (Error (Failure "logout not accepted"))
-         )
-         ()
+            remove_cookie u.auth_token;
+            state := Connected (challenge_id, challenge);
+            f (Ok true)
+          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+            let u = { auth_login; auth_user_id; auth_token; auth_user } in
+            state := User u;
+            f (Error (Failure "logout not accepted"))
+        )
+        ()
 
   let get () =
     match !state with

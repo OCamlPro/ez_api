@@ -55,8 +55,10 @@ let user1_password = EzSession.Hash.password user1_login "dalfhhdgkfh"
 let user1_info = "info-on-user"
 
 module SessionArg = struct
+  type user_id = string
   type user_info = Types.user_info
-  let encoding = Encoding.user_info
+  let user_id_encoding = Json_encoding.string
+  let user_info_encoding = Encoding.user_info
   let rpc_path = []
   let token_kind = `CSRF "X-Csrf-Token" (* `Cookie "EZSESSION" *)
 end
