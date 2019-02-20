@@ -37,137 +37,28 @@ let random_challenge () =
   Bytes.to_string b
 
 module type SessionStore = sig
-  val create_session : login:string -> session
-  val get_session : cookie:string -> session option Lwt.t
-  val remove_session : login:string -> cookie:string -> unit Lwt.t
+  type user_id
+  val create_session : login:string -> user_id -> user_id session Lwt.t
+  val get_session : cookie:string -> user_id session option Lwt.t
+  val remove_session : user_id -> cookie:string -> unit Lwt.t
 end
 
-module SessionStoreInMemory : SessionStore = struct
-
-(*
-    TODO: When crowded, we should:
-    * limit the number of sessions by users
-    * get rid of oldest sessions in general
- *)
-
-  let (session_by_cookie : (string, session) Hashtbl.t) =
-    Hashtbl.create initial_hashtbl_size
-
-  let rec create_session ~login =
-    let cookie = random_challenge () in
-    if Hashtbl.mem session_by_cookie cookie then
-      create_session ~login
-    else begin
-        let s = {
-            session_login = login;
-            session_cookie = cookie;
-            session_variables = StringMap.empty;
-            session_last = EzAPIServer.req_time ();
-          } in
-        Hashtbl.add session_by_cookie cookie s;
-        s
-      end
-
-  let get_session ~cookie =
-    match Hashtbl.find session_by_cookie cookie with
-    | exception Not_found ->
-       Lwt.return None
-    | s ->
-       s.session_last <- EzAPIServer.req_time ();
-       Lwt.return (Some s)
-
-  let remove_session ~login ~cookie =
-    get_session ~cookie >>= function
-    | None -> Lwt.return ()
-    | Some s ->
-      if s.session_login = login then
-        Hashtbl.remove session_by_cookie cookie;
-      Lwt.return ()
-
-end
-
-module UserStoreInMemory(S : EzSession.TYPES.SessionArg) : sig
-
-  type pwhash = string
-  val create_user :
-    ?pwhash:pwhash ->
-    ?password:string -> login:string -> S.user_info -> unit
-  val remove_user : login:string -> unit
-  val find_user : login:string -> (pwhash * S.user_info) option Lwt.t
-
+module type Arg = sig
   module SessionArg : EzSession.TYPES.SessionArg
-         with type user_info = S.user_info
-  module SessionStore : SessionStore
-end = struct
-
-  type pwhash = string
-
-  module SessionArg = S
-  module SessionStore = SessionStoreInMemory
-
-  type user = {
-      login : string;
-      mutable pwhash : string; (* hash of password *)
-      mutable user_info : S.user_info;
-    }
-
-  let (users : (string, user) Hashtbl.t) =
-    Hashtbl.create initial_hashtbl_size
-
-  let create_user
-        ?pwhash ?password ~login
-        user_info =
-    if verbose > 1 then
-      EzDebug.printf "create_user %S ?" login;
-    if Hashtbl.mem users login then
-      raise UserAlreadyDefined;
-    let pwhash = match pwhash with
-      | Some pwhash -> pwhash
-      | None ->
-         match password with
-         | None -> raise NoPasswordProvided
-         | Some password ->
-            EzSession.Hash.password ~login ~password
-    in
-    if verbose > 1 then
-      EzDebug.printf "create_user %S ok" login;
-    Hashtbl.add users login
-                { login;
-                  pwhash;
-                  user_info }
-
-  let find_user ~login =
-    if verbose > 1 then
-      EzDebug.printf "find_user %S ?" login;
-    match Hashtbl.find users login with
-    | exception Not_found ->
-      Lwt.return None
-    | u ->
-      if verbose > 1 then
-        EzDebug.printf "find_user %S ok" login;
-      Lwt.return ( Some (u.pwhash, u.user_info) )
-
-
-  let remove_user ~login =
-    Hashtbl.remove users login
+  module SessionStore : SessionStore with type user_id = SessionArg.user_id
+  val find_user : login:string ->
+    (string * SessionArg.user_id * SessionArg.user_info) option Lwt.t
 
 end
 
-
-module Make(S: sig
-                module SessionArg : EzSession.TYPES.SessionArg
-                module SessionStore : SessionStore
-                val find_user : login:string ->
-                  (string *
-                   SessionArg.user_info) option Lwt.t
-              end
-           ) : sig
+module Make(S: Arg) : sig
 
   val register_handlers :
     EzAPI.request EzAPIServer.directory ->
     EzAPI.request EzAPIServer.directory
 
-  val get_request_session : EzAPI.request -> session option Lwt.t
+  val get_request_session :
+    EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
   val register :
            ('arg, 'b, 'input, 'd) EzAPI.service ->
@@ -255,16 +146,18 @@ end = struct
       add_auth_header req;
       EzAPIServer.return (new_challenge ())
 
-    let return_auth req ?cookie ~login user_info =
-      let cookie = match cookie with
+    let return_auth req ?cookie ~login user_id user_info =
+      begin
+        match cookie with
+        | Some cookie -> Lwt.return cookie
         | None ->
-           let s = create_session ~login in
-           s.session_cookie
-        | Some cookie -> cookie
-      in
-      add_auth_header ~cookie req;
-      EzAPIServer.return
-        (AuthOK (login, cookie, user_info))
+          create_session ~login user_id >>= function s ->
+            Lwt.return s.session_cookie
+      end
+      >>= function cookie ->
+        add_auth_header ~cookie req;
+        EzAPIServer.return
+          (AuthOK (login, user_id, cookie, user_info))
 
     let connect req () =
       get_request_session req >>= function
@@ -276,8 +169,8 @@ end = struct
          find_user ~login >>= function
          | None ->
             request_auth req
-         | Some (_pwhash, user_info) ->
-            return_auth req ~cookie ~login user_info
+         | Some (_pwhash, user_id, user_info) ->
+            return_auth req ~cookie ~login user_id user_info
 
     let login req { login_user; login_challenge_id; login_challenge_reply } =
       find_user ~login:login_user >>= function
@@ -285,7 +178,7 @@ end = struct
          if verbose > 1 then
            EzDebug.printf "/login: could not find user %S\n%!" login_user;
          request_auth req
-      | Some (pwhash, user_info) ->
+      | Some (pwhash, user_id, user_info) ->
          match Hashtbl.find challenges login_challenge_id with
          | exception Not_found ->
             if verbose > 1 then
@@ -302,14 +195,14 @@ end = struct
                 request_auth req
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
-                return_auth req ~login:login_user user_info
+                return_auth req ~login:login_user user_id user_info
               end
 
     let logout req () =
        get_request_session req >>= function
       | None -> EzAPIServer.return_error 403
-      | Some { session_login=login; session_cookie = cookie; _ } ->
-         remove_session ~login ~cookie >>= fun () ->
+      | Some { session_user_id ; session_cookie = cookie; _ } ->
+         remove_session session_user_id ~cookie >>= fun () ->
          request_auth req
   end
 
@@ -328,5 +221,128 @@ end = struct
     |> register Service.connect Handler.connect
     |> EzAPIServer.register Service.login Handler.login
     |> register Service.logout Handler.logout
+
+end
+
+
+
+module SessionStoreInMemory :
+  SessionStore with type user_id = string = struct
+
+(*
+    TODO: When crowded, we should:
+    * limit the number of sessions by users
+    * get rid of oldest sessions in general
+ *)
+
+  type user_id = string
+
+  let (session_by_cookie : (string, user_id session) Hashtbl.t) =
+    Hashtbl.create initial_hashtbl_size
+
+  let rec create_session ~login user_id =
+    let cookie = random_challenge () in
+    if Hashtbl.mem session_by_cookie cookie then
+      create_session ~login user_id
+    else begin
+      let s = {
+        session_login = login;
+        session_user_id = user_id;
+        session_cookie = cookie;
+        session_variables = StringMap.empty;
+        session_last = EzAPIServer.req_time ();
+      } in
+      Hashtbl.add session_by_cookie cookie s;
+      Lwt.return s
+    end
+
+  let get_session ~cookie =
+    match Hashtbl.find session_by_cookie cookie with
+    | exception Not_found ->
+       Lwt.return None
+    | s ->
+       s.session_last <- EzAPIServer.req_time ();
+       Lwt.return (Some s)
+
+  let remove_session user_id ~cookie =
+    get_session ~cookie >>= function
+    | None -> Lwt.return ()
+    | Some s ->
+      if s.session_user_id = user_id then
+        Hashtbl.remove session_by_cookie cookie;
+      Lwt.return ()
+
+end
+
+module UserStoreInMemory(S : EzSession.TYPES.SessionArg
+                        with type user_id = string) : sig
+
+  type pwhash = string
+  val create_user :
+    ?pwhash:pwhash ->
+    ?password:string -> login:string -> S.user_info -> unit
+  val remove_user : login:string -> unit
+  val find_user : login:string -> (pwhash * S.user_id * S.user_info) option Lwt.t
+
+  module SessionArg : EzSession.TYPES.SessionArg
+    with type user_info = S.user_info
+     and type user_id = S.user_id
+  module SessionStore : SessionStore with type user_id = S.user_id
+
+end = struct
+
+  type pwhash = string
+
+  module SessionArg = S
+  module SessionStore =
+    (SessionStoreInMemory : SessionStore with type user_id = S.user_id)
+
+  type user = {
+    login : string;
+    user_id : S.user_id;
+    mutable pwhash : string; (* hash of password *)
+    mutable user_info : S.user_info;
+  }
+
+  let (users : (string, user) Hashtbl.t) =
+    Hashtbl.create initial_hashtbl_size
+
+  let create_user
+      ?pwhash ?password ~login
+      user_info =
+    if verbose > 1 then
+      EzDebug.printf "create_user %S ?" login;
+    if Hashtbl.mem users login then
+      raise UserAlreadyDefined;
+    let pwhash = match pwhash with
+      | Some pwhash -> pwhash
+      | None ->
+        match password with
+        | None -> raise NoPasswordProvided
+        | Some password ->
+          EzSession.Hash.password ~login ~password
+    in
+    if verbose > 1 then
+      EzDebug.printf "create_user %S ok" login;
+    Hashtbl.add users login
+      { login;
+        pwhash;
+        user_id = login;
+        user_info }
+
+  let find_user ~login =
+    if verbose > 1 then
+      EzDebug.printf "find_user %S ?" login;
+    match Hashtbl.find users login with
+    | exception Not_found ->
+      Lwt.return None
+    | u ->
+      if verbose > 1 then
+        EzDebug.printf "find_user %S ok" login;
+      Lwt.return ( Some (u.pwhash, u.user_id, u.user_info) )
+
+
+  let remove_user ~login =
+    Hashtbl.remove users login
 
 end

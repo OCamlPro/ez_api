@@ -5,10 +5,11 @@ module Make(S: SessionArg) : sig
 
   module TYPES : sig
     type auth = {
-        auth_login : string;
-        auth_user : S.user_info;
-        auth_token : string;
-      }
+      auth_login : string;
+      auth_user_id : S.user_id;
+      auth_user : S.user_info;
+      auth_token : string;
+    }
   end
   open TYPES
 
@@ -46,10 +47,11 @@ module Make(S: SessionArg) : sig
 
   module TYPES = struct
     type auth = {
-        auth_login : string;
-        auth_user : S.user_info;
-        auth_token : string;
-      }
+      auth_login : string;
+      auth_user_id : S.user_id;
+      auth_user : S.user_info;
+      auth_token : string;
+    }
   end
   open TYPES
 
@@ -99,8 +101,8 @@ module Make(S: SessionArg) : sig
           | AuthNeeded (challenge_id, challenge) ->
              state := Connected (challenge_id, challenge);
              f (Ok None)
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
+          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+             let u = { auth_login; auth_user_id; auth_token; auth_user } in
              state := User u;
              f (Ok (Some u))
          )
@@ -165,8 +167,8 @@ module Make(S: SessionArg) : sig
           | AuthNeeded (challenge_id, challenge) ->
              state := Connected (challenge_id, challenge);
              login_rec (ntries-1) api u_login u_password f
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
+          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+             let u = { auth_login; auth_user_id; auth_token; auth_user } in
              set_cookie u.auth_token;
              state := User u;
              f (Ok u)
@@ -193,8 +195,8 @@ module Make(S: SessionArg) : sig
              remove_cookie u.auth_token;
              state := Connected (challenge_id, challenge);
              f (Ok true)
-          | AuthOK (auth_login, auth_token, auth_user) ->
-             let u = { auth_login; auth_token; auth_user } in
+          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+             let u = { auth_login; auth_user_id; auth_token; auth_user } in
              state := User u;
              f (Error (Failure "logout not accepted"))
          )

@@ -3,10 +3,11 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
 
   module TYPES : sig
     type auth = {
-        auth_login : string;
-        auth_user : S.user_info;
-        auth_token : string;
-      }
+      auth_login : string;
+      auth_user_id : S.user_id;
+      auth_user : S.user_info;
+      auth_token : string;
+    }
   end
   open TYPES
 

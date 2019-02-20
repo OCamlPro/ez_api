@@ -8,18 +8,22 @@ let debug = false
 
 module TYPES = struct
 
-  type session = {
-      session_cookie : string;
-      session_login : string;
-      mutable session_variables : string StringMap.t;
-      mutable session_last : float;
-    }
+  type 'user_id session = {
+    session_cookie : string;
+    session_login : string;
+    session_user_id : 'user_id;
+    mutable session_variables : string StringMap.t;
+    mutable session_last : float;
+  }
 
   module type SessionArg = sig
 
+    type user_id
     type user_info
 
-    val encoding : user_info Json_encoding.encoding
+    val user_id_encoding : user_id Json_encoding.encoding
+    val user_info_encoding : user_info Json_encoding.encoding
+
     val rpc_path : string list (* ["v1"] *)
 
     (*
@@ -65,8 +69,9 @@ module Make(S : SessionArg) = struct
     (* Authentication succeeded, here is user info *)
     | AuthOK of
         (* login *) string *
-        (* cookie *) string *
-        S.user_info
+                    S.user_id *
+                    (* cookie *) string *
+                    S.user_info
 
   type login_message = {
       login_user : string;
@@ -83,10 +88,11 @@ module Make(S : SessionArg) = struct
         (req "challenge" string)
 
     let auth_ok =
-      obj3
+      obj4
         (req "login" EzEncoding.encoded_string)
+        (req "user_id" S.user_id_encoding)
         (req "token" string)
-        (req "user_info" S.encoding)
+        (req "user_info" S.user_info_encoding)
 
     let s2c_message =
       union [
@@ -104,11 +110,11 @@ module Make(S : SessionArg) = struct
           case
             auth_ok
             (function
-             | AuthOK (login, cookie, user_info) ->
-                Some (login, cookie, user_info)
+             | AuthOK (login, user_id, cookie, user_info) ->
+                Some (login, user_id, cookie, user_info)
              | _ -> None)
-            (fun (login, cookie, user_info) ->
-              AuthOK (login, cookie, user_info)
+            (fun (login, user_id, cookie, user_info) ->
+              AuthOK (login, user_id, cookie, user_info)
             );
 
         ]
