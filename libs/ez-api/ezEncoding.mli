@@ -344,3 +344,6 @@ val merge_objs :
   ?descr:string ->
   'a Json_encoding.encoding ->
   'b Json_encoding.encoding -> ('a * 'b) Json_encoding.encoding
+
+val result : 'a Json_encoding.encoding -> 'b Json_encoding.encoding ->
+  ('a, 'b) result Json_encoding.encoding
