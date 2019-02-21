@@ -396,7 +396,7 @@ let int_kind = Json_schema.(Integer numeric_specs)
 let int_element = Json_schema.element int_kind
 let tup1_int_kind = Json_schema.(Monomorphic_array (int_element, array_specs))
 let tup1_int_element = Json_schema.element tup1_int_kind
-let int64_element = {int_element with format = Some "int64"}
+let int64_element = Json_schema.({int_element with format = Some "int64"})
 let tup1_int64_kind = Json_schema.(Monomorphic_array (int64_element, array_specs))
 let tup1_int64_element = Json_schema.element tup1_int64_kind
 let string_kind = Json_schema.(String string_specs)
