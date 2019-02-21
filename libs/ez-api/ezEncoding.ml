@@ -444,3 +444,15 @@ let merge_objs ?name ?descr o1 o2 =
   let o = Json_encoding.merge_objs o1 o2 in
   register ?name ?descr o;
   o
+
+let result ok_enc err_enc =
+  union [
+    case
+      (obj1 (req "ok" ok_enc))
+      (function Ok s -> Some s | Error _ -> None)
+      (fun s -> Ok s);
+    case
+      (obj1 (req "error" err_enc))
+      (function Error s -> Some s | Ok _ -> None)
+      (fun s -> Error s)
+  ]
