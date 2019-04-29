@@ -125,43 +125,43 @@ module MakeServer(S : sig end) = struct
       match EzAPI.find_param Service.param_arg params with
       | None -> failwith "test1: missing argument"
       | Some s ->
-         EzAPIServer.return { name = "test1"; query = s; version = 1 }
+         EzAPIServerUtils.return { name = "test1"; query = s; version = 1 }
 
     let test2 (params, s) () =
       match EzAPI.find_param Service.param_arg params with
       | None -> failwith "test2: missing argument"
       | Some arg ->
-         EzAPIServer.return { name = "test2";
+         EzAPIServerUtils.return { name = "test2";
                                         query = s ^ arg; version = 1 }
 
     let test3 s r =
-      EzAPIServer.return { name = "test3";
+      EzAPIServerUtils.return { name = "test3";
                                      query = r.user^r.hash; version = 1 }
 
     let test4 (req,s) r =
       Session.get_request_session req >>= function
       | Some { session_login } ->
-         EzAPIServer.return { name = "test4 for " ^ session_login;
+         EzAPIServerUtils.return { name = "test4 for " ^ session_login;
                                      query = r.user^r.hash; version = 1 }
       | None ->
-         EzAPIServer.return_error 403
+         EzAPIServerUtils.return_error 403
   end
 
   let dir =
-    EzAPIServer.empty
-    |> EzAPIServer.register Service.test1 Handler.test1
-    |> EzAPIServer.register Service.test2 Handler.test2
-    |> EzAPIServer.register Service.test3 Handler.test3
-    |> EzAPIServer.register Service.test4 Handler.test4
+    EzAPIServerUtils.empty
+    |> EzAPIServerUtils.register Service.test1 Handler.test1
+    |> EzAPIServerUtils.register Service.test2 Handler.test2
+    |> EzAPIServerUtils.register Service.test3 Handler.test3
+    |> EzAPIServerUtils.register Service.test4 Handler.test4
     |> Session.register_handlers
 
   let main () =
     Users.create_user ~password:user1_password ~login:user1_login user1_info;
-    let servers = [ !api_port, EzAPIServer.API dir ] in
+    let servers = [ !api_port, EzAPIServerUtils.API dir ] in
     let servers = match !root with
       | None -> servers
       | Some root ->
-         (!root_port, EzAPIServer.Root (root, !default)) :: servers
+         (!root_port, EzAPIServerUtils.Root (root, !default)) :: servers
     in
     Lwt_main.run (
         Printf.eprintf "Starting servers on ports %s\n%!"

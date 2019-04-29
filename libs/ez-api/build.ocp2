@@ -22,13 +22,13 @@ OCaml.library("ez-api", ocaml+
     ];
   });
 
-OCaml.library("ez-api-server", ocaml+
+OCaml.library("ez-api-utils", ocaml+
   {
     files = [
       "gMTime.ml";
       "timings.ml";
+      "ezAPIServerUtils.ml";
       "ezCookieServer.ml";
-      "ezAPIServer.ml";
       "ezSessionServer.ml";
       "ezSwagger.ml";
     ];
@@ -43,6 +43,29 @@ OCaml.library("ez-api-server", ocaml+
     ];
   });
 
+
+OCaml.library("ez-api-server", ocaml+
+  {
+    files = [
+      "ezAPIServer.ml";
+    ];
+    requires = [
+      "ez-api-utils";
+    ];
+  });
+
+OCaml.library("ez-api-server-httpaf", ocaml+
+  {
+    files = [
+      "ezAPIServerHttpAf.ml";
+    ];
+    requires = [
+      "ez-api-utils";
+      "httpaf";
+      "httpaf-lwt-unix";
+      "extunix";
+    ];
+  });
 
 OCaml.library("ez-api-session-client", ocaml+
   {
