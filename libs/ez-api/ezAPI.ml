@@ -483,42 +483,60 @@ let paths_of_sections ?(docs=[]) sections =
   let definitions_schema =
     ref (Json_schema.create (Json_schema.element Json_schema.Any))
   in
-  let output_schemas =
+  let input_output_schemas =
     List.map (fun sd ->
         let output_schema = Lazy.force sd.doc_output in
+        let input_schema = Lazy.force sd.doc_input in
         let output_schema, updated =
           Json_schema.merge_definitions
             (output_schema, !definitions_schema) in
+        let input_schema, updated =
+          Json_schema.merge_definitions
+            (input_schema, updated) in
         definitions_schema := updated;
+        Json_schema.root input_schema,
         Json_schema.root output_schema
       ) services
   in
-  let schemas, definitions =
+  let input_schemas, output_schemas = List.split input_output_schemas in
+  let input_schemas, output_schemas, definitions =
     let sch = Json_schema.update
         (Json_schema.element
-           (Json_schema.Array (output_schemas, Json_schema.array_specs)))
+           (Json_schema.Combine
+              (Json_schema.All_of, [
+                  (Json_schema.element
+                     (Json_schema.Array (input_schemas,
+                                         Json_schema.array_specs)));
+                  (Json_schema.element
+                     (Json_schema.Array (output_schemas,
+                                         Json_schema.array_specs)));
+
+                ])))
         !definitions_schema
     in
     match JsonSchema.to_json sch with
-    | `O [
-        "$schema", _;
-        "type", `String "array";
-        "items", `A schemas ;
-        "additionalItems", _;
-        "components", `O [ "schemas", `O definitions ] ;
-      ] ->
-      schemas, definitions
-    | `O [
-        "$schema", _;
-        "type", `String "array";
-        "items", `A schemas ;
-        "additionalItems", _;
-      ] ->
-      schemas, []
-    | `O fields ->
-      Printf.eprintf "%d\n%!" (List.length fields);
-      List.iter (fun (x,_) ->
-          Printf.eprintf "%S\n%!" x) fields;
+    | `O (
+        ("$schema", _) ::
+        ("allOf", `A [
+            `O [
+              "type", `String "array";
+              "items", `A input_schemas;
+              "additionalItems", _;
+            ];
+            `O [
+              "type", `String "array";
+              "items", `A output_schemas;
+              "additionalItems", _;
+            ];
+        ]) ::
+        defs) ->
+      let definitions = match defs with
+        | [] -> []
+        | ["components", `O [ "schemas", `O definitions ]] -> definitions
+        | _ -> assert false in
+      input_schemas, output_schemas, definitions
+    | (`O _ | `A _) as j ->
+      Printf.eprintf "%s\n%!" (Ezjsonm.to_string ~minify:false j);
       assert false
     | _ -> assert false
   in
@@ -578,9 +596,26 @@ let paths_of_sections ?(docs=[]) sections =
         in
         iter sd.doc_path parameters
       in
+      let in_schema = List.nth input_schemas i in
+      let out_schema = List.nth output_schemas i in
+      let meth, request_schema = match in_schema with
+        | `O ["type", `String "object";
+              "properties", `O [];
+              "additionalProperties", `Bool false ] ->
+          (* no request, say GET *)
+          "get", []
+        | _ ->
+          "post", [ "requestBody", `O [
+              "content", `O [
+                "application/json", `O [
+                  "schema", in_schema
+                ]
+              ]
+            ]]
+      in
       get_path sd,
       `O [
-        "get", `O [
+        meth, `O ([
           "tags", `A [ `String sd.doc_section.section_name ];
           "summary", `String summary;
           "description", `String description;
@@ -592,12 +627,12 @@ let paths_of_sections ?(docs=[]) sections =
               "description", `String "Success";
               "content", `O [
                 "application/json", `O [
-                  "schema", List.nth schemas i
+                  "schema", out_schema
                 ]
               ]
             ]
           ];
-        ]
+        ] @ request_schema)
       ]
     ) services
   in
