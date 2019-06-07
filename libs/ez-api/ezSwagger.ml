@@ -50,5 +50,5 @@ let to_string
   json ?descr ?version ?title ?terms ?contact ?license ?servers ?docs sections
 
 let handler sections (_req : EzAPI.request) () =
-    Lwt.fail (EzAPIServer.EzRawReturn
+    Lwt.fail (EzAPIServerUtils.EzRawReturn
                 (to_string sections))
