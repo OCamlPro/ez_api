@@ -1,4 +1,15 @@
 
+OCaml.library("ez-encoding", ocaml+
+  {
+    files = [
+      "ezEncoding.ml";
+    ];
+    requires = [
+      "ocplib-json-typed";
+      "ezjsonm";
+    ];
+  });
+
 OCaml.library("ez-api", ocaml+
   {
     files = [
@@ -15,10 +26,9 @@ OCaml.library("ez-api", ocaml+
     ];
     requires = [
       "lwt";
-      "ocplib-json-typed";
-      "ezjsonm";
       "ocplib-compat";
       "ocplib-lang";
+      "ez-encoding";
     ];
   });
 
