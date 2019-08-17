@@ -16,10 +16,8 @@ OCaml.library("ez-api", ocaml+
     (* Until we upgrade to ocplib-resto new version *)
       "resto1.ml";
       "restoDirectory1.ml";
-
       "ezDebug.ml";
       "ezUrl.ml";
-      "ezEncoding.ml";
       "ezAPI.ml";
       "ezRequest.ml";
       "ezSession.ml";
