@@ -406,21 +406,10 @@ let tup1_string_element = Json_schema.element tup1_string_kind
 
 let int64 =
   conv
-    (fun x -> x)
-    (fun x -> x)
+    (fun x -> Int64.to_string x)
+    (fun x -> Int64.of_string x)
     ~schema:(Json_schema.create int64_element)
-    (union [
-        case
-          int32
-          (fun i ->
-             let j = Int64.to_int32 i in
-             if Int64.equal (Int64.of_int32 j) i then Some j else None)
-          Int64.of_int32 ;
-        case
-          string
-          (fun i -> Some (Int64.to_string i))
-          Int64.of_string
-      ])
+    string
 
 let int =
   conv (fun x -> x) (fun x -> x) ~schema:(Json_schema.create int_element) int
