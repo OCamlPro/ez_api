@@ -75,16 +75,6 @@ OCaml.library("ez-api-server-httpaf", ocaml+
     ];
   });
 
-OCaml.library("ez-api-session-client", ocaml+
-  {
-    files = [
-      "ezSessionClient.ml"
-      ];
-    requires = [
-      "ez-api";
-    ];
-  });
-
 OCaml.library("ez-api-js", ocaml+
   {
     files = [
@@ -94,10 +84,18 @@ OCaml.library("ez-api-js", ocaml+
       "ezJS.ml";
       ];
     requires = [
-      "ez-api-session-client";
-      "ezjsonm";
-      "js_of_ocaml";
+      "ez-api";
       "ocplib-utils-js";
+    ];
+  });
+
+OCaml.library("ez-api-session-client", ocaml+
+  {
+    files = [
+      "ezSessionClient.ml"
+      ];
+    requires = [
+      "ez-api-js";
     ];
   });
 
