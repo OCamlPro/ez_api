@@ -31,13 +31,11 @@ remove: [
 available: [ocaml-version >= "4.03.0"]
 depends: [
      "base64"
-     "camlp4"
      "cohttp-lwt" {>= "0.99.0" }
      "cohttp-lwt-unix"
      "ezjsonm"
      "geoip"
      "js_of_ocaml"
-     "js_of_ocaml-camlp4"
      "js_of_ocaml-ppx"
      "js_of_ocaml-tyxml"
      "ocamlfind"

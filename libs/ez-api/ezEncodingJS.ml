@@ -187,8 +187,8 @@ let json_of_string (s : string) : [> t] =
   try
     Js._JSON##parse (Js.string s) |> json_of_js
   with (Js.Error e) ->
-    if Js.to_string e##name = "SyntaxError" then
-      parse_error `Null "Ezjsonm.from_string %s" (Js.to_string e##message)
+    if Js.to_string e##.name = "SyntaxError" then
+      parse_error `Null "Ezjsonm.from_string %s" (Js.to_string e##.message)
     else Js.raise_js_error e
 
 let js_of_json j  = JSON_to_Js.convert [LeafZip (value j)]

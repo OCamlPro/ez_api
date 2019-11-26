@@ -16,6 +16,4 @@ if( with_version = true ){
      version_fields = [];
    }
 
-camlp4_js = [
-  "camlp4o"; "%{js_of_ocaml-camlp4_SRC_DIR}%/pa_js.cma"
-];
+pp_js = { pp = [ "%{js_of_ocaml-ppx_SRC_DIR}%/ppx.exe"; "--as-pp" ] };
