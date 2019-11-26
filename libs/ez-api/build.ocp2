@@ -79,8 +79,8 @@ OCaml.library("ez-api-js", ocaml+
   {
     files = [
       "ezDebugJS.ml";
-      "ezEncodingJS.ml", { pp = camlp4_js  };
-      "ezXhr.ml", { pp = camlp4_js };
+      "ezEncodingJS.ml", pp_js;
+      "ezXhr.ml", pp_js;
       "ezJS.ml";
       ];
     requires = [

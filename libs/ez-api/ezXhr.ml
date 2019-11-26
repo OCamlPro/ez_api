@@ -7,49 +7,51 @@ let xhr_get msg url ?(headers=[]) f =
   if msg <> "" then
     Js_utils.log "[>%s GET %s]" msg url;
   let xhr = XmlHttpRequest.create () in
-  xhr##_open (Js.string "GET", Js.string url, Js._true) ;
+  xhr##_open (Js.string "GET") (Js.string url) Js._true ;
   List.iter (fun (name, value) ->
       xhr##setRequestHeader
-        (Js.string name, Js.string value) ;
+        (Js.string name) (Js.string value) ;
     ) headers;
-  xhr##onreadystatechange <-
+  xhr##.onreadystatechange :=
     Js.wrap_callback (fun _ ->
-        if xhr##readyState = XmlHttpRequest.DONE then
-          let status = xhr##status in
+        if xhr##.readyState = XmlHttpRequest.DONE then
+          let status = xhr##.status in
           if msg <> "" then
             Js_utils.log "[>%s RECV %d %s]" msg status url;
           if status = 200 then
-            f (CodeOk (Js.Opt.case xhr##responseText (fun () -> "") Js.to_string))
+            f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
           else
             f (CodeError (
                 status,
-                Js.Opt.case xhr##responseText
+                Js.Opt.case xhr##.responseText
                   (fun () -> None) (fun s -> Some (Js.to_string s))))) ;
-  xhr##send (Js.null)
+  xhr##send Js.null
 
 let xhr_post ?(content_type="application/json") ?(content="{}") msg url
          ?(headers=[]) f =
   if msg <> "" then
     Js_utils.log "[>%s POST %s]" msg url;
   let xhr = XmlHttpRequest.create () in
-  xhr##_open (Js.string "POST", Js.string url, Js._true) ;
+  xhr##_open (Js.string "POST") (Js.string url) Js._true ;
   xhr##setRequestHeader
-    (Js.string "Content-Type", Js.string content_type) ;
+    (Js.string "Content-Type") (Js.string content_type) ;
   List.iter (fun (name, value) ->
       xhr##setRequestHeader
-        (Js.string name, Js.string value) ;
+        (Js.string name) (Js.string value) ;
     ) headers;
-  xhr##onreadystatechange <-
+  xhr##.onreadystatechange :=
     Js.wrap_callback (fun _ ->
-        if xhr##readyState = XmlHttpRequest.DONE then
-          let status = xhr##status in
+        if xhr##.readyState = XmlHttpRequest.DONE then
+          let status = xhr##.status in
           if msg <> "" then
             Js_utils.log "[>%s RECV %d %s]" msg status url;
           if status = 200 then
-            f (CodeOk (Js.to_string xhr##responseText))
+            f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
           else
-            f (CodeError (status, Some (Js.to_string xhr##responseText)))
-      ) ;
+            f (CodeError (
+                status,
+                Js.Opt.case xhr##.responseText
+                  (fun () -> None) (fun s -> Some (Js.to_string s) )))) ;
   xhr##send (Js.some @@ Js.string content)
   end)
 
