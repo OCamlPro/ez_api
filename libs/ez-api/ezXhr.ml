@@ -19,10 +19,12 @@ let xhr_get msg url ?(headers=[]) f =
           if msg <> "" then
             Js_utils.log "[>%s RECV %d %s]" msg status url;
           if status = 200 then
-            f (CodeOk (Js.to_string xhr##responseText))
+            f (CodeOk (Js.Opt.case xhr##responseText (fun () -> "") Js.to_string))
           else
-            f (CodeError (status,Some (Js.to_string xhr##responseText)))
-      ) ;
+            f (CodeError (
+                status,
+                Js.Opt.case xhr##responseText
+                  (fun () -> None) (fun s -> Some (Js.to_string s))))) ;
   xhr##send (Js.null)
 
 let xhr_post ?(content_type="application/json") ?(content="{}") msg url
