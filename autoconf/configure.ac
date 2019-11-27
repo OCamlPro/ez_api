@@ -120,10 +120,6 @@ AC_SUBST(OCAMLLIB)
 AC_SUBST(OCAMLOPT)
 AC_SUBST(OCAMLDEP)
 AC_SUBST(OCAMLBIN)
-AC_PROG_CAMLP4
-if test "$CAMLP4" = "no"; then
-   AC_MSG_ERROR([You must install OCaml package 'camlp4'])
-fi
 if test "$OCAMLFIND" = "no"; then
    AC_MSG_ERROR([You must install OCaml package 'ocamlfind'])
 fi
@@ -142,10 +138,6 @@ fi
 AC_CHECK_OCAML_PKG(js_of_ocaml-ppx)
 if test "$OCAML_PKG_js_of_ocaml_ppx" = "no"; then
    AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'js_of_ocaml-ppx'.])
-fi
-AC_CHECK_OCAML_PKG(js_of_ocaml-camlp4)
-if test "$OCAML_PKG_js_of_ocaml_camlp4" = "no"; then
-   AC_MSG_WARN([BEFORE ERROR: Please install OCaml package 'js_of_ocaml-camlp4'.])
 fi
 AC_CHECK_OCAML_PKG(js_of_ocaml-tyxml)
 if test "$OCAML_PKG_js_of_ocaml_tyxml" = "no"; then
@@ -202,9 +194,6 @@ fi
 if test "$OCAML_PKG_js_of_ocaml_ppx" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
-if test "$OCAML_PKG_js_of_ocaml_camlp4" = "no"; then
-   AC_MSG_FAILURE([Missing dependencies (see warnings above).])
-fi
 if test "$OCAML_PKG_js_of_ocaml_tyxml" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
@@ -237,9 +226,9 @@ fi
 if test "$OCAML_PKG_re.str" = "no"; then
    AC_MSG_FAILURE([Missing dependencies (see warnings above).])
 fi
-OPAM_REPO=/home/lefessan/GIT/ocp-public/opam-repository
-OPAM_REPO_OFFICIAL_REMOTE=ocaml
-OPAM_REPO_FORK_REMOTE=origin
+OPAM_REPO=
+OPAM_REPO_OFFICIAL_REMOTE=
+OPAM_REPO_FORK_REMOTE=
 DOWNLOAD_URL_PREFIX=http://github.com/OCamlPro/ez-api/archive/
 
 ###############################################################
@@ -260,8 +249,6 @@ DOWNLOAD_URL_PREFIX=http://github.com/OCamlPro/ez-api/archive/
 ##                                                            #
 ###############################################################
 
-AC_SUBST(CAMLP4)
-AC_SUBST(CAMLP4O)
 AC_SUBST(OCAMLFIND)
 AC_SUBST(PROJECTURE_ARGS)
 AC_SUBST(ROOTDIR)
