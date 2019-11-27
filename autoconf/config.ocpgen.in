@@ -1,5 +1,3 @@
-conf_camlp4="@CAMLP4@"
-conf_camlp4o="@CAMLP4O@"
 conf_ocamlfind="@OCAMLFIND@"
 rootdir="@ROOTDIR@"
 prefix="@prefix@"
