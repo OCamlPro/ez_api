@@ -177,13 +177,9 @@ module Js_to_JSON = Make_Conv (Js_to_JSON_Converter)
 module JSON_to_Js = Make_Conv (JSON_to_Js_Converter)
 
 let json_of_js j =
-  let res = Js_to_JSON.convert [LeafZip j] in
-  match res with
-  | `A l -> `A l
-  | `O l -> `O l
-  | _ -> assert false (* wrap res *)
+  Js_to_JSON.convert [LeafZip j]
 
-let json_of_string (s : string) : [> t] =
+let json_of_string (s : string) =
   try
     Js._JSON##parse (Js.string s) |> json_of_js
   with (Js.Error e) ->
@@ -191,9 +187,9 @@ let json_of_string (s : string) : [> t] =
       parse_error `Null "Ezjsonm.from_string %s" (Js.to_string e##.message)
     else Js.raise_js_error e
 
-let js_of_json j  = JSON_to_Js.convert [LeafZip (value j)]
+let js_of_json j  = JSON_to_Js.convert [LeafZip j]
 
-let string_of_json ?(minify=true) (j : t) : string =
+let string_of_json ?(minify=true) (j : value) : string =
   if minify then
     Js._JSON##stringify (js_of_json j) |> Js.to_string
   else
