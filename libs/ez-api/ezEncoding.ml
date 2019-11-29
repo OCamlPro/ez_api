@@ -1,7 +1,7 @@
 module Ezjsonm_direct = Ezjsonm
 open Json_encoding
 
-let json_of_string = ref Ezjsonm.from_string
+let json_of_string = ref Ezjsonm.value_from_string
 
 module Ezjsonm : sig
 
