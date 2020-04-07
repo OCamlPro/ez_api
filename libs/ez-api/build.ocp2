@@ -78,14 +78,14 @@ OCaml.library("ez-api-server-httpaf", ocaml+
 OCaml.library("ez-api-js", ocaml+
   {
     files = [
-      "ezDebugJS.ml";
+      "ezDebugJS.ml", pp_js;
       "ezEncodingJS.ml", pp_js;
       "ezXhr.ml", pp_js;
       "ezJS.ml";
       ];
     requires = [
       "ez-api";
-      "ocplib-utils-js";
+      "js_of_ocaml";
     ];
   });
 

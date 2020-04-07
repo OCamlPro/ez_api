@@ -1,11 +1,13 @@
-open Ocp_js
+open Js_of_ocaml
 open EzRequest
+
+let log ?(meth="GET") msg url = Firebug.console##log (
+    Js.string ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]"))
 
 include Make(struct
 
 let xhr_get msg url ?(headers=[]) f =
-  if msg <> "" then
-    Js_utils.log "[>%s GET %s]" msg url;
+  if msg <> "" then log msg url;
   let xhr = XmlHttpRequest.create () in
   xhr##_open (Js.string "GET") (Js.string url) Js._true ;
   List.iter (fun (name, value) ->
@@ -16,8 +18,7 @@ let xhr_get msg url ?(headers=[]) f =
     Js.wrap_callback (fun _ ->
         if xhr##.readyState = XmlHttpRequest.DONE then
           let status = xhr##.status in
-          if msg <> "" then
-            Js_utils.log "[>%s RECV %d %s]" msg status url;
+          if msg <> "" then log ~meth:("RECV " ^ string_of_int status) msg url;
           if status = 200 then
             f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
           else
@@ -29,8 +30,7 @@ let xhr_get msg url ?(headers=[]) f =
 
 let xhr_post ?(content_type="application/json") ?(content="{}") msg url
          ?(headers=[]) f =
-  if msg <> "" then
-    Js_utils.log "[>%s POST %s]" msg url;
+  if msg <> "" then log ~meth:"POST" msg url;
   let xhr = XmlHttpRequest.create () in
   xhr##_open (Js.string "POST") (Js.string url) Js._true ;
   xhr##setRequestHeader
@@ -43,8 +43,7 @@ let xhr_post ?(content_type="application/json") ?(content="{}") msg url
     Js.wrap_callback (fun _ ->
         if xhr##.readyState = XmlHttpRequest.DONE then
           let status = xhr##.status in
-          if msg <> "" then
-            Js_utils.log "[>%s RECV %d %s]" msg status url;
+          if msg <> "" then log ~meth:("RECV " ^ string_of_int status) msg url;
           if status = 200 then
             f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
           else
@@ -60,5 +59,5 @@ let init () =
   EzEncodingJS.init ();
   EzDebugJS.init ();
   init ();
-  EzRequest.log := (fun s -> Js_utils.log "%s" s);
+  EzRequest.log := (fun s -> Firebug.console##log (Js.string s));
   ()
