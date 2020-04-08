@@ -20,6 +20,7 @@ OCaml.library("ez-api", ocaml+
       "ezUrl.ml";
       "ezAPI.ml";
       "ezRequest.ml";
+      "ezRequest_lwt.ml";
       "ezSession.ml";
     ];
     requires = [
@@ -89,6 +90,20 @@ OCaml.library("ez-api-js", ocaml+
     ];
   });
 
+OCaml.library("ez-api-js-lwt", ocaml+
+  {
+    files = [
+      "ezDebugJS.ml", pp_js;
+      "ezEncodingJS.ml", pp_js;
+      "ezXhr_lwt.ml", pp_js;
+      "ezJS_lwt.ml";
+      ];
+    requires = [
+      "ez-api";
+      "js_of_ocaml-lwt";
+    ];
+  });
+
 OCaml.library("ez-api-session-client", ocaml+
   {
     files = [
@@ -110,10 +125,32 @@ OCaml.library("ez-api-curl", ocaml+
     ];
   });
 
+OCaml.library("ez-api-curl-lwt", ocaml+
+  {
+    files = [
+      "ezCurl_lwt.ml";
+      ];
+    requires = [
+      "ez-api";
+      "curl";
+    ];
+  });
+
 OCaml.library("ez-api-cohttp", ocaml+
   {
     files = [
       "ezCohttp.ml";
+      ];
+    requires = [
+      "ez-api";
+      "cohttp-lwt-unix";
+    ];
+  });
+
+OCaml.library("ez-api-cohttp-lwt", ocaml+
+  {
+    files = [
+      "ezCohttp_lwt.ml";
       ];
     requires = [
       "ez-api";
