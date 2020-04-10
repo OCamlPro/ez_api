@@ -173,8 +173,8 @@ let split_on_char c s = OcpString.split s c
 
 let rev_extensions filename =
   List.rev (split_on_char '.'
-                                 (String.lowercase
-                                    (Filename.basename filename)))
+              (String.lowercase_ascii
+                 (Filename.basename filename)))
 
 let normalize_path path =
   let rec normalize_path path revpath =

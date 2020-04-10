@@ -16,43 +16,43 @@ module type S = sig
     ?post:bool ->
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->                    (* debug msg *)
     EzAPI.base_url ->                 (* API url *)
     'output EzAPI.service0 ->         (* GET service *)
-    string ->                         (* debug msg *)
     'output api_result Lwt.t
 
   val get1 :
     ?post:bool ->
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg: string ->
     EzAPI.base_url ->
     ('arg, 'output) EzAPI.service1 ->
-    string ->
     'arg ->
     'output api_result Lwt.t
 
   val post0 :
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('input,'output) EzAPI.post_service0 -> (* POST service *)
-    string ->                         (* debug msg *)
     'output api_result Lwt.t
 
   val post1 :
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('arg, 'input,'output) EzAPI.post_service1 -> (* POST service *)
-    string ->                         (* debug msg *)
     'arg ->
     'output api_result Lwt.t
 
   val get :
     ?headers:(string * string) list ->
-    string ->                 (* debug msg *)
+    ?msg:string ->
     EzAPI.url ->              (* url *)
     string api_result Lwt.t
 
@@ -60,7 +60,7 @@ module type S = sig
     ?content_type:string ->
     ?content:string ->
     ?headers:(string * string) list ->
-    string ->
+    ?msg:string ->
     EzAPI.url ->
     string api_result Lwt.t
 

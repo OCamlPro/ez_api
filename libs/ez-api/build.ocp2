@@ -132,7 +132,7 @@ OCaml.library("ez-api-curl-lwt", ocaml+
       ];
     requires = [
       "ez-api";
-      "curl";
+      "curl.lwt";
     ];
   });
 
