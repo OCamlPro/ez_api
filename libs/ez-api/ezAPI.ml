@@ -532,7 +532,7 @@ let paths_of_sections ?(docs=[]) sections =
         defs) ->
       let definitions = match defs with
         | [] -> []
-        | ["components", `O [ "schemas", `O definitions ]] -> definitions
+        | ("components", `O [ "schemas", `O definitions ]) :: _ -> definitions
         | _ -> assert false in
       input_schemas, output_schemas, definitions
     | (`O _ | `A _) as j ->
