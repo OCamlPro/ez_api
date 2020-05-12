@@ -14,6 +14,7 @@ let empty = {
 }
 
 let return x = RestoDirectory1.Answer.return x
+let return_raw s = RestoDirectory1.Answer.return_raw s
 
 let verbose =
   try
@@ -166,6 +167,8 @@ let reply_answer
      reply_none code
   | RestoDirectory1.Answer.Single json ->
      reply_json code json
+  | RestoDirectory1.Answer.Single_raw s ->
+     reply_raw_json code s
   | RestoDirectory1.Answer.Stream _ ->
      reply_none 500
 
