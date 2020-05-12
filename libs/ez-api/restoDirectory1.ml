@@ -58,6 +58,7 @@ module Answer = struct
   type 'a output =
     | Empty
     | Single of 'a
+    | Single_raw of string
     | Stream of 'a stream
 
   type 'a answer =
@@ -68,6 +69,9 @@ module Answer = struct
   let ok json = { code = 200 ; body = Single json }
   let return json = Lwt.return { code = 200 ; body = Single json }
 
+  let ok_raw s = { code = 200 ; body = Single_raw s }
+  let return_raw s = Lwt.return (ok_raw s)
+
   let ok_stream st = { code = 200 ; body = Stream st }
   let return_stream st = Lwt.return { code = 200 ; body = Stream st }
 
@@ -75,6 +79,7 @@ module Answer = struct
     match ans.body with
     | Empty -> { code ; body = Empty }
     | Single body -> { code ; body = Single (f body) }
+    | Single_raw body -> { code ; body = Single_raw body }
     | Stream { next ; shutdown } ->
         let next () =
           next () >>= function

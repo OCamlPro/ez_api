@@ -31,14 +31,14 @@ let destruct encoding buf =
        raise DestructError
 
 let construct ?(compact=true) encoding data =
-    let ezjson =
-      (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in
-    Json_repr.pp
-      ~compact
-      ezjson
-      Format.str_formatter
-      (Json_encoding.construct encoding data) ;
-    Format.flush_str_formatter ()
+  let ezjson =
+    (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in
+  Json_repr.pp
+    ~compact
+    ezjson
+    Format.str_formatter
+    (Json_encoding.construct encoding data) ;
+  Format.flush_str_formatter ()
 
 let unexpected_error ~kind ~expected =
   raise (Json_encoding.Cannot_destruct
