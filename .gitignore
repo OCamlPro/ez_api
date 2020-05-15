@@ -1,5 +1,7 @@
-_obuild/
+_obuild
 *~
-
-# this file can be used by the user to set variables
-ocp-autoconf.d/build.config
+_build
+autoconf
+ocp-autoconf.d
+configure
+*.merlin

@@ -1,3 +1,0 @@
-(* Just here to refer to this directory *)
-if include "config.ocpgen" then {} else {}
-begin library autoconf_dir end
