@@ -38,7 +38,7 @@ let dispatch s (io, _conn) req body =
   in
   let path =
     local_path
-    |> split_on_char '/'
+    |> String.split_on_char '/'
     |> list_trim
   in
   let req_params = req |> Request.uri |> Uri.query in
@@ -46,7 +46,7 @@ let dispatch s (io, _conn) req body =
     let headers = ref StringMap.empty in
     Header.iter (fun s v ->
         headers :=
-          StringMap.add (String.lowercase s) v !headers)
+          StringMap.add (String.lowercase_ascii s) v !headers)
                 (Request.headers req);
     !headers
   in

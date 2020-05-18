@@ -16,14 +16,11 @@
 (package
  (name ez-api)
  (synopsis "Easy API library over ocplib-resto/ocplib-directory")
- (description "Easy API library over ocplib-resto/ocplib-directory")
  (documentation "https://ocamlpro.github.io/ez-api/doc")
  (depends
-  (ocplib-json-encoding (>= 0.7.0))
+  (ocplib-json-typed (>= 0.7.0))
   (lwt (>= 4.0.0))
-  (ezjsonm (>= 1.0.0))
-  (ocplib-compat (>= 1.0))
-  (ocplib-lang (>= 1.0)))
+  (ezjsonm (>= 1.0.0)))
  (depopts
   (js_of_ocaml-lwt (>= 3.4.0))
   (calendar (>= 2.03))

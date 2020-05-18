@@ -240,7 +240,7 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
       end ;
       let uri = mk_uri request in
       let local_path = Uri.path uri in
-      let path = local_path |> split_on_char '/' |> list_trim in
+      let path = local_path |> String.split_on_char '/' |> list_trim in
       let req_params = Uri.query uri in
       let headers =
         let headers = ref StringMap.empty in

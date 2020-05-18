@@ -172,10 +172,8 @@ let reply_answer
   | RestoDirectory1.Answer.Stream _ ->
      reply_none 500
 
-let split_on_char c s = OcpString.split s c
-
 let rev_extensions filename =
-  List.rev (split_on_char '.'
+  List.rev (String.split_on_char '.'
               (String.lowercase_ascii
                  (Filename.basename filename)))
 
@@ -263,6 +261,6 @@ let rec reply_file ?(meth=`GET) ?default root path =
           raise Not_found
        | Some file ->
           reply_file ~meth root
-                     (split_on_char '/' file)
+                     (String.split_on_char '/' file)
 
 let return_error code = raise (EzRawError code)

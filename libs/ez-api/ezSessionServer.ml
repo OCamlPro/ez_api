@@ -75,7 +75,7 @@ end = struct
   let token_kind =
     match S.token_kind with
     | `Cookie name -> `Cookie name
-    | `CSRF name -> `CSRF (String.lowercase name)
+    | `CSRF name -> `CSRF (String.lowercase_ascii name)
 
   module M = EzSession.Make(S)
   include M

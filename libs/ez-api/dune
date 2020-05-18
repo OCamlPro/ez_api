@@ -6,10 +6,10 @@
 
 (library
  (name ezAPI)
- (public_name ez-api)
+ (public_name ez-api.common)
  (wrapped false)
- (modules resto1 restoDirectory1 ezDebug ezUrl ezAPI)
- (libraries lwt ocplib-compat ocplib-lang ezEncoding))
+ (modules stringCompat resto1 restoDirectory1 ezDebug ezUrl ezAPI)
+ (libraries lwt ezEncoding))
 
 (library
  (name ezSession)
