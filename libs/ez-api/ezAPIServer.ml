@@ -103,16 +103,17 @@ let dispatch s (io, _conn) req body =
            reply_none 200
          | API dir, _ ->
            let content =
-             match request.req_body with
-             | BodyString (Some "application/x-www-form-urlencoded", content) ->
-               EzAPI.add_params request ( EzUrl.decode_args content );
-               None
-             | BodyString (Some "application/json", content) ->
-               Some (Ezjsonm.from_string content)
-             | BodyString (_, content) ->
-               try
-                 Some (Ezjsonm.from_string content)
-               with _ -> None
+             match meth, request.req_body with
+             | `GET, BodyString (_, "") -> None
+             | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
+                EzAPI.add_params request ( EzUrl.decode_args content );
+                None
+             | _, BodyString (Some "application/json", content) ->
+                Some (Ezjsonm.from_string content)
+             | _, BodyString (_, content) ->
+                try
+                  Some (Ezjsonm.from_string content)
+                with _ -> None
            in
            RestoDirectory1.lookup dir.meth_GET request path >>= fun handler ->
            handler content
