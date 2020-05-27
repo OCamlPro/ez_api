@@ -423,6 +423,18 @@ module Make(Repr : Json_repr.Repr) = struct
           | CustomDirectory _ -> Lwt.fail Not_found
         end
 
+  let response_of_cannot_parse descr msg rpath =
+    let body =
+      Repr.repr @@
+      `O [ "error", Repr.repr @@
+           `String (Printf.sprintf "Cannot parse path argument %s" descr.Arg.name) ;
+           "path", Repr.repr @@
+           `String (String.concat "/" (List.rev rpath));
+           "msg", Repr.repr @@
+           `String msg;
+         ] in
+    { code = 400 ; body = Single body }
+
   let describe_directory
     : type a _p.
       ?recurse:bool -> a directory -> a -> string list -> Description.directory_descr Lwt.t

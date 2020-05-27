@@ -68,6 +68,9 @@ module Make (Repr : Json_repr.Repr) : sig
     'prefix directory -> 'prefix -> string list ->
     (Repr.value option -> Repr.value Answer.answer Lwt.t) Lwt.t
 
+  val response_of_cannot_parse :
+    Arg.descr -> string -> string list ->
+    Repr.value Answer.answer
 
   (** Registring handler in service tree. *)
   val register:

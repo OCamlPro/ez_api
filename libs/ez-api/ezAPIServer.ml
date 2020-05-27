@@ -132,6 +132,8 @@ let dispatch s (io, _conn) req body =
        | EzContentError (code, json) ->
          reply_raw_json code json
        | Not_found -> reply_none 404
+       | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
+         reply_answer (RestoDirectory1.response_of_cannot_parse descr msg rpath)
        | exn ->
          Printf.eprintf "In %s: exception %s\n%!"
            local_path (Printexc.to_string exn);
