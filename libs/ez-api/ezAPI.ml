@@ -294,10 +294,11 @@ let post_service ?(section=default_section)
   end;
   service
 
-let service ?section ?name ?descr ~output ?params arg =
+let service ?section ?name ?descr ?meth ~output ?params arg =
+  let meth = match meth with None -> "get" | Some s -> s in
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
-    ~output ~meth:"get" ?params arg
+    ~output ~meth ?params arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in

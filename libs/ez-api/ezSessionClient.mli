@@ -21,6 +21,7 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
     ((auth option, exn) result -> unit) -> unit
 
   val login :
+    ?format:(string -> string) ->
     EzAPI.base_url ->
     login:string -> (* login *)
     password:string -> (* password *)
