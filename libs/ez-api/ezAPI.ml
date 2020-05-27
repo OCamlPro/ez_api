@@ -83,6 +83,7 @@ type service_doc = {
     doc_section : section;
     doc_input : Json_schema.schema Lazy.t;
     doc_output : Json_schema.schema Lazy.t;
+    doc_meth : string;
   }
 
 and section = {
@@ -257,6 +258,7 @@ let rec update_service_list services doc = match services with
 let post_service ?(section=default_section)
     ?name
     ?descr
+    ?meth
     ~input
     ~output
     ?(params = []) (doc_path,path1,path2,sample) =
@@ -273,6 +275,7 @@ let post_service ?(section=default_section)
       doc_section = section;
       doc_input = lazy (Json_encoding.schema ~definitions_path input);
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
+      doc_meth = (match meth with None -> "post" | Some meth -> meth);
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
@@ -293,8 +296,8 @@ let post_service ?(section=default_section)
 
 let service ?section ?name ?descr ~output ?params arg =
   post_service ?section ?name ?descr
-               ~input:Json_encoding.empty
-               ~output ?params arg
+    ~input:Json_encoding.empty
+    ~output ~meth:"get" ?params arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -598,14 +601,12 @@ let paths_of_sections ?(docs=[]) sections =
       in
       let in_schema = List.nth input_schemas i in
       let out_schema = List.nth output_schemas i in
-      let meth, request_schema = match in_schema with
+      let request_schema = match in_schema with
         | `O ["type", `String "object";
               "properties", `O [];
-              "additionalProperties", `Bool false ] ->
-          (* no request, say GET *)
-          "get", []
-        | _ ->
-          "post", [ "requestBody", `O [
+              "additionalProperties", `Bool false ] -> []
+        | _ -> [
+            "requestBody", `O [
               "content", `O [
                 "application/json", `O [
                   "schema", in_schema
@@ -615,7 +616,7 @@ let paths_of_sections ?(docs=[]) sections =
       in
       get_path sd,
       `O [
-        meth, `O ([
+        sd.doc_meth, `O ([
           "tags", `A [ `String sd.doc_section.section_name ];
           "summary", `String summary;
           "description", `String description;

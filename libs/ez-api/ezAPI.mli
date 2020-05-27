@@ -72,6 +72,7 @@ type service_doc = {
   doc_section : section;
   doc_input : Json_schema.schema Lazy.t;
   doc_output : Json_schema.schema Lazy.t;
+  doc_meth : string;
 }
 
 and section = {
@@ -136,6 +137,7 @@ val post_service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
   ?descr: string ->
+  ?meth:string (* meth type: get, post *) ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
