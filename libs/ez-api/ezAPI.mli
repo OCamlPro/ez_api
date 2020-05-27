@@ -128,6 +128,7 @@ val service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
   ?descr: string ->
+  ?meth:string ->
   output: 'output Json_encoding.encoding ->
   ?params:param list ->
   ('b, 'c) p ->

@@ -23,6 +23,7 @@ module Make(S: SessionArg) : sig
     ((auth option, exn) result -> unit) -> unit
 
   val login :
+    ?format:(string -> string) ->
     EzAPI.base_url ->
     login:string -> (* login *)
     password:string -> (* password *)
@@ -115,7 +116,7 @@ module Make(S: SessionArg) : sig
     | User u ->
        (try f (Ok (Some u)) with _ -> ())
 
-  let rec login_rec ntries api (u_login : string) u_password f =
+  let rec login_rec ?format ntries api (u_login : string) u_password f =
     if ntries = 0 then
       (try f (Error (Failure "too many login attempts")) with _ -> ())
     else
@@ -124,7 +125,7 @@ module Make(S: SessionArg) : sig
         connect api
           (function
             | Error _ as err -> f err
-            | Ok None -> login_rec (ntries-1) api u_login u_password f
+            | Ok None -> login_rec ?format (ntries-1) api u_login u_password f
             | Ok (Some u) ->
               if u.auth_login <> u_login then
                 logout
@@ -132,7 +133,7 @@ module Make(S: SessionArg) : sig
                   ~token:u.auth_token
                   (function
                       Ok _ ->
-                      login_rec (ntries-1) api u_login u_password f
+                      login_rec ?format (ntries-1) api u_login u_password f
                     | Error _ as err ->
                       f err )
               else
@@ -143,18 +144,19 @@ module Make(S: SessionArg) : sig
             ~token:u.auth_token
             (function
               | Ok _ ->
-                login_rec (ntries-1) api u_login u_password f
+                login_rec ?format (ntries-1) api u_login u_password f
               | Error _ as err ->
                 f err
             )
         else
           f (Ok u)
       | Connected (challenge_id, challenge) ->
+        let pwhash = EzSession.Hash.password ~login:u_login ~password:u_password in
+        let pwhash = match format with
+          | None -> pwhash
+          | Some f -> f pwhash in
         let challenge_reply =
-          EzSession.Hash.challenge
-            ~challenge
-            ~pwhash:(EzSession.Hash.password ~login:u_login
-                       ~password:u_password)
+          EzSession.Hash.challenge ~challenge ~pwhash
         in
         EzRequest.ANY.post0
           api
@@ -171,7 +173,7 @@ module Make(S: SessionArg) : sig
               f (Error (Failure msg))
             | AuthNeeded (challenge_id, challenge) ->
               state := Connected (challenge_id, challenge);
-              login_rec (ntries-1) api u_login u_password f
+              login_rec ?format (ntries-1) api u_login u_password f
             | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
               let u = { auth_login; auth_user_id; auth_token; auth_user } in
               set_cookie u.auth_token;
@@ -179,8 +181,8 @@ module Make(S: SessionArg) : sig
               f (Ok u)
           )
 
-  and login api ~login:u_login ~password:u_password f =
-    login_rec 4 api u_login u_password f
+  and login ?format api ~login:u_login ~password:u_password f =
+    login_rec ?format 4 api u_login u_password f
 
   and logout api ~token f =
     remove_cookie ();

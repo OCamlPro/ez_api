@@ -189,6 +189,7 @@ module Make(S : SessionArg) = struct
         ~section:section_session
         ~name:"logout"
         ~params:[param_token]
+        ~meth:"put"
         ~output:Encoding.s2c_message
         EzAPI.Path.(rpc_root // "logout")
   end
