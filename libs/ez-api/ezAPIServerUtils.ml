@@ -21,8 +21,8 @@ let verbose =
     let s = Sys.getenv "EZAPISERVER" in
     try
       int_of_string s
-    with _ -> 2
-  with _ -> 1
+    with _ -> 1
+  with _ -> 0
 
 
 exception EzRawReturn of string
