@@ -13,18 +13,18 @@ let dispatch s (io, _conn) req body =
   begin
     match io with
     | Conduit_lwt_unix.TCP tcp ->
-       begin
-         match[@warning "-42"] Lwt_unix.getpeername
-                               tcp.Conduit_lwt_unix.fd with
+      begin
+        match[@warning "-42"] Lwt_unix.getpeername
+                                tcp.Conduit_lwt_unix.fd with
         | Lwt_unix.ADDR_INET (ip,_port) ->
-           let ip = Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip) in
-           let ip =
-             match Header.get (Cohttp.Request.headers req) "x-forwarded-for"
-             with
-             | None -> ip
-             | Some ip -> ip
-           in
-           register_ip ip
+          let ip = Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip) in
+          let ip =
+            match Header.get (Cohttp.Request.headers req) "x-forwarded-for"
+            with
+            | None -> ip
+            | Some ip -> ip
+          in
+          register_ip ip
         | Lwt_unix.ADDR_UNIX _path -> ()
       end
     | Conduit_lwt_unix.Domain_socket _
@@ -47,7 +47,7 @@ let dispatch s (io, _conn) req body =
     Header.iter (fun s v ->
         headers :=
           StringMap.add (String.lowercase_ascii s) v !headers)
-                (Request.headers req);
+      (Request.headers req);
     !headers
   in
   let version = match Request.version req with
@@ -64,14 +64,14 @@ let dispatch s (io, _conn) req body =
   in
   let body = BodyString (content_type, content) in
   let request = EzAPI.request ~version
-                              ~headers
-                              ~body
-                              req_params
+      ~headers
+      ~body
+      req_params
   in
   if verbose > 0 then
     Printf.eprintf "REQUEST: %s %S\n%!"
-                   (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
-                   local_path;
+      (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
+      local_path;
   if verbose > 1 then
     StringMap.iter (fun s v ->
         List.iter (fun v ->
@@ -81,58 +81,60 @@ let dispatch s (io, _conn) req body =
   let meth = Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
-      if path = ["debug"] then
-        reply_json 200
-                   (`O
-                     ["headers", `A
-                       (Cohttp.Request.headers req
-                        |> Header.to_lines
-                        |> List.map (fun s -> `String s));
-                      "params", `O
-                                 (List.map (fun (arg,list) ->
-                                      arg, `A (List.map (fun s -> `String s) list)
-                                    ) req_params)
-                     ]
-                   )
-      else
-        match s.server_kind, meth with
-        | API dir, `OPTIONS ->
-          RestoDirectory1.lookup dir.meth_OPTIONS request path
-          >>= fun handler -> handler None >>= fun _answer ->
-          (* Note: this path always fails with EzReturnOPTIONS *)
-          reply_none 200
-        | API dir, _ ->
+       if path = ["debug"] then
+         reply_json 200
+           (`O
+              ["headers", `A
+                 (Cohttp.Request.headers req
+                  |> Header.to_lines
+                  |> List.map (fun s -> `String s));
+               "params", `O
+                 (List.map (fun (arg,list) ->
+                      arg, `A (List.map (fun s -> `String s) list)
+                    ) req_params)
+              ]
+           )
+       else
+         match s.server_kind, meth with
+         | API dir, `OPTIONS ->
+           RestoDirectory1.lookup dir.meth_OPTIONS request path
+           >>= fun handler -> handler None >>= fun _answer ->
+           (* Note: this path always fails with EzReturnOPTIONS *)
+           reply_none 200
+         | API dir, _ ->
            let content =
              match request.req_body with
              | BodyString (Some "application/x-www-form-urlencoded", content) ->
-                EzAPI.add_params request ( EzUrl.decode_args content );
-                None
+               EzAPI.add_params request ( EzUrl.decode_args content );
+               None
              | BodyString (Some "application/json", content) ->
-                Some (Ezjsonm.from_string content)
+               Some (Ezjsonm.from_string content)
              | BodyString (_, content) ->
-                try
-                  Some (Ezjsonm.from_string content)
-                with _ -> None
+               try
+                 Some (Ezjsonm.from_string content)
+               with _ -> None
            in
            RestoDirectory1.lookup dir.meth_GET request path >>= fun handler ->
            handler content
            >>= reply_answer
-        | Root (root, default), meth ->
-          reply_file ~meth root ?default path
+         | Root (root, default), meth ->
+           reply_file ~meth root ?default path
     )
     (fun exn ->
        Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn);
        match exn with
-      | EzReturnOPTIONS headers ->
-        request.rep_headers <- headers @ request.rep_headers;
-        reply_none 200
-     | EzRawReturn s -> reply_raw_json 200 s
-     | EzRawError code -> reply_none code
-     | Not_found -> reply_none 404
-     | exn ->
-        Printf.eprintf "In %s: exception %s\n%!"
-                       local_path (Printexc.to_string exn);
-        reply_none 500)
+       | EzReturnOPTIONS headers ->
+         request.rep_headers <- headers @ request.rep_headers;
+         reply_none 200
+       | EzRawReturn s -> reply_raw_json 200 s
+       | EzRawError code -> reply_none code
+       | EzContentError (code, json) ->
+         reply_raw_json code json
+       | Not_found -> reply_none 404
+       | exn ->
+         Printf.eprintf "In %s: exception %s\n%!"
+           local_path (Printexc.to_string exn);
+         reply_none 500)
   >>= fun (code, reply) ->
   let headers =
     Header.add_list
@@ -142,13 +144,13 @@ let dispatch s (io, _conn) req body =
          [
            ("access-control-allow-headers", "Accept, Content-Type");
            ("access-control-allow-methods", "POST, GET, OPTIONS, PUT, DELETE")
-      ]) request.rep_headers in
+         ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
   if verbose > 1 then
     Printf.eprintf "Reply computed %d\n%!" code;
   let body, headers = match reply with
     | ReplyNone ->
-       Cohttp_lwt__Body.empty, headers
+      Cohttp_lwt__Body.empty, headers
     | ReplyJson json ->
       let content = Ezjsonm.to_string (json_root json) in
       if verbose > 2 then
@@ -183,7 +185,7 @@ let server servers =
       (* Broken Pipe -> do nothing *)
       | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
       | exn ->
-         Printf.eprintf "Server Error: %s\n%!" (Printexc.to_string exn)
+        Printf.eprintf "Server Error: %s\n%!" (Printexc.to_string exn)
     in
     (*  Cache.set_error_handler (fun e -> return @@ dont_crash_on_exn e); *)
     Server.create
@@ -192,4 +194,4 @@ let server servers =
       (Server.make ~callback ())
   in
   Lwt.join (List.map (fun (port,kind) ->
-                create_server port kind) servers)
+      create_server port kind) servers)

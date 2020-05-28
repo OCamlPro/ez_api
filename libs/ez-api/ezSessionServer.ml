@@ -146,9 +146,9 @@ end = struct
       add_auth_header req;
       EzAPIServerUtils.return (new_challenge ())
 
-    let request_error req msg =
+    let request_error ?(code=401) req msg =
       add_auth_header req;
-      EzAPIServerUtils.return (AuthError msg)
+      EzAPIServerUtils.return_error ~content:msg code
 
     let return_auth req ?cookie ~login user_id user_info =
       begin
@@ -187,7 +187,7 @@ end = struct
          | exception Not_found ->
             if verbose > 1 then
               EzDebug.printf "/login: could not find challenge\n%!";
-            request_auth req
+            request_error req "Challenge not found or expired"
          | (challenge, _t0) ->
             let expected_reply =
               EzSession.Hash.challenge

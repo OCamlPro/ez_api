@@ -311,6 +311,8 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                    | EzReturnOPTIONS _ -> reply_none 200
                    | EzRawReturn s -> reply_raw_json 200 s
                    | EzRawError code -> reply_none code
+                   | EzContentError (code, json) ->
+                     reply_raw_json code json
                    | Not_found -> reply_none 404
                    | exn ->
                      Printf.eprintf "In %s: exception %s\n%!"
