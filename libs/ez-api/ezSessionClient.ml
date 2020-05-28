@@ -160,23 +160,22 @@ module Make(S: SessionArg) : sig
         EzRequest.ANY.post0
           api
           Service.login "login"
-          ~error:(fun _n _ -> f (Error (Failure "Error login")))
+          ~error:(fun code _ ->
+              if code = 401 then
+                login_rec ?format (ntries-1) api u_login u_password f
+              else
+                f (Error (Failure "Error login")))
           ~params:[]
           ~input: {
             login_user = u_login;
             login_challenge_id = challenge_id;
             login_challenge_reply = challenge_reply;
           }
-          (function
-            | AuthNeeded (challenge_id, challenge) ->
-              state := Connected (challenge_id, challenge);
-              login_rec ?format (ntries-1) api u_login u_password f
-            | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
-              let u = { auth_login; auth_user_id; auth_token; auth_user } in
-              set_cookie u.auth_token;
-              state := User u;
-              f (Ok u)
-          )
+          (fun (auth_login, auth_user_id, auth_token, auth_user) ->
+             let u = { auth_login; auth_user_id; auth_token; auth_user } in
+             set_cookie u.auth_token;
+             state := User u;
+             f (Ok u))
 
   and login ?format api ~login:u_login ~password:u_password f =
     login_rec ?format 4 api u_login u_password f
@@ -194,16 +193,10 @@ module Make(S: SessionArg) : sig
         ~error:(fun _n _data -> f (Error (Failure "Error")))
         ~params:[]
         ~headers:(auth_headers ~token)
-        (function
-          | AuthNeeded (challenge_id, challenge) ->
-            remove_cookie u.auth_token;
-            state := Connected (challenge_id, challenge);
-            f (Ok true)
-          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
-            let u = { auth_login; auth_user_id; auth_token; auth_user } in
-            state := User u;
-            f (Error (Failure "logout not accepted"))
-        )
+        (fun (challenge_id, challenge) ->
+           remove_cookie u.auth_token;
+           state := Connected (challenge_id, challenge);
+           f (Ok true))
         ()
 
   let get () =

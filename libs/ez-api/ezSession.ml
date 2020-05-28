@@ -158,22 +158,23 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.s2c_message
         EzAPI.Path.(rpc_root // "connect")
 
-    let login : (login_message, s2c_message) EzAPI.post_service0  =
+    let login : (login_message,
+                 string * S.user_id * string * S.user_info) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
         ~params:[param_token]
         ~input:Encoding.login_message
-        ~output:Encoding.s2c_message
+        ~output:Encoding.auth_ok
         EzAPI.Path.(rpc_root // "login")
 
-    let logout : s2c_message EzAPI.service0  =
+    let logout : (string * string) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"logout"
         ~params:[param_token]
         ~meth:"put"
-        ~output:Encoding.s2c_message
+        ~output:Encoding.auth_needed
         EzAPI.Path.(rpc_root // "logout")
   end
 
