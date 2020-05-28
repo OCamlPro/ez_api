@@ -13,7 +13,7 @@ module type Arg = sig
   val find_user : login:string ->
     (string * SessionArg.user_id *
      SessionArg.user_info) option Lwt.t
-
+  val error_wrapper : (string -> string) option
 end
 
 module Make(S: Arg) : sig
