@@ -96,12 +96,11 @@ module Make(S: SessionArg) : sig
          Service.connect "connect"
          ~post:true
          ?headers
-         ~error:(fun _n _ -> f (Error (Failure "Error connect")))
+         ~error:(fun _n _ ->
+             state := Disconnected;
+             f (Error (Failure "Error connect")))
          ~params:[]
          (function
-           | AuthError msg ->
-             state := Disconnected;
-             f (Error (Failure msg))
           | AuthNeeded (challenge_id, challenge) ->
              state := Connected (challenge_id, challenge);
              f (Ok None)
@@ -169,8 +168,6 @@ module Make(S: SessionArg) : sig
             login_challenge_reply = challenge_reply;
           }
           (function
-            | AuthError msg ->
-              f (Error (Failure msg))
             | AuthNeeded (challenge_id, challenge) ->
               state := Connected (challenge_id, challenge);
               login_rec ?format (ntries-1) api u_login u_password f
@@ -198,8 +195,6 @@ module Make(S: SessionArg) : sig
         ~params:[]
         ~headers:(auth_headers ~token)
         (function
-          | AuthError msg ->
-            f (Error (Failure msg))
           | AuthNeeded (challenge_id, challenge) ->
             remove_cookie u.auth_token;
             state := Connected (challenge_id, challenge);
