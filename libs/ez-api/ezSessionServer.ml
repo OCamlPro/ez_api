@@ -48,7 +48,7 @@ module type Arg = sig
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
     (string * SessionArg.user_id * SessionArg.user_info) option Lwt.t
-
+  val error_wrapper : (string -> string) option
 end
 
 module Make(S: Arg) : sig
@@ -69,6 +69,7 @@ module Make(S: Arg) : sig
 end = struct
 
   let find_user = S.find_user
+  let error_wrapper = S.error_wrapper
   open S.SessionStore
   module S = S.SessionArg
 
@@ -151,7 +152,8 @@ end = struct
 
     let request_error ?(code=401) req msg =
       add_auth_header req;
-      EzAPIServerUtils.return_error ~content:msg code
+      let content = match error_wrapper with None -> msg | Some f -> f msg in
+      EzAPIServerUtils.return_error ~content code
 
     let return_auth_base req ?cookie ~login user_id user_info f =
       begin
