@@ -293,12 +293,11 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                       | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
                         EzAPI.add_params ez_request ( EzUrl.decode_args content );
                         None
-                      | _, BodyString (Some "application/json", content) ->
-                        Some (Ezjsonm.from_string content)
+                      | _, BodyString (Some mime, content) when
+                          Re.Str.(string_match (regexp "image") mime 0) ->
+                        Some (`String content)
                       | _, BodyString (_, content) ->
-                        try
-                          Some (Ezjsonm.from_string content)
-                        with _ -> None
+                        try Some (Ezjsonm.from_string content) with _ -> None
                     in
                     RestoDirectory1.lookup dir.meth_GET ez_request path >>= fun handler ->
                     (* Lwt.pick [ *)
