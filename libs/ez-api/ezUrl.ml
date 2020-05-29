@@ -1,4 +1,3 @@
-open StringCompat
 
 let cut_at s c =
   try
@@ -19,14 +18,14 @@ let encode s =
     if x >= 10 then Char.chr (Char.code 'A' + x - 10)
     else Char.chr (Char.code '0' + x) in
   for i=0 to len-1 do
-    match s.[i] with
+    match String.get s i with
     | 'a'..'z' | 'A'..'Z' | '0'..'9' | '.' | '-' | '*' | '_' ->
-        res.[!pos] <- s.[i]; incr pos
+        Bytes.set res !pos (String.get s i); incr pos
 (*    | ' ' -> res.[!pos] <- '+'; incr pos *)
     | c ->
-        res.[!pos] <- '%';
-        res.[!pos+1] <- hexa_digit (Char.code c / 16);
-        res.[!pos+2] <- hexa_digit (Char.code c mod 16);
+        Bytes.set res !pos '%';
+        Bytes.set res (!pos+1) @@ hexa_digit (Char.code c / 16);
+        Bytes.set res (!pos+2) @@ hexa_digit (Char.code c mod 16);
         pos := !pos + 3
   done;
   Bytes.sub_string res 0 !pos
@@ -71,13 +70,11 @@ let encode_args l =
                                         (String.concat ","
                                                        (List.map encode arg))) l)
 
-let split_on_char c s = OcpString.split s c
-
 let decode_args s =
-  let args = split_on_char '&' s in
+  let args = String.split_on_char '&' s in
   List.map (fun s ->
       let s, v = cut_at s '=' in
-      let v = split_on_char ',' v in
+      let v = String.split_on_char ',' v in
       let s = decode s in
       let v = List.map decode v in
       s, v

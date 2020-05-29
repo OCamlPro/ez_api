@@ -1,26 +1,26 @@
 
-#############################################################################
-#
-#          This file is managed by ocp-autoconf.
-#
-#  Remove it from `manage_files` in 'ocp-autoconf.config' if you want to
-#  modify it manually.
-#
-#############################################################################
-
-include autoconf/Makefile.config
-
 all: build
 
+build:
+	dune build
+install:
+	dune install
+clean:
+	dune clean
+
+-include autoconf/Makefile.config
 -include ocp-autoconf.d/Makefile
 
-build: ocp-build-build $(PROJECT_BUILD)
+ocp-build-conf:
+	ocp-autoconf
 
-install: ocp-build-install $(PROJECT_INSTALL)
+ocp-build: ocp-build-build $(PROJECT_BUILD)
 
-clean: ocp-build-clean $(PROJECT_CLEAN)
+ocp-build-install: ocp-build-install $(PROJECT_INSTALL)
 
-distclean: clean ocp-distclean $(PROJECT_DISTCLEAN)
+ocp-build-clean: ocp-build-clean $(PROJECT_CLEAN)
+
+ocp-build-distclean: clean ocp-distclean $(PROJECT_DISTCLEAN)
 	find . -name '*~' -exec rm -f {} \;
 
-include autoconf/Makefile.rules
+-include autoconf/Makefile.rules

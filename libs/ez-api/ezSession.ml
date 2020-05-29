@@ -64,8 +64,6 @@ end
 module Make(S : SessionArg) = struct
 
   type s2c_message =
-    | AuthError of string
-
     (* Authentication failed, here is a new challenge *)
     | AuthNeeded of
         (* challenge_id *) string *
@@ -86,10 +84,6 @@ module Make(S : SessionArg) = struct
   module Encoding = struct
     open Json_encoding
 
-    let auth_error =
-      obj1
-        (req "msg" EzEncoding.encoded_string)
-
     let auth_needed =
       obj2
         (req "challenge_id" string)
@@ -104,17 +98,6 @@ module Make(S : SessionArg) = struct
 
     let s2c_message =
       union [
-
-          case
-            auth_error
-            (function
-             | AuthError msg ->
-                Some msg
-             | _ -> None)
-            (fun msg ->
-              AuthError msg
-            );
-
           case
             auth_needed
             (function
@@ -175,21 +158,23 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.s2c_message
         EzAPI.Path.(rpc_root // "connect")
 
-    let login : (login_message, s2c_message) EzAPI.post_service0  =
+    let login : (login_message,
+                 string * S.user_id * string * S.user_info) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
         ~params:[param_token]
         ~input:Encoding.login_message
-        ~output:Encoding.s2c_message
+        ~output:Encoding.auth_ok
         EzAPI.Path.(rpc_root // "login")
 
-    let logout : s2c_message EzAPI.service0  =
+    let logout : (string * string) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"logout"
         ~params:[param_token]
-        ~output:Encoding.s2c_message
+        ~meth:"put"
+        ~output:Encoding.auth_needed
         EzAPI.Path.(rpc_root // "logout")
   end
 

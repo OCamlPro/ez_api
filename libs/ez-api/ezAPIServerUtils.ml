@@ -13,20 +13,21 @@ let empty = {
   meth_OPTIONS = RestoDirectory1.empty;
 }
 
-let return x = RestoDirectory1.Answer.return x
-let return_raw s = RestoDirectory1.Answer.return_raw s
+let return ?code x = RestoDirectory1.Answer.return ?code x
+let return_raw ?code s = RestoDirectory1.Answer.return_raw ?code s
 
 let verbose =
   try
     let s = Sys.getenv "EZAPISERVER" in
     try
       int_of_string s
-    with _ -> 2
-  with _ -> 1
+    with _ -> 1
+  with _ -> 0
 
 
 exception EzRawReturn of string
 exception EzRawError of int
+exception EzContentError of (int * string)
 
 (* Remove empty strings from a list of string *)
 let list_trim l = List.filter (fun s -> s <> "") l
@@ -39,14 +40,14 @@ let set_req_time () =
 let req_time () = !req_time
 
 type timings = {
-   mutable timings_ok : Timings.t array;
-   mutable timings_fail : Timings.t array;
-  }
+  mutable timings_ok : Timings.t array;
+  mutable timings_fail : Timings.t array;
+}
 
 let timings = {
-    timings_ok = [||];
-    timings_fail = [||];
-  }
+  timings_ok = [||];
+  timings_fail = [||];
+}
 
 let add_timing n ok t dt =
   if ok then
@@ -56,9 +57,9 @@ let add_timing n ok t dt =
 
 let init_timings nservices =
   timings.timings_ok <-Array.init nservices
-                              (fun _ -> Timings.create t0);
+      (fun _ -> Timings.create t0);
   timings.timings_fail <- Array.init nservices
-                                (fun _ -> Timings.create t0);
+      (fun _ -> Timings.create t0);
   ()
 
 let req_ips = Hashtbl.create 1111
@@ -82,11 +83,11 @@ let register_ip ip =
     in
     Geoip.close gi;
     let s = {
-        ip_ip = ip;
-        ip_last = req_time();
-        ip_nb = 1;
-        ip_country = (country_name, country_code);
-      } in
+      ip_ip = ip;
+      ip_last = req_time();
+      ip_nb = 1;
+      ip_country = (country_name, country_code);
+    } in
     Hashtbl.add req_ips ip s
 
 exception EzReturnOPTIONS of (string * string) list
@@ -96,10 +97,10 @@ let register ?(options_headers=[]) service handler dir =
     try
       handler a b
     with
-    | (EzRawReturn _ | EzRawError _) as exn -> Lwt.fail exn
+    | (EzRawReturn _ | EzRawError _ | EzContentError _) as exn -> Lwt.fail exn
     | exn ->
       Printf.eprintf "*** exception %s in handler ***\n%!"
-                     (Printexc.to_string exn);
+        (Printexc.to_string exn);
       Lwt.fail EzAPI.ResultNotfound
   in
 
@@ -111,28 +112,28 @@ let register ?(options_headers=[]) service handler dir =
     in
     Lwt.catch
       (function () ->
-                handler_GET a b >>=
-                function res ->
-                  add_timing_wrap true;
-                  Lwt.return res)
+         handler_GET a b >>=
+         function res ->
+           add_timing_wrap true;
+           Lwt.return res)
       (function
-        | (EzRawReturn _ | EzRawError _) as exn ->
+        | (EzRawReturn _ | EzRawError _ | EzContentError _) as exn ->
           add_timing_wrap true;
-         Lwt.fail exn
+          Lwt.fail exn
         | exn ->
-         add_timing_wrap false;
-         Lwt.fail exn)
+          add_timing_wrap false;
+          Lwt.fail exn)
   in
   let handler_OPTIONS _a _b =
     Lwt.fail (EzReturnOPTIONS options_headers)
   in
   let service_GET, service_OPTIONS = EzAPI.register service in
   {
-      meth_GET =
-        RestoDirectory1.register dir.meth_GET service_GET handler_GET;
-      meth_OPTIONS =
-        RestoDirectory1.register dir.meth_OPTIONS service_OPTIONS
-          handler_OPTIONS;
+    meth_GET =
+      RestoDirectory1.register dir.meth_GET service_GET handler_GET;
+    meth_OPTIONS =
+      RestoDirectory1.register dir.meth_OPTIONS service_OPTIONS
+        handler_OPTIONS;
   }
 
 let json_root = function
@@ -151,9 +152,9 @@ type server_kind =
   | Root of string * string option
 
 type server = {
-    server_port : int;
-    server_kind : server_kind;
-  }
+  server_port : int;
+  server_kind : server_kind;
+}
 
 let reply_none code = Lwt.return (code, ReplyNone)
 let reply_json code json = Lwt.return (code, ReplyJson json)
@@ -161,21 +162,19 @@ let reply_raw_json code json = Lwt.return (code, ReplyString ("application/javas
 let reply_timeout () =
   Lwt.return @@ 408, ReplyNone
 let reply_answer
-      { RestoDirectory1.Answer.code; RestoDirectory1.Answer.body } =
+    { RestoDirectory1.Answer.code; RestoDirectory1.Answer.body } =
   match body with
   | RestoDirectory1.Answer.Empty ->
-     reply_none code
+    reply_none code
   | RestoDirectory1.Answer.Single json ->
-     reply_json code json
+    reply_json code json
   | RestoDirectory1.Answer.Single_raw s ->
-     reply_raw_json code s
+    reply_raw_json code s
   | RestoDirectory1.Answer.Stream _ ->
-     reply_none 500
-
-let split_on_char c s = OcpString.split s c
+    reply_none 500
 
 let rev_extensions filename =
-  List.rev (split_on_char '.'
+  List.rev (String.split_on_char '.'
               (String.lowercase_ascii
                  (Filename.basename filename)))
 
@@ -194,7 +193,7 @@ let content_type_of_file file =
   let exts = rev_extensions file in
   if verbose > 2 then
     EzDebug.printf "content_type_of_file: [%s]"
-                    (String.concat "," exts);
+      (String.concat "," exts);
   match exts with
   | "js" :: _ -> "application/javascript"
   | "pdf" :: _ -> "application/pdf"
@@ -224,9 +223,9 @@ module FileString = struct
     let rec iter ic b s =
       let nread = input ic s 0 size in
       if nread > 0 then begin
-          Buffer.add_subbytes b s 0 nread;
-          iter ic b s
-        end
+        Buffer.add_subbytes b s 0 nread;
+        iter ic b s
+      end
     in
     iter ic b s;
     Buffer.contents b
@@ -258,11 +257,14 @@ let rec reply_file ?(meth=`GET) ?default root path =
         (String.length content);
       Lwt.return (200, ReplyString (content_type, content))
   with _exn ->
-       match default with
-       | None ->
-          raise Not_found
-       | Some file ->
-          reply_file ~meth root
-                     (split_on_char '/' file)
+  match default with
+  | None ->
+    raise Not_found
+  | Some file ->
+    reply_file ~meth root
+      (String.split_on_char '/' file)
 
-let return_error code = raise (EzRawError code)
+let return_error ?content code =
+  match content with
+  | None -> raise (EzRawError code)
+  | Some content -> raise (EzContentError (code, content))

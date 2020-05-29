@@ -240,7 +240,7 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
       end ;
       let uri = mk_uri request in
       let local_path = Uri.path uri in
-      let path = local_path |> split_on_char '/' |> list_trim in
+      let path = local_path |> String.split_on_char '/' |> list_trim in
       let req_params = Uri.query uri in
       let headers =
         let headers = ref StringMap.empty in
@@ -288,13 +288,14 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                     handler None >>= fun _answer -> reply_none 200
                   | API dir, _ ->
                     let content =
-                      match ez_request.req_body with
-                      | BodyString (Some "application/x-www-form-urlencoded", content) ->
+                      match request.Request.meth, ez_request.req_body with
+                      | `GET, BodyString (_, "") -> None
+                      | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
                         EzAPI.add_params ez_request ( EzUrl.decode_args content );
                         None
-                      | BodyString (Some "application/json", content) ->
+                      | _, BodyString (Some "application/json", content) ->
                         Some (Ezjsonm.from_string content)
-                      | BodyString (_, content) ->
+                      | _, BodyString (_, content) ->
                         try
                           Some (Ezjsonm.from_string content)
                         with _ -> None
@@ -311,7 +312,13 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                    | EzReturnOPTIONS _ -> reply_none 200
                    | EzRawReturn s -> reply_raw_json 200 s
                    | EzRawError code -> reply_none code
+                   | EzContentError (code, json) ->
+                     reply_raw_json code json
                    | Not_found -> reply_none 404
+                   | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
+                     reply_answer
+                       (RestoDirectory1.response_of_cannot_parse
+                          descr msg rpath)
                    | exn ->
                      Printf.eprintf "In %s: exception %s\n%!"
                        local_path (Printexc.to_string exn);

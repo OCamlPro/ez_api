@@ -83,6 +83,7 @@ type service_doc = {
     doc_section : section;
     doc_input : Json_schema.schema Lazy.t;
     doc_output : Json_schema.schema Lazy.t;
+    doc_meth : string;
   }
 
 and section = {
@@ -257,6 +258,7 @@ let rec update_service_list services doc = match services with
 let post_service ?(section=default_section)
     ?name
     ?descr
+    ?meth
     ~input
     ~output
     ?(params = []) (doc_path,path1,path2,sample) =
@@ -273,6 +275,7 @@ let post_service ?(section=default_section)
       doc_section = section;
       doc_input = lazy (Json_encoding.schema ~definitions_path input);
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
+      doc_meth = (match meth with None -> "post" | Some meth -> meth);
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
@@ -291,10 +294,11 @@ let post_service ?(section=default_section)
   end;
   service
 
-let service ?section ?name ?descr ~output ?params arg =
+let service ?section ?name ?descr ?meth ~output ?params arg =
+  let meth = match meth with None -> "get" | Some s -> s in
   post_service ?section ?name ?descr
-               ~input:Json_encoding.empty
-               ~output ?params arg
+    ~input:Json_encoding.empty
+    ~output ~meth ?params arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -559,15 +563,18 @@ let paths_of_sections ?(docs=[]) sections =
               | PARAM_INT -> "integer"
               | PARAM_BOOL -> "boolean"
             in
-            `O [
-              "name", `String p.param_value;
-              "in", `String "query";
-              "description", `String param_descr;
-              "required", `Bool p.param_required;
-              "schema", `O [
-                "type", `String param_type
-              ]
-            ]
+            `O ([
+                "name", `String p.param_value;
+                "in", `String "query";
+                "description", `String param_descr;
+                "required", `Bool p.param_required;
+                "schema", `O [
+                  "type", `String param_type
+                ]
+              ] @ match p.param_examples with
+              | [] -> []
+              | e :: _ -> ["example", `String e]
+              )
           ) sd.doc_params
       in
       let parameters =
@@ -598,14 +605,12 @@ let paths_of_sections ?(docs=[]) sections =
       in
       let in_schema = List.nth input_schemas i in
       let out_schema = List.nth output_schemas i in
-      let meth, request_schema = match in_schema with
+      let request_schema = match in_schema with
         | `O ["type", `String "object";
               "properties", `O [];
-              "additionalProperties", `Bool false ] ->
-          (* no request, say GET *)
-          "get", []
-        | _ ->
-          "post", [ "requestBody", `O [
+              "additionalProperties", `Bool false ] -> []
+        | _ -> [
+            "requestBody", `O [
               "content", `O [
                 "application/json", `O [
                   "schema", in_schema
@@ -615,7 +620,7 @@ let paths_of_sections ?(docs=[]) sections =
       in
       get_path sd,
       `O [
-        meth, `O ([
+        sd.doc_meth, `O ([
           "tags", `A [ `String sd.doc_section.section_name ];
           "summary", `String summary;
           "description", `String description;

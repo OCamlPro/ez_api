@@ -48,7 +48,7 @@ module type Arg = sig
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
     (string * SessionArg.user_id * SessionArg.user_info) option Lwt.t
-
+  val error_wrapper : (string -> string) option
 end
 
 module Make(S: Arg) : sig
@@ -69,13 +69,14 @@ module Make(S: Arg) : sig
 end = struct
 
   let find_user = S.find_user
+  let error_wrapper = S.error_wrapper
   open S.SessionStore
   module S = S.SessionArg
 
   let token_kind =
     match S.token_kind with
     | `Cookie name -> `Cookie name
-    | `CSRF name -> `CSRF (String.lowercase name)
+    | `CSRF name -> `CSRF (String.lowercase_ascii name)
 
   module M = EzSession.Make(S)
   include M
@@ -127,7 +128,7 @@ end = struct
           end;
         Hashtbl.add challenges challenge_id (challenge, t0);
         Queue.add challenge_id challenge_queue;
-        AuthNeeded (challenge_id, challenge)
+        (challenge_id, challenge)
 
     let add_auth_header ?cookie req =
       match S.token_kind with
@@ -142,15 +143,19 @@ end = struct
           ("access-control-allow-headers", header) ::
           req.rep_headers
 
+    let request_auth_base req f =
+      add_auth_header req;
+      EzAPIServerUtils.return (f @@ new_challenge ())
+
     let request_auth req =
-      add_auth_header req;
-      EzAPIServerUtils.return (new_challenge ())
+      request_auth_base req (fun (id, challenge) -> AuthNeeded (id, challenge))
 
-    let request_error req msg =
+    let request_error ?(code=401) req msg =
       add_auth_header req;
-      EzAPIServerUtils.return (AuthError msg)
+      let content = match error_wrapper with None -> msg | Some f -> f msg in
+      EzAPIServerUtils.return_error ~content code
 
-    let return_auth req ?cookie ~login user_id user_info =
+    let return_auth_base req ?cookie ~login user_id user_info f =
       begin
         match cookie with
         | Some cookie -> Lwt.return cookie
@@ -161,7 +166,11 @@ end = struct
       >>= function cookie ->
         add_auth_header ~cookie req;
         EzAPIServerUtils.return
-          (AuthOK (login, user_id, cookie, user_info))
+          (f (login, user_id, cookie, user_info))
+
+    let return_auth req ?cookie ~login user_id user_info =
+      return_auth_base req ?cookie ~login user_id user_info
+        (fun (login, id, cookie, info) -> AuthOK (login, id, cookie, info))
 
     let connect req () =
       get_request_session req >>= function
@@ -187,7 +196,7 @@ end = struct
          | exception Not_found ->
             if verbose > 1 then
               EzDebug.printf "/login: could not find challenge\n%!";
-            request_auth req
+            request_error req "Challenge not found or expired"
          | (challenge, _t0) ->
             let expected_reply =
               EzSession.Hash.challenge
@@ -199,7 +208,7 @@ end = struct
                 request_error req "Bad user or password"
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
-                return_auth req ~login:login_user user_id user_info
+                return_auth_base req ~login:login_user user_id user_info (fun x -> x)
               end
 
     let logout req () =
@@ -207,7 +216,7 @@ end = struct
       | None -> EzAPIServerUtils.return_error 403
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
-         request_auth req
+         request_auth_base req (fun x -> x)
   end
 
   let register service handler =
