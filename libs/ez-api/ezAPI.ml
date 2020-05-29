@@ -563,15 +563,18 @@ let paths_of_sections ?(docs=[]) sections =
               | PARAM_INT -> "integer"
               | PARAM_BOOL -> "boolean"
             in
-            `O [
-              "name", `String p.param_value;
-              "in", `String "query";
-              "description", `String param_descr;
-              "required", `Bool p.param_required;
-              "schema", `O [
-                "type", `String param_type
-              ]
-            ]
+            `O ([
+                "name", `String p.param_value;
+                "in", `String "query";
+                "description", `String param_descr;
+                "required", `Bool p.param_required;
+                "schema", `O [
+                  "type", `String param_type
+                ]
+              ] @ match p.param_examples with
+              | [] -> []
+              | e :: _ -> ["example", `String e]
+              )
           ) sd.doc_params
       in
       let parameters =
