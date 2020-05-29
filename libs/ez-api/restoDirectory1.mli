@@ -29,12 +29,12 @@ module Answer : sig
     shutdown: unit -> unit ;
   }
 
-  val ok: 'a -> 'a answer
-  val ok_raw: string -> 'a answer
-  val ok_stream: 'a stream -> 'a answer
-  val return: 'a -> 'a answer Lwt.t
-  val return_raw: string -> 'a answer Lwt.t
-  val return_stream: 'a stream -> 'a answer Lwt.t
+  val ok: ?code:int -> 'a -> 'a answer
+  val ok_raw: ?code:int -> string -> 'a answer
+  val ok_stream: ?code:int -> 'a stream -> 'a answer
+  val return: ?code:int -> 'a -> 'a answer Lwt.t
+  val return_raw: ?code:int -> string -> 'a answer Lwt.t
+  val return_stream: ?code:int -> 'a stream -> 'a answer Lwt.t
 
 end
 
@@ -68,6 +68,9 @@ module Make (Repr : Json_repr.Repr) : sig
     'prefix directory -> 'prefix -> string list ->
     (Repr.value option -> Repr.value Answer.answer Lwt.t) Lwt.t
 
+  val response_of_cannot_parse :
+    Arg.descr -> string -> string list ->
+    Repr.value Answer.answer
 
   (** Registring handler in service tree. *)
   val register:

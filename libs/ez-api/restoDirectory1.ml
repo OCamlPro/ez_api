@@ -66,14 +66,14 @@ module Answer = struct
       body : 'a output ;
     }
 
-  let ok json = { code = 200 ; body = Single json }
-  let return json = Lwt.return { code = 200 ; body = Single json }
+  let ok ?(code=200) json = { code ; body = Single json }
+  let return ?code json = Lwt.return (ok ?code json)
 
-  let ok_raw s = { code = 200 ; body = Single_raw s }
-  let return_raw s = Lwt.return (ok_raw s)
+  let ok_raw ?(code=200) s = { code ; body = Single_raw s }
+  let return_raw ?code s = Lwt.return (ok_raw ?code s)
 
-  let ok_stream st = { code = 200 ; body = Stream st }
-  let return_stream st = Lwt.return { code = 200 ; body = Stream st }
+  let ok_stream ?(code=200) st = { code ; body = Stream st }
+  let return_stream ?code st = Lwt.return (ok_stream ?code st)
 
   let map (type a) (type b) (f:a -> b) (({ code ; body = _ } as ans) : a answer) : b answer =
     match ans.body with
@@ -422,6 +422,18 @@ module Make(Repr : Json_repr.Repr) = struct
           | CustomService (_, handler) -> Lwt.return handler
           | CustomDirectory _ -> Lwt.fail Not_found
         end
+
+  let response_of_cannot_parse descr msg rpath =
+    let body =
+      Repr.repr @@
+      `O [ "error", Repr.repr @@
+           `String (Printf.sprintf "Cannot parse path argument %s" descr.Arg.name) ;
+           "path", Repr.repr @@
+           `String (String.concat "/" (List.rev rpath));
+           "msg", Repr.repr @@
+           `String msg;
+         ] in
+    { code = 400 ; body = Single body }
 
   let describe_directory
     : type a _p.

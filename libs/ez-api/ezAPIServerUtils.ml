@@ -13,16 +13,16 @@ let empty = {
   meth_OPTIONS = RestoDirectory1.empty;
 }
 
-let return x = RestoDirectory1.Answer.return x
-let return_raw s = RestoDirectory1.Answer.return_raw s
+let return ?code x = RestoDirectory1.Answer.return ?code x
+let return_raw ?code s = RestoDirectory1.Answer.return_raw ?code s
 
 let verbose =
   try
     let s = Sys.getenv "EZAPISERVER" in
     try
       int_of_string s
-    with _ -> 2
-  with _ -> 1
+    with _ -> 1
+  with _ -> 0
 
 
 exception EzRawReturn of string

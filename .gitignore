@@ -1,4 +1,5 @@
-_obuild
+_opam
+_obuild/
 *~
 _build
 autoconf
