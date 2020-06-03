@@ -61,8 +61,8 @@ module Make(S: Arg) : sig
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
   val register :
-           ('arg, 'b, 'input, 'd) EzAPI.service ->
-           ('arg -> 'input -> 'd EzAPIServerUtils.answer Lwt.t) ->
+           ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
+           ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
            EzAPI.request EzAPIServerUtils.directory ->
            EzAPI.request EzAPIServerUtils.directory
 
@@ -148,7 +148,7 @@ end = struct
       EzAPIServerUtils.return (f @@ new_challenge ())
 
     let request_auth req =
-      request_auth_base req (fun (id, challenge) -> AuthNeeded (id, challenge))
+      request_auth_base req (fun (id, challenge) -> Ok (AuthNeeded (id, challenge)))
 
     let request_error ?(code=401) req msg =
       add_auth_header req;
@@ -170,7 +170,7 @@ end = struct
 
     let return_auth req ?cookie ~login user_id user_info =
       return_auth_base req ?cookie ~login user_id user_info
-        (fun (login, id, cookie, info) -> AuthOK (login, id, cookie, info))
+        (fun (login, id, cookie, info) -> Ok (AuthOK (login, id, cookie, info)))
 
     let connect req () =
       get_request_session req >>= function
@@ -208,7 +208,7 @@ end = struct
                 request_error req "Bad user or password"
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
-                return_auth_base req ~login:login_user user_id user_info (fun x -> x)
+                return_auth_base req ~login:login_user user_id user_info (fun x -> Ok x)
               end
 
     let logout req () =
@@ -216,7 +216,7 @@ end = struct
       | None -> EzAPIServerUtils.return_error 403
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
-         request_auth_base req (fun x -> x)
+         request_auth_base req (fun x -> Ok x)
   end
 
   let register service handler =

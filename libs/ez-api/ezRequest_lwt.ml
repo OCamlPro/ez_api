@@ -3,7 +3,10 @@ open EzAPI.TYPES
 let (>|=) = Lwt.(>|=)
 let return = Lwt.return
 
-type 'a api_result = ('a, (int * string option)) result
+type 'a api_error =
+  | KnownError of { code : int ; error : 'a }
+  | UnknwownError of { code : int ; msg : string option }
+type ('output, 'error) api_result = ('output, 'error api_error) result
 
 module type S = sig
 
@@ -15,18 +18,18 @@ val get0 :
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   ?msg:string ->                    (* debug msg *)
   EzAPI.base_url ->                 (* API url *)
-  'output EzAPI.service0 ->         (* GET service *)
-  'output api_result Lwt.t
+  ('output, 'error) EzAPI.service0 ->         (* GET service *)
+  ('output, 'error) api_result Lwt.t
 
 val get1 :
   ?post:bool ->
   ?headers:(string * string) list ->
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ?msg:string ->
+  ?msg: string ->
   EzAPI.base_url ->
-  ('arg, 'output) EzAPI.service1 ->
+  ('arg, 'output, 'error) EzAPI.service1 ->
   'arg ->
-  'output api_result Lwt.t
+  ('output, 'error) api_result Lwt.t
 
 val post0 :
   ?headers:(string * string) list ->
@@ -34,8 +37,8 @@ val post0 :
   ?msg:string ->
   input:'input ->                           (* input *)
   EzAPI.base_url ->                 (* API url *)
-  ('input,'output) EzAPI.post_service0 -> (* POST service *)
-  'output api_result Lwt.t
+  ('input,'output, 'error) EzAPI.post_service0 -> (* POST service *)
+  ('output, 'error) api_result Lwt.t
 
 val post1 :
   ?headers:(string * string) list ->
@@ -43,15 +46,15 @@ val post1 :
   ?msg:string ->
   input:'input ->                           (* input *)
   EzAPI.base_url ->                 (* API url *)
-  ('arg, 'input,'output) EzAPI.post_service1 -> (* POST service *)
+  ('arg, 'input,'output, 'error) EzAPI.post_service1 -> (* POST service *)
   'arg ->
-  'output api_result Lwt.t
+  ('output, 'error) api_result Lwt.t
 
 val get :
   ?headers:(string * string) list ->
   ?msg:string ->
   EzAPI.url ->              (* url *)
-  string api_result Lwt.t
+  (string, int * string option) result Lwt.t
 
 val post :
   ?content_type:string ->
@@ -59,7 +62,7 @@ val post :
   ?headers:(string * string) list ->
   ?msg:string ->
   EzAPI.url ->
-  string api_result Lwt.t
+  (string, int * string option) result Lwt.t
 
 (* hook executed before every xhr *)
 val add_hook : (unit -> unit) -> unit
@@ -72,33 +75,50 @@ let request_reply_hook = ref (fun () -> ())
 
 let before_hook = ref (fun () -> ())
 
-let decode_result encoding = function
-  | Error _ as e -> e
+let decode_result encoding err_encodings = function
+  | Error (code, None) -> Error (UnknwownError { code ; msg = None })
+  | Error (code, Some msg) ->
+    (match List.find_all (fun (c, _) -> c = code) err_encodings with
+      | [] -> Error (UnknwownError { code ; msg = Some msg })
+      | cases ->
+        let encoding = Json_encoding.union (List.map snd cases) in
+        try Error (
+            KnownError { code ; error = EzEncoding.destruct encoding msg })
+        with _ -> Error (UnknwownError { code ; msg = Some msg })
+    )
   | Ok res ->
     match EzEncoding.destruct encoding res with
     | res -> (Ok res)
     | exception exn ->
       let msg = Printf.sprintf "Decoding error: %s in\n%s"
           (Printexc.to_string exn) res in
-      (Error ((-2), (Some msg)))
+      Error (UnknwownError { code = -2; msg = Some msg })
 
-let any_get = ref (fun ?headers:_ ?msg:_ _url -> return (Error (-1,None)))
+let handle_result service res =
+  let err_encodings = EzAPI.service_errors service in
+  let encoding = EzAPI.service_output service in
+  decode_result encoding err_encodings res
+
+let any_get = ref (fun ?headers:_ ?msg:_ _url ->
+    return (Error (-2, None))
+  )
 let any_post = ref (fun ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
-    return (Error (-1,None)))
+    return (Error (-2, None))
+  )
 
 module Make(S : sig
 
     val get :
       ?headers:(string * string) list ->
       ?msg:string -> string ->
-      string api_result Lwt.t
+      (string, int * string option) result Lwt.t
 
     val post :
       ?content_type:string ->
       ?content:string ->
       ?headers:(string * string) list ->
       ?msg:string -> string ->
-      string api_result Lwt.t
+      (string, int * string option) result Lwt.t
 
     end) = struct
 
@@ -128,55 +148,50 @@ module Make(S : sig
     before_hook := (fun () -> old_hook (); f ())
 
   let get0 ?(post=false) ?headers ?(params=[]) ?msg
-      api (service:'output EzAPI.service0) =
+      api (service: ('output, 'error) EzAPI.service0) =
     !before_hook ();
-    let encoding = EzAPI.service_output service in
     if post then
       let url = EzAPI.forge0 api service [] in
       let content = EzAPI.encode_args service url params in
       let content_type = EzUrl.content_type in
       internal_post ~content ~content_type ?headers ?msg url >|=
-      (decode_result encoding)
-
+      handle_result service
     else
       let url = EzAPI.forge0 api service params in
-      internal_get ?headers ?msg url >|= (decode_result encoding)
+      internal_get ?headers ?msg url >|= handle_result service
 
   let get1 ?(post=false) ?headers ?(params=[]) ?msg
-      api (service : ('arg,'output) EzAPI.service1) (arg : 'arg) =
+      api (service : ('arg,'output, 'error) EzAPI.service1) (arg : 'arg) =
     !before_hook ();
-    let encoding = EzAPI.service_output service in
     if post then
       let url = EzAPI.forge1 api service arg []  in
       let content = EzAPI.encode_args service url params in
       let content_type = EzUrl.content_type in
       internal_post ~content ~content_type ?headers ?msg url >|=
-      (decode_result encoding)
+      handle_result service
     else
       let url = EzAPI.forge1 api service arg params in
-      internal_get ?headers ?msg url >|= (decode_result encoding)
+      internal_get ?headers ?msg url >|= handle_result service
 
   let post0 ?headers ?(params=[]) ?msg ~(input : 'input)
-      api (service : ('input,'output) EzAPI.post_service0) =
+      api (service : ('input,'output, 'error) EzAPI.post_service0) =
     !before_hook ();
     let input_encoding = EzAPI.service_input service in
-    let output_encoding = EzAPI.service_output service in
     let url = EzAPI.forge0 api service params in
     let content = EzEncoding.construct input_encoding input in
     let content_type = "application/json" in
     internal_post ~content ~content_type ?headers ?msg url >|=
-    (decode_result output_encoding)
+    handle_result service
 
   let post1 ?headers ?(params=[]) ?msg ~(input : 'input)
-      api (service : ('arg, 'input,'output) EzAPI.post_service1) (arg : 'arg) =
+      api (service : ('arg, 'input,'output, 'error) EzAPI.post_service1) (arg : 'arg) =
     !before_hook ();
     let input_encoding = EzAPI.service_input service in
-    let output_encoding = EzAPI.service_output service in
     let url = EzAPI.forge1 api service arg params in
     let content = EzEncoding.construct input_encoding input in
     let content_type = "application/json" in
     internal_post ~content ~content_type ?headers ?msg url >|=
-    (decode_result output_encoding)
+    handle_result service
 
   let get = internal_get
   let post = internal_post
@@ -190,9 +205,9 @@ module ANY : S = Make(struct
   end)
 
 module Default = Make(struct
-    let get ?headers:_ ?msg:_ _url = return (Error (-1,None))
+    let get ?headers:_ ?msg:_ _url = return (Error (-2, None))
     let post ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
-      return (Error (-1,None))
+      return (Error (-2, None))
   end)
 
 let () = Default.init ()

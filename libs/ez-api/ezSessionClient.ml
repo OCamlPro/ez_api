@@ -101,13 +101,14 @@ module Make(S: SessionArg) : sig
              f (Error (Failure "Error connect")))
          ~params:[]
          (function
-          | AuthNeeded (challenge_id, challenge) ->
+          | Ok AuthNeeded (challenge_id, challenge) -> (* TODO *)
              state := Connected (challenge_id, challenge);
              f (Ok None)
-          | AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
+          | Ok AuthOK (auth_login, auth_user_id, auth_token, auth_user) ->
              let u = { auth_login; auth_user_id; auth_token; auth_user } in
              state := User u;
              f (Ok (Some u))
+          | Error () -> assert false
          )
          ()
     | Connected _ ->
@@ -171,11 +172,14 @@ module Make(S: SessionArg) : sig
             login_challenge_id = challenge_id;
             login_challenge_reply = challenge_reply;
           }
-          (fun (auth_login, auth_user_id, auth_token, auth_user) ->
-             let u = { auth_login; auth_user_id; auth_token; auth_user } in
-             set_cookie u.auth_token;
-             state := User u;
-             f (Ok u))
+          (function
+            | Ok (auth_login, auth_user_id, auth_token, auth_user) ->
+              let u = { auth_login; auth_user_id; auth_token; auth_user } in
+              set_cookie u.auth_token;
+              state := User u;
+              f (Ok u)
+            | Error () -> assert false (* TODO *)
+          )
 
   and login ?format api ~login:u_login ~password:u_password f =
     login_rec ?format 4 api u_login u_password f
@@ -193,10 +197,13 @@ module Make(S: SessionArg) : sig
         ~error:(fun _n _data -> f (Error (Failure "Error")))
         ~params:[]
         ~headers:(auth_headers ~token)
-        (fun (challenge_id, challenge) ->
+        (function
+          | Ok (challenge_id, challenge) ->
            remove_cookie u.auth_token;
            state := Connected (challenge_id, challenge);
-           f (Ok true))
+           f (Ok true)
+          | Error () -> assert false (* TODO *)
+        )
         ()
 
   let get () =

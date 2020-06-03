@@ -7,50 +7,50 @@ module type S = sig
 val init : unit -> unit
 
 val get0 :
-  EzAPI.base_url ->                 (* API url *)
-  'output EzAPI.service0 ->         (* GET service *)
-  string ->                         (* debug msg *)
+  EzAPI.base_url ->                   (* API url *)
+  ('output, 'error) EzAPI.service0 -> (* GET service *)
+  string ->                           (* debug msg *)
   ?post:bool ->
   ?headers:(string * string) list ->
-  ?error: error_handler ->          (* error handler *)
+  ?error: error_handler ->            (* unhandled error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit ->                           (* trigger *)
   unit
 
 val get1 :
   EzAPI.base_url ->
-  ('arg, 'output) EzAPI.service1 ->
+  ('arg, 'output, 'error) EzAPI.service1 ->
   string ->
   ?post:bool ->
   ?headers:(string * string) list ->
   ?error: error_handler ->
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ('output -> unit) ->
+  (('output, 'error) Result.result -> unit) ->
   'arg ->
   unit
 
 val post0 :
   EzAPI.base_url ->                 (* API url *)
-  ('input,'output) EzAPI.post_service0 -> (* POST service *)
+  ('input, 'output, 'error) EzAPI.post_service0 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit
 
 val post1 :
   EzAPI.base_url ->                 (* API url *)
-  ('arg, 'input,'output) EzAPI.post_service1 -> (* POST service *)
+  ('arg, 'input, 'output, 'error) EzAPI.post_service1 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
   'arg ->
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit
 
 val get :
@@ -156,8 +156,22 @@ module Make(S : sig
     let old_hook = !before_xhr_hook in
     before_xhr_hook := (fun () -> old_hook (); f ())
 
+  let handlers ?error service f =
+    let error_encodings = EzAPI.service_errors service in
+    let error code msg =
+      match List.find_all (fun (c, _) -> c = code) error_encodings, msg with
+      | _::_ as cases , Some s ->
+        let enc = Json_encoding.union (List.map snd cases) in
+        decode_result ?error enc (fun x -> f (Error x)) s
+      | _, _ -> match error with
+        | Some error -> error code msg (* unhandled *)
+        | None -> () in
+    let encoding = EzAPI.service_output service in
+    let ok = decode_result ~error encoding (fun x -> f (Ok x)) in
+    ok, error
+
   let get0 api
-           ( service : 'output EzAPI.service0 )
+           ( service : ('output, 'error) EzAPI.service0 )
            msg
            ?(post=false)
            ?headers
@@ -165,19 +179,18 @@ module Make(S : sig
            ?(params=[])
            f () =
     !before_xhr_hook ();
-    let encoding = EzAPI.service_output service in
+    let ok, error = handlers ?error service f in
     if post then
       let url = EzAPI.forge0 api service [] in
       let content = EzAPI.encode_args service url params in
       let content_type = EzUrl.content_type in
-      internal_post msg url ~content ~content_type ?headers ?error
-                    (decode_result ?error encoding f)
+      internal_post msg url ~content ~content_type ?headers ~error ok
     else
       let url = EzAPI.forge0 api service params in
-      internal_get msg url ?headers ?error (decode_result ?error encoding f)
+      internal_get msg url ?headers ~error ok
 
   let get1 api
-           ( service : ('arg,'output) EzAPI.service1 )
+           ( service : ('arg, 'output, 'error) EzAPI.service1 )
            msg
            ?(post=false)
            ?headers
@@ -186,19 +199,18 @@ module Make(S : sig
            f
            (arg : 'arg) =
     !before_xhr_hook ();
-    let encoding = EzAPI.service_output service in
+    let ok, error = handlers ?error service f in
     if post then
       let url = EzAPI.forge1 api service arg []  in
       let content = EzAPI.encode_args service url params in
       let content_type = EzUrl.content_type in
-      internal_post msg url ~content ~content_type ?headers ?error
-                    (decode_result ?error encoding f)
+      internal_post msg url ~content ~content_type ?headers ~error ok
     else
       let url = EzAPI.forge1 api service arg params in
-      internal_get msg url ?headers ?error (decode_result ?error encoding f)
+      internal_get msg url ?headers ~error ok
 
   let post0 api
-            ( service : ('input,'output) EzAPI.post_service0 )
+            ( service : ('input, 'output, 'error) EzAPI.post_service0 )
             msg
             ?headers
             ?error
@@ -207,16 +219,15 @@ module Make(S : sig
             f
     =
     !before_xhr_hook ();
+    let ok, error = handlers ?error service f in
     let input_encoding = EzAPI.service_input service in
-    let output_encoding = EzAPI.service_output service in
     let url = EzAPI.forge0 api service params in
     let content = EzEncoding.construct input_encoding input in
     let content_type = "application/json" in
-    internal_post msg url ~content ~content_type ?headers ?error
-                  (decode_result ?error output_encoding f)
+    internal_post msg url ~content ~content_type ?headers ~error ok
 
   let post1 api
-            (service : ('arg, 'input,'output) EzAPI.post_service1 )
+            (service : ('arg, 'input, 'output, 'error) EzAPI.post_service1 )
             msg
             ?headers
             ?error
@@ -226,13 +237,12 @@ module Make(S : sig
             f
     =
     !before_xhr_hook ();
+    let ok, error = handlers ?error service f in
     let input_encoding = EzAPI.service_input service in
-    let output_encoding = EzAPI.service_output service in
     let url = EzAPI.forge1 api service arg params in
     let content = EzEncoding.construct input_encoding input in
     let content_type = "application/json" in
-    internal_post msg url ~content ~content_type ?headers ?error
-                  (decode_result ?error output_encoding f)
+    internal_post msg url ~content ~content_type ?headers ~error ok
 
   let get = internal_get
   let post = internal_post

@@ -150,7 +150,11 @@ module Make(S : SessionArg) = struct
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
-    let connect : s2c_message EzAPI.service0  =
+    type connect_error = unit (* TODO *)
+    type login_error = unit   (* TODO *)
+    type logout_error = unit  (* TODO *)
+
+    let connect : (s2c_message, connect_error) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"connect"
@@ -159,7 +163,8 @@ module Make(S : SessionArg) = struct
         EzAPI.Path.(rpc_root // "connect")
 
     let login : (login_message,
-                 string * S.user_id * string * S.user_info) EzAPI.post_service0  =
+                 string * S.user_id * string * S.user_info,
+                 login_error) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
@@ -168,7 +173,7 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.auth_ok
         EzAPI.Path.(rpc_root // "login")
 
-    let logout : (string * string) EzAPI.service0  =
+    let logout : (string * string, logout_error) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"logout"

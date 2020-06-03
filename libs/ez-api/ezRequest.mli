@@ -13,50 +13,50 @@ module type S = sig
   val init : unit -> unit
 
 val get0 :
-  EzAPI.base_url ->                 (* API url *)
-  'output EzAPI.service0 ->         (* GET service *)
-  string ->                         (* debug msg *)
+  EzAPI.base_url ->                   (* API url *)
+  ('output, 'error) EzAPI.service0 -> (* GET service *)
+  string ->                           (* debug msg *)
   ?post:bool ->
   ?headers:(string * string) list ->
-  ?error: error_handler ->          (* error handler *)
+  ?error: error_handler ->            (* unhandled error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit ->                           (* trigger *)
   unit
 
 val get1 :
   EzAPI.base_url ->
-  ('arg, 'output) EzAPI.service1 ->
+  ('arg, 'output, 'error) EzAPI.service1 ->
   string ->
   ?post:bool ->
   ?headers:(string * string) list ->
   ?error: error_handler ->
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ('output -> unit) ->
+  (('output, 'error) Result.result -> unit) ->
   'arg ->
   unit
 
 val post0 :
   EzAPI.base_url ->                 (* API url *)
-  ('input,'output) EzAPI.post_service0 -> (* POST service *)
+  ('input, 'output, 'error) EzAPI.post_service0 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit
 
 val post1 :
   EzAPI.base_url ->                 (* API url *)
-  ('arg, 'input,'output) EzAPI.post_service1 -> (* POST service *)
+  ('arg, 'input, 'output, 'error) EzAPI.post_service1 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
   'arg ->
-  ('output -> unit) ->              (* reply handler *)
+  (('output, 'error) Result.result -> unit) -> (* reply handler *)
   unit
 
 val get :
