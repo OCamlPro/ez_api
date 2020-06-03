@@ -109,7 +109,7 @@ let dispatch s (io, _conn) req body =
                EzAPI.add_params request ( EzUrl.decode_args content );
                None
              | _, BodyString (Some mime, content)
-               when Re.Str.(string_match (regexp "image") mime 0) ->
+               when Re.Str.(string_match (regexp "image") mime 0) || mime = "multipart/form-data"->
                Some (`String content)
              | _, BodyString (_, content) ->
                try Some (Ezjsonm.from_string content) with _ -> None
