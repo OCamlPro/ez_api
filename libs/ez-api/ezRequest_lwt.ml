@@ -78,10 +78,9 @@ let before_hook = ref (fun () -> ())
 let decode_result encoding err_encodings = function
   | Error (code, None) -> Error (UnknwownError { code ; msg = None })
   | Error (code, Some msg) ->
-    (match List.find_all (fun (c, _) -> c = code) err_encodings with
-      | [] -> Error (UnknwownError { code ; msg = Some msg })
-      | cases ->
-        let encoding = Json_encoding.union (List.map snd cases) in
+    (match err_encodings ~code with
+      | None -> Error (UnknwownError { code ; msg = Some msg })
+      | Some encoding ->
         try Error (
             KnownError { code ; error = EzEncoding.destruct encoding msg })
         with _ -> Error (UnknwownError { code ; msg = Some msg })

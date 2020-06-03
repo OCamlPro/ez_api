@@ -96,6 +96,15 @@ type ('arg,'input,'output, 'error) post_service1 =
 
 type ('a, 'b) p
 
+type _ err_case =
+    ErrCase : {
+      code : int;
+      name : string;
+      encoding : 'a Json_encoding.encoding;
+      select : 'b -> 'a option;
+      deselect: 'a -> 'b;
+    } -> 'b err_case
+
 val request :
   ?version:http_version ->
   ?headers:string list StringMap.t ->
@@ -131,7 +140,7 @@ val service :
   ?descr: string ->
   ?meth:string ->
   output: 'output Json_encoding.encoding ->
-  ?error_outputs: (int * 'error Json_encoding.case) list ->
+  ?error_outputs: 'error err_case list ->
   ?params:param list ->
   ('b, 'c) p ->
   ('b, 'c, unit, 'output, 'error) service
@@ -143,7 +152,7 @@ val post_service :
   ?meth:string (* meth type: get, post *) ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
-  ?error_outputs: (int * 'error Json_encoding.case) list ->
+  ?error_outputs: 'error err_case list ->
   ?params:param list ->
   ('b, 'c) p ->
   ('b, 'c, 'input, 'output, 'error) service
@@ -203,7 +212,7 @@ val service_input : (_, _, 'input, _, _) service -> 'input Json_encoding.encodin
 val service_output : (_, _, _, 'output, _) service -> 'output Json_encoding.encoding
 val service_errors :
   (_, _, _, _, 'error) service ->
-  (int * 'error Json_encoding.case) list
+  code:int -> 'error Json_encoding.encoding option
 
 (* swagger *)
 val paths_of_sections : ?docs:((string * string * string) list) ->

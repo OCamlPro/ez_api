@@ -2,6 +2,7 @@
 module Resto = Resto1
 
 open StringCompat
+module IntMap = Map.Make(struct type t = int let compare = compare end)
 
 exception ResultNotfound
 
@@ -92,6 +93,15 @@ and section = {
     mutable section_docs : service_doc list;
   }
 
+type _ err_case =
+    ErrCase : {
+      code : int;
+      name : string;
+      encoding : 'a Json_encoding.encoding;
+      select : 'b -> 'a option;
+      deselect: 'a -> 'b;
+    } -> 'b err_case
+
 (* All our services use 'params' as 'prefix of the service *)
 type ('params, 'params2, 'input, 'output, 'error) service
   = {
@@ -102,7 +112,7 @@ type ('params, 'params2, 'input, 'output, 'error) service
     doc : service_doc;
     enc_input : 'input Json_encoding.encoding;
     enc_output : 'output Json_encoding.encoding;
-    enc_error : (int * 'error Json_encoding.case) list;
+    enc_error : 'error err_case list;
   }
 
 type ('output, 'error) service0 = (request, unit, unit, 'output, 'error) service
@@ -255,7 +265,35 @@ let rec update_service_list services doc = match services with
   | h :: t when h.doc_path = doc.doc_path -> doc :: t
   | h :: t -> h :: (update_service_list t doc)
 
- let definitions_path = "/components/schemas/"
+let definitions_path = "/components/schemas/"
+
+let merge_errs_same_code errors =
+  let code_map =
+    List.fold_left (fun acc (ErrCase { code; _ } as c) ->
+        let encs = match IntMap.find_opt code acc with
+          | Some l -> l
+          | None -> [] in
+        IntMap.add code (c :: encs) acc
+      ) IntMap.empty errors in
+  IntMap.map (fun l ->
+      let encoding = match l with
+        | [ErrCase { encoding; select; deselect; _ }] ->
+          Json_encoding.conv
+            (fun x -> match select x with
+               | None -> assert false
+               | Some x -> x)
+            deselect
+            encoding
+        | _ ->
+          let err_cases =
+            List.map (function ErrCase { encoding;  select;  deselect; _} ->
+                Json_encoding.case encoding select deselect
+              ) l in
+          Json_encoding.union err_cases in
+      lazy (Json_encoding.schema ~definitions_path encoding)
+    ) code_map
+  |> IntMap.bindings
+
 
 let post_service ?(section=default_section)
     ?name
@@ -278,23 +316,30 @@ let post_service ?(section=default_section)
       doc_section = section;
       doc_input = lazy (Json_encoding.schema ~definitions_path input);
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
-      doc_error_outputs = List.map (fun (code, err_case) ->
-          let output = Json_encoding.union [err_case] in (* hackish *)
-          code, lazy (Json_encoding.schema ~definitions_path output)
-        ) error_outputs;
+      doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = (match meth with None -> "post" | Some meth -> meth);
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
-  let union_enc_error = Json_encoding.(union (List.map snd error_outputs)) in
-  let resto_output = Json_encoding.(union [
-      case output
-        (function Ok r -> Some r | Error _ -> None)
-        (fun r -> Ok r);
-      case union_enc_error
-        (function Error e -> Some e | Ok _ -> None)
-        (fun e -> Error e);
-    ]) in
+  let resto_output = match error_outputs with
+    | [] ->
+      Json_encoding.conv
+        (function Ok r -> r | _ -> assert false)
+        (fun r -> Ok r)
+        output
+    | _ ->
+      let err_cases =
+        List.map (function ErrCase { encoding;  select;  deselect; _} ->
+          Json_encoding.case encoding select deselect
+        ) error_outputs in
+      Json_encoding.(union [
+          case output
+            (function Ok r -> Some r | Error _ -> None)
+            (fun r -> Ok r);
+          case (Json_encoding.union err_cases)
+           (function Error e -> Some e | Ok _ -> None)
+           (fun e -> Error e)
+        ]) in
   let service = {
       s = Resto.service ~input ~output:resto_output path1;
       s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output:resto_output path1;
@@ -464,7 +509,24 @@ let services () =
 
 let service_input s = s.enc_input
 let service_output s = s.enc_output
-let service_errors s = s.enc_error
+let service_errors s ~code =
+  match
+    List.find_all (function ErrCase { code = c; _ } -> c = code) s.enc_error
+  with
+  | [] -> None
+  | [ ErrCase { encoding = enc; select; deselect; _ } ] ->
+    Some (Json_encoding.conv
+            (fun x -> match select x with
+               | None -> assert false
+               | Some x -> x)
+            deselect
+            enc)
+  | l ->
+    let cases =
+      List.map (function ErrCase { encoding = enc; select; deselect; _ } ->
+          Json_encoding.case enc select deselect
+        ) l in
+    Some (Json_encoding.union cases)
 
 let get_path sd =
 
@@ -666,31 +728,34 @@ let paths_of_sections ?(docs=[]) sections =
             ]
           ]
         ] in
-      let error_responses = List.map (fun (code, (err_schema : Ezjsonm.value)) ->
-          let descr = (* Hackish *)
-            try match err_schema with
-              | `O l -> (
-                  List.find (function
-                      | ("kind" | "error" | "description"),
-                        `O ( ("type", `String "string") :: ("enum", `A [_]) :: _) -> true
-                      | _ -> false
-                    ) l
-                  |> function
-                  | (_, `O (_ :: (_, `A [`String s]) :: _)) -> s
-                  | _ -> assert false
-                )
-              | _ -> raise Not_found
-            with Not_found -> "Error " ^ code in
-          code,
-          `O [
-            "description", `String descr;
-            "content", `O [
-              "application/json", `O [
-                "schema", err_schema
+      let error_responses =
+        err_schemas
+        |> List.filter (fun (code, _) -> int_of_string code < 500)
+        |> List.map (fun (code, (err_schema : Ezjsonm.value)) ->
+            let descr = (* Hackish *)
+              try match err_schema with
+                | `O (("type", `String "object") :: ("properties", `O l) :: _) -> (
+                    List.find (function
+                        | ("kind" | "error" | "description"),
+                          `O ( ("type", `String "string") :: ("enum", `A [_]) :: _) -> true
+                        | _ -> false
+                      ) l
+                    |> function
+                    | (_, `O (_ :: (_, `A [`String s]) :: _)) -> s
+                    | _ -> assert false
+                  )
+                | _ -> raise Not_found
+              with Not_found -> "Error " ^ code in
+            code,
+            `O [
+              "description", `String descr;
+              "content", `O [
+                "application/json", `O [
+                  "schema", err_schema
+                ]
               ]
             ]
-          ]
-        ) err_schemas in
+          ) in
       get_path sd,
       `O [
         sd.doc_meth, `O ([

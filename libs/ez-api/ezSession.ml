@@ -106,16 +106,24 @@ module Make(S : SessionArg) = struct
         (req "challenge" string)
 
     let auth_needed_case =
-      case (merge_objs
-              (obj1 (req "error" (constant "AuthNeeded")))
-              auth_needed)
-        (function `Auth_needed s -> Some ((), s) | _ -> None)
-        (fun ((), s) -> `Auth_needed s)
+      EzAPI.ErrCase {
+        code = 401;
+        name = "AuthNeeded";
+        encoding = (merge_objs
+                      (obj1 (req "error" (constant "AuthNeeded")))
+                      auth_needed);
+        select = (function `Auth_needed s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Auth_needed s);
+      }
 
     let session_expired_case =
-      case (obj1 (req "error" (constant "SessionExpired")))
-        (function `Session_expired -> Some () | _ -> None)
-        (fun () -> `Session_expired)
+      EzAPI.ErrCase {
+        code = 440;
+        name = "SessionExpired";
+        encoding = (obj1 (req "error" (constant "sSessionExpired")));
+        select = (function `Session_expired -> Some () | _ -> None);
+        deselect = (fun () -> `Session_expired);
+      }
 
     let auth_ok =
       let open S in
@@ -148,21 +156,33 @@ module Make(S : SessionArg) = struct
            (req "challenge_reply" EzEncoding.encoded_string))
 
     let bad_user_case =
-      case (obj1 (req "error" (constant "BadUserOrPassword")))
-        (function `Bad_user_or_password -> Some () | _ -> None)
-        (fun () -> `Bad_user_or_password)
+      EzAPI.ErrCase {
+        code = 403;
+        name = "BadUserOrPassword";
+        encoding = (obj1 (req "error" (constant "BadUserOrPassword")));
+        select = (function `Bad_user_or_password -> Some () | _ -> None);
+        deselect = (fun () -> `Bad_user_or_password);
+      }
 
     let challenge_not_found_case =
-      case (obj2
-              (req "error" (constant "BadUserOrPassword"))
-              (req "challenge_id" string))
-        (function `Challenge_not_found_or_expired s -> Some ((), s) | _ -> None)
-        (fun ((), s) -> `Challenge_not_found_or_expired s)
+      EzAPI.ErrCase {
+        code = 401;
+        name = "ChallengeNotFoundOrExpired";
+        encoding = (obj2
+                      (req "error" (constant "ChallengeNotFoundOrExpired"))
+                      (req "challenge_id" string));
+        select = (function `Challenge_not_found_or_expired s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Challenge_not_found_or_expired s);
+      }
 
     let invalid_session_case =
-      case (obj1 (req "error" (constant "InvalidSession")))
-        (function `Invalid_session -> Some () (* | _ -> None *))
-        (fun () -> `Invalid_session)
+      EzAPI.ErrCase {
+        code = 403;
+        name = "InvalidSession";
+        encoding = (obj1 (req "error" (constant "InvalidSession")));
+        select = (function `Invalid_session -> Some () (* | _ -> None *));
+        deselect = (fun () -> `Invalid_session);
+      }
 
   end
 
@@ -184,8 +204,8 @@ module Make(S : SessionArg) = struct
         ~name:"connect"
         ~params:[param_token]
         ~output:Encoding.auth_ok
-        ~error_outputs: [401, Encoding.auth_needed_case;
-                         440, Encoding.session_expired_case]
+        ~error_outputs: [Encoding.auth_needed_case;
+                         Encoding.session_expired_case]
         EzAPI.Path.(rpc_root // "connect")
 
     let login : (login_message,
@@ -197,8 +217,8 @@ module Make(S : SessionArg) = struct
         ~params:[param_token]
         ~input:Encoding.login_message
         ~output:Encoding.auth_ok
-        ~error_outputs: [403, Encoding.bad_user_case;
-                         401, Encoding.challenge_not_found_case]
+        ~error_outputs: [Encoding.bad_user_case;
+                         Encoding.challenge_not_found_case]
         EzAPI.Path.(rpc_root // "login")
 
     let logout : (auth_needed, logout_error) EzAPI.service0  =
@@ -208,7 +228,7 @@ module Make(S : SessionArg) = struct
         ~params:[param_token]
         ~meth:"put"
         ~output:Encoding.auth_needed
-        ~error_outputs: [403, Encoding.invalid_session_case]
+        ~error_outputs: [Encoding.invalid_session_case]
         EzAPI.Path.(rpc_root // "logout")
   end
 

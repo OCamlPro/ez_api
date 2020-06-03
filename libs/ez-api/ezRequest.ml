@@ -157,15 +157,14 @@ module Make(S : sig
     before_xhr_hook := (fun () -> old_hook (); f ())
 
   let handlers ?error service f =
-    let error_encodings = EzAPI.service_errors service in
     let error code msg =
-      match List.find_all (fun (c, _) -> c = code) error_encodings, msg with
-      | _::_ as cases , Some s ->
-        let enc = Json_encoding.union (List.map snd cases) in
+      match EzAPI.service_errors service ~code, msg with
+      | Some enc, Some s ->
         decode_result ?error enc (fun x -> f (Error x)) s
       | _, _ -> match error with
         | Some error -> error code msg (* unhandled *)
-        | None -> () in
+        | None -> ()
+    in
     let encoding = EzAPI.service_output service in
     let ok = decode_result ~error encoding (fun x -> f (Ok x)) in
     ok, error
