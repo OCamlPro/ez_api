@@ -3,20 +3,13 @@ open EzAPI.TYPES
 let (>|=) = Lwt.(>|=)
 let return = Lwt.return
 
-type 'a api_error =
-  | KnownError of { code : int ; error : 'a }
-  | UnknwownError of { code : int ; msg : string option }
-type ('output, 'error) api_result = ('output, 'error api_error) result
-
-module type SGen = sig
+module type RAWGEN = sig
 
   type ('output, 'error) service0
   type ('arg, 'output, 'error) service1
   type ('input, 'output, 'error) post_service0
   type ('arg, 'input, 'output, 'error) post_service1
   type ('output, 'error) api_result
-
-  val init : unit -> unit
 
   val get0 :
     ?post:bool ->
@@ -55,6 +48,44 @@ module type SGen = sig
     ('arg, 'input,'output, 'error) post_service1 -> (* POST service *)
     'arg ->
     ('output, 'error) api_result Lwt.t
+
+end
+
+type 'a api_error =
+  | KnownError of { code : int ; error : 'a }
+  | UnknwownError of { code : int ; msg : string option }
+type ('output, 'error) api_result = ('output, 'error api_error) result
+
+module type RAW = RAWGEN
+  with type ('output, 'error) service0 :=
+    ('output, 'error) EzAPI.service0
+   and type ('arg, 'output, 'error) service1 :=
+     ('arg, 'output, 'error) EzAPI.service1
+   and type ('input, 'output, 'error) post_service0 :=
+     ('input, 'output, 'error) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error) post_service1 :=
+     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+   and type ('output, 'error) api_result := ('output, 'error) api_result
+
+module type LEGACY = RAWGEN
+  with type ('output, 'error) service0 :=
+    ('output) EzAPI.Legacy.service0
+   and type ('arg, 'output, 'error) service1 :=
+     ('arg, 'output) EzAPI.Legacy.service1
+   and type ('input, 'output, 'error) post_service0 :=
+     ('input, 'output) EzAPI.Legacy.post_service0
+   and type ('arg, 'input, 'output, 'error) post_service1 :=
+     ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+   and type ('output, 'error) api_result :=
+     ('output, (int * string option)) result
+
+module type S = sig
+
+  include RAW
+
+  module Legacy : LEGACY
+
+  val init : unit -> unit
 
   val get :
     ?headers:(string * string) list ->
@@ -111,16 +142,6 @@ let any_post = ref (fun ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_
     return (Error (-2, None))
   )
 
-module type S = SGen
-  with type ('output, 'error) service0 :=
-    ('output, 'error) EzAPI.service0
-   and type ('arg, 'output, 'error) service1 :=
-     ('arg, 'output, 'error) EzAPI.service1
-   and type ('input, 'output, 'error) post_service0 :=
-     ('input, 'output, 'error) EzAPI.post_service0
-   and type ('arg, 'input, 'output, 'error) post_service1 :=
-     ('arg, 'input, 'output, 'error) EzAPI.post_service1
-   and type ('output, 'error) api_result := ('output, 'error) api_result
 
 module Make(S : sig
 
@@ -163,93 +184,64 @@ module Make(S : sig
     let old_hook = !before_hook in
     before_hook := (fun () -> old_hook (); f ())
 
-  let get0 ?(post=false) ?headers ?(params=[]) ?msg
-      api (service: ('output, 'error) EzAPI.service0) =
-    !before_hook ();
-    if post then
-      let url = EzAPI.forge0 api service [] in
-      let content = EzAPI.encode_args service url params in
-      let content_type = EzUrl.content_type in
-      internal_post ~content ~content_type ?headers ?msg url >|=
-      handle_result service
-    else
-      let url = EzAPI.forge0 api service params in
-      internal_get ?headers ?msg url >|= handle_result service
-
-  let get1 ?(post=false) ?headers ?(params=[]) ?msg
-      api (service : ('arg,'output, 'error) EzAPI.service1) (arg : 'arg) =
-    !before_hook ();
-    if post then
-      let url = EzAPI.forge1 api service arg []  in
-      let content = EzAPI.encode_args service url params in
-      let content_type = EzUrl.content_type in
-      internal_post ~content ~content_type ?headers ?msg url >|=
-      handle_result service
-    else
-      let url = EzAPI.forge1 api service arg params in
-      internal_get ?headers ?msg url >|= handle_result service
-
-  let post0 ?headers ?(params=[]) ?msg ~(input : 'input)
-      api (service : ('input,'output, 'error) EzAPI.post_service0) =
-    !before_hook ();
-    let input_encoding = EzAPI.service_input service in
-    let url = EzAPI.forge0 api service params in
-    let content = EzEncoding.construct input_encoding input in
-    let content_type = "application/json" in
-    internal_post ~content ~content_type ?headers ?msg url >|=
-    handle_result service
-
-  let post1 ?headers ?(params=[]) ?msg ~(input : 'input)
-      api (service : ('arg, 'input,'output, 'error) EzAPI.post_service1) (arg : 'arg) =
-    !before_hook ();
-    let input_encoding = EzAPI.service_input service in
-    let url = EzAPI.forge1 api service arg params in
-    let content = EzEncoding.construct input_encoding input in
-    let content_type = "application/json" in
-    internal_post ~content ~content_type ?headers ?msg url >|=
-    handle_result service
 
   let get = internal_get
   let post = internal_post
 
-end
+  module Raw = struct
 
-module ANY : S = Make(struct
-    let get ?headers ?msg url = !any_get ?headers ?msg url
-    let post ?content_type ?content ?headers ?msg url =
-      !any_post ?content_type ?content ?headers ?msg url
-  end)
+    let get0 ?(post=false) ?headers ?(params=[]) ?msg
+        api (service: ('output, 'error) EzAPI.service0) =
+      !before_hook ();
+      if post then
+        let url = EzAPI.forge0 api service [] in
+        let content = EzAPI.encode_args service url params in
+        let content_type = EzUrl.content_type in
+        internal_post ~content ~content_type ?headers ?msg url >|=
+        handle_result service
+      else
+        let url = EzAPI.forge0 api service params in
+        internal_get ?headers ?msg url >|= handle_result service
 
-module Default = Make(struct
-    let get ?headers:_ ?msg:_ _url = return (Error (-2, None))
-    let post ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
-      return (Error (-2, None))
-  end)
+    let get1 ?(post=false) ?headers ?(params=[]) ?msg
+        api (service : ('arg,'output, 'error) EzAPI.service1) (arg : 'arg) =
+      !before_hook ();
+      if post then
+        let url = EzAPI.forge1 api service arg []  in
+        let content = EzAPI.encode_args service url params in
+        let content_type = EzUrl.content_type in
+        internal_post ~content ~content_type ?headers ?msg url >|=
+        handle_result service
+      else
+        let url = EzAPI.forge1 api service arg params in
+        internal_get ?headers ?msg url >|= handle_result service
 
-let () = Default.init ()
+    let post0 ?headers ?(params=[]) ?msg ~(input : 'input)
+        api (service : ('input,'output, 'error) EzAPI.post_service0) =
+      !before_hook ();
+      let input_encoding = EzAPI.service_input service in
+      let url = EzAPI.forge0 api service params in
+      let content = EzEncoding.construct input_encoding input in
+      let content_type = "application/json" in
+      internal_post ~content ~content_type ?headers ?msg url >|=
+      handle_result service
+
+    let post1 ?headers ?(params=[]) ?msg ~(input : 'input)
+        api (service : ('arg, 'input,'output, 'error) EzAPI.post_service1) (arg : 'arg) =
+      !before_hook ();
+      let input_encoding = EzAPI.service_input service in
+      let url = EzAPI.forge1 api service arg params in
+      let content = EzEncoding.construct input_encoding input in
+      let content_type = "application/json" in
+      internal_post ~content ~content_type ?headers ?msg url >|=
+      handle_result service
+  end
+
+  include Raw
 
 
-module Legacy = struct
+  module Legacy = struct
 
-  type 'output api_result = ('output, (int * string option)) result
-
-  module type NewS = S
-
-  module type S = SGen
-    with type ('output, 'error) service0 :=
-      ('output) EzAPI.Legacy.service0
-     and type ('arg, 'output, 'error) service1 :=
-       ('arg, 'output) EzAPI.Legacy.service1
-     and type ('input, 'output, 'error) post_service0 :=
-       ('input, 'output) EzAPI.Legacy.post_service0
-     and type ('arg, 'input, 'output, 'error) post_service1 :=
-       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
-     and type ('output, 'error) api_result := 'output api_result
-
-
-  module Unresultize(R : NewS)  = struct
-
-    include R
     open EzAPI.Legacy
 
     let unresultize = function
@@ -280,23 +272,18 @@ module Legacy = struct
 
   end
 
-  module Make(S : sig
-
-      val get :
-        ?headers:(string * string) list ->
-        ?msg:string -> string ->
-        (string, int * string option) result Lwt.t
-
-      val post :
-        ?content_type:string ->
-        ?content:string ->
-        ?headers:(string * string) list ->
-        ?msg:string -> string ->
-        (string, int * string option) result Lwt.t
-
-    end) = Unresultize(Make(S))
-
-  module ANY : S = Unresultize(ANY)
-
-
 end
+
+module ANY : S = Make(struct
+    let get ?headers ?msg url = !any_get ?headers ?msg url
+    let post ?content_type ?content ?headers ?msg url =
+      !any_post ?content_type ?content ?headers ?msg url
+  end)
+
+module Default = Make(struct
+    let get ?headers:_ ?msg:_ _url = return (Error (-2, None))
+    let post ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
+      return (Error (-2, None))
+  end)
+
+let () = Default.init ()
