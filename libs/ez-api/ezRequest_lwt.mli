@@ -11,7 +11,13 @@ type ('output, 'error) api_result = ('output, 'error api_error) result
 
 (* This interface is exported by all engines, so that you can directly
 use them from there. *)
-module type S = sig
+module type SGen = sig
+
+  type ('output, 'error) service0
+  type ('arg, 'output, 'error) service1
+  type ('input, 'output, 'error) post_service0
+  type ('arg, 'input, 'output, 'error) post_service1
+  type ('output, 'error) api_result
 
   val init : unit -> unit
 
@@ -21,7 +27,7 @@ module type S = sig
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg:string ->                    (* debug msg *)
     EzAPI.base_url ->                 (* API url *)
-    ('output, 'error) EzAPI.service0 ->         (* GET service *)
+    ('output, 'error) service0 ->         (* GET service *)
     ('output, 'error) api_result Lwt.t
 
   val get1 :
@@ -30,7 +36,7 @@ module type S = sig
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg: string ->
     EzAPI.base_url ->
-    ('arg, 'output, 'error) EzAPI.service1 ->
+    ('arg, 'output, 'error) service1 ->
     'arg ->
     ('output, 'error) api_result Lwt.t
 
@@ -40,7 +46,7 @@ module type S = sig
     ?msg:string ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
-    ('input,'output, 'error) EzAPI.post_service0 -> (* POST service *)
+    ('input,'output, 'error) post_service0 -> (* POST service *)
     ('output, 'error) api_result Lwt.t
 
   val post1 :
@@ -49,7 +55,7 @@ module type S = sig
     ?msg:string ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
-    ('arg, 'input,'output, 'error) EzAPI.post_service1 -> (* POST service *)
+    ('arg, 'input,'output, 'error) post_service1 -> (* POST service *)
     'arg ->
     ('output, 'error) api_result Lwt.t
 
@@ -76,6 +82,17 @@ val request_reply_hook : (unit -> unit) ref
 
 val log : (string -> unit) ref
 
+module type S = SGen
+  with type ('output, 'error) service0 :=
+    ('output, 'error) EzAPI.service0
+   and type ('arg, 'output, 'error) service1 :=
+     ('arg, 'output, 'error) EzAPI.service1
+   and type ('input, 'output, 'error) post_service0 :=
+     ('input, 'output, 'error) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error) post_service1 :=
+     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+   and type ('output, 'error) api_result := ('output, 'error) api_result
+
 (* Engine independent implementation. Beware: if you use these calls,
    you must initialize an engine independantly.*)
 module ANY : S
@@ -95,3 +112,39 @@ module Make(S : sig
       (string, int * string option) result Lwt.t
 
   end) : S
+
+
+module Legacy : sig
+
+  type 'output api_result = ('output, (int * string option)) result
+
+  module type S = SGen
+    with type ('output, 'error) service0 :=
+      ('output) EzAPI.Legacy.service0
+     and type ('arg, 'output, 'error) service1 :=
+       ('arg, 'output) EzAPI.Legacy.service1
+     and type ('input, 'output, 'error) post_service0 :=
+       ('input, 'output) EzAPI.Legacy.post_service0
+     and type ('arg, 'input, 'output, 'error) post_service1 :=
+       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+     and type ('output, 'error) api_result := 'output api_result
+
+  module ANY : S
+
+  module Make(S : sig
+
+      val get :
+        ?headers:(string * string) list ->
+        ?msg:string -> string ->
+        (string, int * string option) result Lwt.t
+
+      val post :
+        ?content_type:string ->
+        ?content:string ->
+        ?headers:(string * string) list ->
+        ?msg:string -> string ->
+        (string, int * string option) result Lwt.t
+
+    end) : S
+
+end

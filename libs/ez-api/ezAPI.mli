@@ -218,3 +218,46 @@ val service_errors :
 val paths_of_sections : ?docs:((string * string * string) list) ->
   section list ->
   (string * Ezjsonm.value) list * (string * Ezjsonm.value) list
+
+
+module Legacy : sig
+
+  type uninhabited
+
+  val unreachable : uninhabited -> 'a
+
+  type nonrec ('params, 'params2, 'input, 'output) service =
+    ('params, 'params2, 'input, 'output, uninhabited) service
+
+  type nonrec 'output service0 =
+    (request, unit, unit, 'output) service
+  type ('arg, 'output) service1 =
+    (request * 'arg, unit * 'arg, unit, 'output) service
+
+  type ('input, 'output) post_service0 =
+    (request, unit, 'input, 'output) service
+  type ('arg,'input,'output) post_service1 =
+    (request * 'arg, unit * 'arg, 'input, 'output) service
+
+  val service :
+    ?section: section ->
+    ?name: string ->
+    ?descr: string ->
+    ?meth:string ->
+    output: 'output Json_encoding.encoding ->
+    ?params:param list ->
+    ('b, 'c) p ->
+    ('b, 'c, unit, 'output) service
+
+  val post_service :
+    ?section: section ->
+    ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+    ?descr: string ->
+    ?meth:string (* meth type: get, post *) ->
+    input:'input Json_encoding.encoding ->
+    output: 'output Json_encoding.encoding ->
+    ?params:param list ->
+    ('b, 'c) p ->
+    ('b, 'c, 'input, 'output) service
+
+end

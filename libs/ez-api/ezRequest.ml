@@ -2,55 +2,61 @@ open EzAPI.TYPES
 
 type error_handler = (int -> string option -> unit)
 
-module type S = sig
+module type SGen = sig
 
 val init : unit -> unit
 
+type ('output, 'error) service0
+type ('arg, 'output, 'error) service1
+type ('input, 'output, 'error) post_service0
+type ('arg, 'input, 'output, 'error) post_service1
+type ('output, 'error) reply_handler
+
 val get0 :
   EzAPI.base_url ->                   (* API url *)
-  ('output, 'error) EzAPI.service0 -> (* GET service *)
+  ('output, 'error) service0 -> (* GET service *)
   string ->                           (* debug msg *)
   ?post:bool ->
   ?headers:(string * string) list ->
   ?error: error_handler ->            (* unhandled error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  (('output, 'error) Result.result -> unit) -> (* reply handler *)
+  (('output, 'error) reply_handler) -> (* reply handler *)
   unit ->                           (* trigger *)
   unit
 
 val get1 :
   EzAPI.base_url ->
-  ('arg, 'output, 'error) EzAPI.service1 ->
+  ('arg, 'output, 'error) service1 ->
   string ->
   ?post:bool ->
   ?headers:(string * string) list ->
   ?error: error_handler ->
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  (('output, 'error) Result.result -> unit) ->
+  (('output, 'error) reply_handler) ->
   'arg ->
   unit
 
 val post0 :
   EzAPI.base_url ->                 (* API url *)
-  ('input, 'output, 'error) EzAPI.post_service0 -> (* POST service *)
+  ('input, 'output, 'error) post_service0 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
-  (('output, 'error) Result.result -> unit) -> (* reply handler *)
+  (('output, 'error) reply_handler) -> (* reply handler *)
   unit
 
 val post1 :
   EzAPI.base_url ->                 (* API url *)
-  ('arg, 'input, 'output, 'error) EzAPI.post_service1 -> (* POST service *)
+  ('arg, 'input, 'output, 'error) post_service1 -> (* POST service *)
   string ->                         (* debug msg *)
   ?headers:(string * string) list ->
   ?error: error_handler ->          (* error handler *)
   ?params:(EzAPI.param * EzAPI.arg_value) list ->
   input:'input ->                           (* input *)
   'arg ->
-  (('output, 'error) Result.result -> unit) -> (* reply handler *)
+  (('output, 'error) reply_handler) -> (* reply handler *)
   unit
 
 val get :
@@ -101,6 +107,17 @@ let decode_result ?error encoding f res =
 let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1,None)))
 let any_xhr_post = ref (fun ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
                   f (CodeError (-1,None)))
+
+module type S = SGen
+  with type ('output, 'error) service0 :=
+    ('output, 'error) EzAPI.service0
+   and type ('arg, 'output, 'error) service1 :=
+     ('arg, 'output, 'error) EzAPI.service1
+   and type ('input, 'output, 'error) post_service0 :=
+     ('input, 'output, 'error) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error) post_service1 :=
+     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+   and type ('output, 'error) reply_handler := ('output, 'error) Result.result -> unit
 
 module Make(S : sig
 
@@ -265,3 +282,66 @@ module Default = Make(struct
     end)
 
 let () = Default.init ()
+
+
+module Legacy = struct
+
+  module type NewS = S
+
+  module type S = SGen
+    with type ('output, 'error) service0 :=
+      ('output) EzAPI.Legacy.service0
+     and type ('arg, 'output, 'error) service1 :=
+       ('arg, 'output) EzAPI.Legacy.service1
+     and type ('input, 'output, 'error) post_service0 :=
+       ('input, 'output) EzAPI.Legacy.post_service0
+     and type ('arg, 'input, 'output, 'error) post_service1 :=
+       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+     and type ('output, 'error) reply_handler := 'output -> unit
+
+  module Unresultize(R : NewS) : S = struct
+
+    include R
+    open EzAPI.Legacy
+
+    let unresultize f = function
+      | Ok res -> f res
+      | Error u -> unreachable u
+
+    let get0 api ( service : 'output service0 )
+        msg ?post ?headers ?error ?params f () =
+      get0 api service msg ?post ?headers ?error ?params (unresultize f) ()
+
+    let get1 api ( service : ('arg, 'output) service1 )
+        msg ?post ?headers ?error ?params f arg =
+      get1 api service msg ?post ?headers ?error ?params (unresultize f) arg
+
+    let post0 api ( service : ('input, 'output) post_service0 )
+        msg ?headers ?error ?params ~input f =
+      post0 api service msg ?headers ?error ?params ~input (unresultize f)
+
+    let post1 api (service : ('arg, 'input, 'output) post_service1 )
+        msg ?headers ?error ?params ~input arg f =
+      post1 api service msg ?headers ?error ?params ~input arg (unresultize f)
+
+  end
+
+  module Make(S : sig
+
+      val xhr_get :
+        string -> string ->
+        ?headers:(string * string) list ->
+        (rep -> unit) -> unit
+
+      val xhr_post :
+        ?content_type:string ->
+        ?content:string ->
+        string -> string ->
+        ?headers:(string * string) list ->
+        (rep -> unit) -> unit
+
+    end) = Unresultize(Make(S))
+
+  module ANY : S = Unresultize(ANY)
+
+end

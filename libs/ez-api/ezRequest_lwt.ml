@@ -8,64 +8,70 @@ type 'a api_error =
   | UnknwownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
-module type S = sig
+module type SGen = sig
 
-val init : unit -> unit
+  type ('output, 'error) service0
+  type ('arg, 'output, 'error) service1
+  type ('input, 'output, 'error) post_service0
+  type ('arg, 'input, 'output, 'error) post_service1
+  type ('output, 'error) api_result
 
-val get0 :
-  ?post:bool ->
-  ?headers:(string * string) list ->
-  ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ?msg:string ->                    (* debug msg *)
-  EzAPI.base_url ->                 (* API url *)
-  ('output, 'error) EzAPI.service0 ->         (* GET service *)
-  ('output, 'error) api_result Lwt.t
+  val init : unit -> unit
 
-val get1 :
-  ?post:bool ->
-  ?headers:(string * string) list ->
-  ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ?msg: string ->
-  EzAPI.base_url ->
-  ('arg, 'output, 'error) EzAPI.service1 ->
-  'arg ->
-  ('output, 'error) api_result Lwt.t
+  val get0 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->                    (* debug msg *)
+    EzAPI.base_url ->                 (* API url *)
+    ('output, 'error) service0 ->         (* GET service *)
+    ('output, 'error) api_result Lwt.t
 
-val post0 :
-  ?headers:(string * string) list ->
-  ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ?msg:string ->
-  input:'input ->                           (* input *)
-  EzAPI.base_url ->                 (* API url *)
-  ('input,'output, 'error) EzAPI.post_service0 -> (* POST service *)
-  ('output, 'error) api_result Lwt.t
+  val get1 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg: string ->
+    EzAPI.base_url ->
+    ('arg, 'output, 'error) service1 ->
+    'arg ->
+    ('output, 'error) api_result Lwt.t
 
-val post1 :
-  ?headers:(string * string) list ->
-  ?params:(EzAPI.param * EzAPI.arg_value) list ->
-  ?msg:string ->
-  input:'input ->                           (* input *)
-  EzAPI.base_url ->                 (* API url *)
-  ('arg, 'input,'output, 'error) EzAPI.post_service1 -> (* POST service *)
-  'arg ->
-  ('output, 'error) api_result Lwt.t
+  val post0 :
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
+    input:'input ->                           (* input *)
+    EzAPI.base_url ->                 (* API url *)
+    ('input,'output, 'error) post_service0 -> (* POST service *)
+    ('output, 'error) api_result Lwt.t
 
-val get :
-  ?headers:(string * string) list ->
-  ?msg:string ->
-  EzAPI.url ->              (* url *)
-  (string, int * string option) result Lwt.t
+  val post1 :
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
+    input:'input ->                           (* input *)
+    EzAPI.base_url ->                 (* API url *)
+    ('arg, 'input,'output, 'error) post_service1 -> (* POST service *)
+    'arg ->
+    ('output, 'error) api_result Lwt.t
 
-val post :
-  ?content_type:string ->
-  ?content:string ->
-  ?headers:(string * string) list ->
-  ?msg:string ->
-  EzAPI.url ->
-  (string, int * string option) result Lwt.t
+  val get :
+    ?headers:(string * string) list ->
+    ?msg:string ->
+    EzAPI.url ->              (* url *)
+    (string, int * string option) result Lwt.t
 
-(* hook executed before every xhr *)
-val add_hook : (unit -> unit) -> unit
+  val post :
+    ?content_type:string ->
+    ?content:string ->
+    ?headers:(string * string) list ->
+    ?msg:string ->
+    EzAPI.url ->
+    (string, int * string option) result Lwt.t
+
+  (* hook executed before every xhr *)
+  val add_hook : (unit -> unit) -> unit
 
 end
 
@@ -104,6 +110,17 @@ let any_get = ref (fun ?headers:_ ?msg:_ _url ->
 let any_post = ref (fun ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
     return (Error (-2, None))
   )
+
+module type S = SGen
+  with type ('output, 'error) service0 :=
+    ('output, 'error) EzAPI.service0
+   and type ('arg, 'output, 'error) service1 :=
+     ('arg, 'output, 'error) EzAPI.service1
+   and type ('input, 'output, 'error) post_service0 :=
+     ('input, 'output, 'error) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error) post_service1 :=
+     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+   and type ('output, 'error) api_result := ('output, 'error) api_result
 
 module Make(S : sig
 
@@ -210,3 +227,76 @@ module Default = Make(struct
   end)
 
 let () = Default.init ()
+
+
+module Legacy = struct
+
+  type 'output api_result = ('output, (int * string option)) result
+
+  module type NewS = S
+
+  module type S = SGen
+    with type ('output, 'error) service0 :=
+      ('output) EzAPI.Legacy.service0
+     and type ('arg, 'output, 'error) service1 :=
+       ('arg, 'output) EzAPI.Legacy.service1
+     and type ('input, 'output, 'error) post_service0 :=
+       ('input, 'output) EzAPI.Legacy.post_service0
+     and type ('arg, 'input, 'output, 'error) post_service1 :=
+       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+     and type ('output, 'error) api_result := 'output api_result
+
+
+  module Unresultize(R : NewS)  = struct
+
+    include R
+    open EzAPI.Legacy
+
+    let unresultize = function
+      | Ok res -> Ok res
+      | Error UnknwownError { code ; msg } -> Error (code, msg)
+      | Error KnownError { error ; _ } -> unreachable error
+
+
+    let get0 ?post ?headers ?params ?msg
+        api (service: 'output EzAPI.Legacy.service0) =
+      get0 ?post ?headers ?params ?msg api service
+      >|= unresultize
+
+    let get1 ?post ?headers ?params ?msg
+        api (service : ('arg,'output) service1) (arg : 'arg) =
+      get1 ?post ?headers ?params ?msg api service arg
+      >|= unresultize
+
+    let post0 ?headers ?params ?msg ~(input : 'input)
+        api (service : ('input,'output) post_service0) =
+      post0 ?headers ?params ?msg ~input api service
+      >|= unresultize
+
+    let post1 ?headers ?params ?msg ~(input : 'input)
+        api (service : ('arg, 'input,'output) post_service1) (arg : 'arg) =
+      post1 ?headers ?params ?msg ~input api service arg
+      >|= unresultize
+
+  end
+
+  module Make(S : sig
+
+      val get :
+        ?headers:(string * string) list ->
+        ?msg:string -> string ->
+        (string, int * string option) result Lwt.t
+
+      val post :
+        ?content_type:string ->
+        ?content:string ->
+        ?headers:(string * string) list ->
+        ?msg:string -> string ->
+        (string, int * string option) result Lwt.t
+
+    end) = Unresultize(Make(S))
+
+  module ANY : S = Unresultize(ANY)
+
+
+end

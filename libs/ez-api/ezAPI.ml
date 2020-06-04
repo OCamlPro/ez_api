@@ -770,3 +770,31 @@ let paths_of_sections ?(docs=[]) sections =
     ) services
   in
   paths, definitions
+
+
+module Legacy = struct
+
+  type uninhabited = |
+
+  let unreachable = function (_ : uninhabited) -> .
+
+  type nonrec ('params, 'params2, 'input, 'output) service =
+    ('params, 'params2, 'input, 'output, uninhabited) service
+
+  type 'output service0 =
+    (request, unit, unit, 'output) service
+  type ('arg, 'output) service1 =
+    (request * 'arg, unit * 'arg, unit, 'output) service
+
+  type ('input, 'output) post_service0 =
+    (request, unit, 'input, 'output) service
+  type ('arg,'input,'output) post_service1 =
+    (request * 'arg, unit * 'arg, 'input, 'output) service
+
+  let post_service ?section ?name ?descr ?meth ~input ~output ?params arg =
+    post_service ?section ?name ?descr ?meth ~input ~output ?params arg
+
+  let service ?section ?name ?descr ?meth ~output ?params arg =
+    service ?section ?name ?descr ?meth ~output ?params arg
+
+end
