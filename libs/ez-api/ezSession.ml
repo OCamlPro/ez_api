@@ -193,6 +193,21 @@ module Make(S : SessionArg) = struct
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
+    let security = [
+      (let (`CSRF name | `Cookie name) = S.token_kind in
+       let in_ = match S.token_kind with
+         | `CSRF _ -> `Header
+         | `Cookie _ -> `Cookie in
+       let ref_name = match S.token_kind with
+         | `CSRF name -> name ^ " Header"
+         | `Cookie name -> name ^ " Cookie" in
+       EzAPI.TYPES.(ApiKey { ref_name; in_; name}));
+      EzAPI.TYPES.(ApiKey {
+          ref_name = "Token parameter";
+          in_ = `Query;
+          name = param_token.param_value});
+    ]
+
     let rpc_root =
       List.fold_left (fun path s ->
            EzAPI.Path.( path // s )
@@ -206,6 +221,7 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.auth_ok
         ~error_outputs: [Encoding.auth_needed_case;
                          Encoding.session_expired_case]
+        ~security
         EzAPI.Path.(rpc_root // "connect")
 
     let login : (login_message,
@@ -229,6 +245,7 @@ module Make(S : SessionArg) = struct
         ~meth:"put"
         ~output:Encoding.auth_needed
         ~error_outputs: [Encoding.invalid_session_case]
+        ~security
         EzAPI.Path.(rpc_root // "logout")
   end
 
