@@ -41,6 +41,11 @@ module TYPES = struct
     | S of string
     | LS of string list
 
+  type security_scheme =
+    | Basic of { ref_name : string }
+    | Bearer of { ref_name : string ; format : string option }
+    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
+
 end
 
 open TYPES
@@ -51,6 +56,7 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
+type security_scheme = TYPES.security_scheme
 
 
 type param = {
@@ -86,6 +92,7 @@ type service_doc = {
     doc_output : Json_schema.schema Lazy.t;
     doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
     doc_meth : string;
+    doc_security : security_scheme list;
   }
 
 and section = {
@@ -267,6 +274,7 @@ let rec update_service_list services doc = match services with
 
 let definitions_path = "/components/schemas/"
 let responses_path = "/components/responses/"
+(* let security_path = "/components/securitySchemes/" *)
 
 let merge_errs_same_code errors =
   let code_map =
@@ -303,7 +311,9 @@ let post_service ?(section=default_section)
     ~input
     ~output
     ?(error_outputs=[])
-    ?(params = []) (doc_path,path1,path2,sample) =
+    ?(params = [])
+    ?(security=[])
+    (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   incr nservices;
   let doc = {
@@ -319,6 +329,7 @@ let post_service ?(section=default_section)
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
       doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = (match meth with None -> "post" | Some meth -> meth);
+      doc_security = security;
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
@@ -357,11 +368,11 @@ let post_service ?(section=default_section)
   end;
   service
 
-let service ?section ?name ?descr ?meth ~output ?error_outputs ?params arg =
+let service ?section ?name ?descr ?meth ~output ?error_outputs ?params ?security arg =
   let meth = match meth with None -> "get" | Some s -> s in
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
-    ~output ?error_outputs ~meth ?params arg
+    ~output ?error_outputs ~meth ?params ?security arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -530,7 +541,6 @@ let service_errors s ~code =
     Some (Json_encoding.union cases)
 
 let get_path sd =
-
   let rec buf_path b p =
     match p with
     | ROOT -> ()
@@ -549,6 +559,34 @@ let get_path sd =
 
 module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
 
+let schema_security_scheme = function
+  | Basic { ref_name } ->
+    ref_name, `O [
+      "type", `String "http";
+      "scheme", `String "basic";
+    ]
+  | Bearer { ref_name; format } ->
+    ref_name, `O ([
+        "type", `String "http";
+        "scheme", `String "bearer"
+      ] @ match format with
+      | None -> []
+      | Some format -> ["bearerFormat", `String format]
+      )
+  | ApiKey { ref_name; in_; name } ->
+    let in_ = match in_ with
+      | `Header -> "header"
+      | `Cookie -> "cookie"
+      | `Query -> "query" in
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String in_;
+      "name", `String name;
+    ]
+
+let security_ref_name = function
+  | Basic { ref_name; _ } | Bearer { ref_name; _ } | ApiKey { ref_name; _ } ->
+    ref_name
 
 let paths_of_sections ?(docs=[]) sections =
   let docs = List.map (fun (name, summary, descr) -> name, (summary, descr)) docs in
@@ -762,6 +800,10 @@ let paths_of_sections ?(docs=[]) sections =
               ]
             ]
           ) in
+      let security = `A (List.map (fun secscheme ->
+          `O [security_ref_name secscheme, `A []]
+        ) sd.doc_security)
+      in
       get_path sd,
       `O [
         sd.doc_meth, `O ([
@@ -771,10 +813,17 @@ let paths_of_sections ?(docs=[]) sections =
           "operationId", `String (string_of_int sd.doc_id);
           "parameters", `A parameters;
           "responses", `O (success_response :: error_responses);
+          "security", security;
         ] @ request_schema)
       ]
     ) services
   in
+  let security_schemes = List.fold_left (fun acc sd ->
+      let security = List.map schema_security_scheme sd.doc_security in
+      List.rev_append security acc
+    ) [] (List.rev services)
+  in
+  let definitions = definitions @ [ "securitySchemes", `O security_schemes ] in
   paths, definitions
 
 

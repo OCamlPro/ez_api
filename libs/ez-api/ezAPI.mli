@@ -36,6 +36,11 @@ module TYPES : sig
 
   type base_url = BASE of string
   type url = URL of string
+
+  type security_scheme =
+    | Basic of { ref_name : string }
+    | Bearer of { ref_name : string ; format : string option }
+    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
 end
 
 open TYPES
@@ -46,6 +51,7 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
+type security_scheme = TYPES.security_scheme
 
 type path =
   | ROOT
@@ -74,6 +80,7 @@ type service_doc = {
   doc_output : Json_schema.schema Lazy.t;
   doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
   doc_meth : string;
+  doc_security : security_scheme list;
 }
 
 and section = {
@@ -142,6 +149,7 @@ val service :
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
+  ?security:security_scheme list ->
   ('b, 'c) p ->
   ('b, 'c, unit, 'output, 'error) service
 
@@ -154,6 +162,7 @@ val post_service :
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
+  ?security:security_scheme list ->
   ('b, 'c) p ->
   ('b, 'c, 'input, 'output, 'error) service
 
