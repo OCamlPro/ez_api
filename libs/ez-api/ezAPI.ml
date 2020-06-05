@@ -266,6 +266,7 @@ let rec update_service_list services doc = match services with
   | h :: t -> h :: (update_service_list t doc)
 
 let definitions_path = "/components/schemas/"
+let responses_path = "/components/responses/"
 
 let merge_errs_same_code errors =
   let code_map =
@@ -290,7 +291,7 @@ let merge_errs_same_code errors =
                 Json_encoding.case encoding select deselect
               ) l in
           Json_encoding.union err_cases in
-      lazy (Json_encoding.schema ~definitions_path encoding)
+      lazy (Json_encoding.schema ~definitions_path:responses_path encoding)
     ) code_map
   |> IntMap.bindings
 
@@ -625,7 +626,7 @@ let paths_of_sections ?(docs=[]) sections =
       ) ->
       let definitions = match defs with
         | [] -> []
-        | ("components", `O [ "schemas", `O definitions ]) :: _ -> definitions
+        | ("components", `O definitions) :: _ -> definitions
         | _ -> assert false in
       let io_json_schemas = List.map (function
           | `O ( ("type", `String "object") ::
@@ -734,6 +735,11 @@ let paths_of_sections ?(docs=[]) sections =
         |> List.map (fun (code, (err_schema : Ezjsonm.value)) ->
             let descr = (* Hackish *)
               try match err_schema with
+                | `O ["$ref", `String refname] ->
+                  (match String.split_on_char '/' refname with
+                   | [_; _; _; s] -> s
+                   | _ -> raise Not_found
+                  )
                 | `O (("type", `String "object") :: ("properties", `O l) :: _) -> (
                     List.find (function
                         | ("kind" | "error" | "description"),
