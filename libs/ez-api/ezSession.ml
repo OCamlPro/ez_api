@@ -193,7 +193,10 @@ module Make(S : SessionArg) = struct
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
-    let security = [
+    type token_security =
+      [ `ApiKey of [ `Cookie | `Header | `Query ] EzAPI.TYPES.apikey_security ]
+
+    let security : token_security list = [
       (let (`CSRF name | `Cookie name) = S.token_kind in
        let in_ = match S.token_kind with
          | `CSRF _ -> `Header
@@ -201,8 +204,8 @@ module Make(S : SessionArg) = struct
        let ref_name = match S.token_kind with
          | `CSRF name -> name ^ " Header"
          | `Cookie name -> name ^ " Cookie" in
-       EzAPI.TYPES.(ApiKey { ref_name; in_; name}));
-      EzAPI.TYPES.(ApiKey {
+       EzAPI.TYPES.(`ApiKey { ref_name; in_; name}));
+      EzAPI.TYPES.(`ApiKey {
           ref_name = "Token parameter";
           in_ = `Query;
           name = param_token.param_value});
@@ -213,7 +216,7 @@ module Make(S : SessionArg) = struct
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
-    let connect : (S.auth, connect_error) EzAPI.service0  =
+    let connect : (S.auth, connect_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"connect"
@@ -226,7 +229,8 @@ module Make(S : SessionArg) = struct
 
     let login : (login_message,
                  S.auth,
-                 login_error) EzAPI.post_service0  =
+                 login_error,
+                 EzAPI.TYPES.no_security) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
@@ -237,7 +241,7 @@ module Make(S : SessionArg) = struct
                          Encoding.challenge_not_found_case]
         EzAPI.Path.(rpc_root // "login")
 
-    let logout : (auth_needed, logout_error) EzAPI.service0  =
+    let logout : (auth_needed, logout_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"logout"

@@ -31,7 +31,7 @@ module Make(S: Arg) : sig
 
   (* Use this one to be sure that OPTIONS requests are correctly replied to *)
   val register :
-    ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
+    ('arg, 'b, 'input, 'd, 'e, 'f) EzAPI.service ->
     ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
     EzAPI.request EzAPIServerUtils.directory ->
     EzAPI.request EzAPIServerUtils.directory

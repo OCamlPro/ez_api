@@ -2,6 +2,10 @@ module Resto = Resto1
 
 open StringCompat
 
+type uninhabited
+
+val unreachable : uninhabited -> 'a
+
 module TYPES : sig
 
   type ip_info = {
@@ -37,10 +41,21 @@ module TYPES : sig
   type base_url = BASE of string
   type url = URL of string
 
+
+  type no_security = [ `Nosecurity of uninhabited ]
+  type 'a apikey_security = {
+    ref_name : string;
+    in_: 'a;
+    name : string
+  }
+  type bearer_security = { ref_name : string ; format : string option }
+  type basic_security = { ref_name : string }
   type security_scheme =
-    | Basic of { ref_name : string }
-    | Bearer of { ref_name : string ; format : string option }
-    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
+    [ no_security
+    | `Basic of basic_security
+    | `Bearer of bearer_security
+    | `ApiKey of [`Header | `Cookie |`Query ] apikey_security
+    ]
 end
 
 open TYPES
@@ -90,16 +105,17 @@ and section = {
 
 (* All our services use 'params' as 'prefix of the service, and
    'unit' as 'input of the service (i.e. no input) *)
-type ('params, 'params2, 'input, 'output, 'error) service
+type ('params, 'params2, 'input, 'output, 'error, 'security) service
+    constraint 'security = [< security_scheme ]
 
-type ('output, 'error) service0 = (request, unit, unit, 'output, 'error) service
-type ('arg, 'output, 'error) service1 =
-  (request * 'arg, unit * 'arg, unit, 'output, 'error) service
+type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
+type ('arg, 'output, 'error, 'security) service1 =
+  (request * 'arg, unit * 'arg, unit, 'output, 'error, 'security) service
 
-type ('input, 'output, 'error) post_service0 =
-  (request, unit, 'input, 'output, 'error) service
-type ('arg,'input,'output, 'error) post_service1 =
-  (request * 'arg, unit * 'arg, 'input, 'output, 'error) service
+type ('input, 'output, 'error, 'security) post_service0 =
+  (request, unit, 'input, 'output, 'error, 'security) service
+type ('arg,'input,'output, 'error, 'security) post_service1 =
+  (request * 'arg, unit * 'arg, 'input, 'output, 'error, 'security) service
 
 type ('a, 'b) p
 
@@ -149,9 +165,9 @@ val service :
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
-  ?security:security_scheme list ->
+  ?security:([< security_scheme ] as 'security) list ->
   ('b, 'c) p ->
-  ('b, 'c, unit, 'output, 'error) service
+  ('b, 'c, unit, 'output, 'error, 'security) service
 
 val post_service :
   ?section: section ->
@@ -162,12 +178,12 @@ val post_service :
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
-  ?security:security_scheme list ->
+  ?security:([< security_scheme ] as 'security) list ->
   ('b, 'c) p ->
-  ('b, 'c, 'input, 'output, 'error) service
+  ('b, 'c, 'input, 'output, 'error, 'security) service
 
 val register :
-  ('a, 'b, 'input, 'output, 'error) service ->
+  ('a, 'b, 'input, 'output, 'error, 'security) service ->
     (request, 'a, 'input, ('output, 'error) Result.result) Resto.service *
     (request, 'a, unit, ('output, 'error) Result.result) Resto.service
 
@@ -176,9 +192,9 @@ val all_services_registered : unit -> bool
 val warnings : (string -> unit) -> unit
 
 val forge0 :
-  base_url -> (_, unit, _ ,_ , _) service -> (param * arg_value) list -> url
+  base_url -> (_, unit, _ ,_ , _, _) service -> (param * arg_value) list -> url
 val forge1 :
-  base_url -> (_, unit * 'a, _, _, _) service ->
+  base_url -> (_, unit * 'a, _, _, _, _) service ->
   'a -> (param * arg_value) list -> url
 val printf : base_url -> ('a, unit, string, url) format4 -> 'a
 
@@ -214,13 +230,13 @@ val services : unit -> string array
 exception ResultNotfound
 
 val encode_args :
-  ('a, 'b, 'c, 'd, 'e) service ->
+  ('a, 'b, 'c, 'd, 'e, 'f) service ->
   url -> (param * arg_value) list -> string
 
-val service_input : (_, _, 'input, _, _) service -> 'input Json_encoding.encoding
-val service_output : (_, _, _, 'output, _) service -> 'output Json_encoding.encoding
+val service_input : (_, _, 'input, _, _, _) service -> 'input Json_encoding.encoding
+val service_output : (_, _, _, 'output, _, _) service -> 'output Json_encoding.encoding
 val service_errors :
-  (_, _, _, _, 'error) service ->
+  (_, _, _, _, 'error, _) service ->
   code:int -> 'error Json_encoding.encoding option
 
 (* swagger *)
@@ -231,12 +247,8 @@ val paths_of_sections : ?docs:((string * string * string) list) ->
 
 module Legacy : sig
 
-  type uninhabited
-
-  val unreachable : uninhabited -> 'a
-
   type nonrec ('params, 'params2, 'input, 'output) service =
-    ('params, 'params2, 'input, 'output, uninhabited) service
+    ('params, 'params2, 'input, 'output, uninhabited, no_security) service
 
   type nonrec 'output service0 =
     (request, unit, unit, 'output) service

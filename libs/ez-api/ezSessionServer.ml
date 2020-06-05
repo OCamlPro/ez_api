@@ -61,7 +61,7 @@ module Make(S: Arg) : sig
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
   val register :
-           ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
+           ('arg, 'b, 'input, 'd, 'e, 'f) EzAPI.service ->
            ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
            EzAPI.request EzAPIServerUtils.directory ->
            EzAPI.request EzAPIServerUtils.directory
