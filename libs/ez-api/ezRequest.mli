@@ -7,15 +7,19 @@
 type error_handler = (int -> string option -> unit)
 module type RAWGEN = sig
 
-  type ('output, 'error) service0
-  type ('arg, 'output, 'error) service1
-  type ('input, 'output, 'error) post_service0
-  type ('arg, 'input, 'output, 'error) post_service1
+  type ('output, 'error, 'security) service0
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg, 'output, 'error, 'security) service1
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('input, 'output, 'error, 'security) post_service0
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg, 'input, 'output, 'error, 'security) post_service1
+    constraint 'security = [< EzAPI.security_scheme ]
   type ('output, 'error) reply_handler
 
   val get0 :
     EzAPI.base_url ->                   (* API url *)
-    ('output, 'error) service0 -> (* GET service *)
+    ('output, 'error, 'security) service0 -> (* GET service *)
     string ->                           (* debug msg *)
     ?post:bool ->
     ?headers:(string * string) list ->
@@ -27,7 +31,7 @@ module type RAWGEN = sig
 
   val get1 :
     EzAPI.base_url ->
-    ('arg, 'output, 'error) service1 ->
+    ('arg, 'output, 'error, 'security) service1 ->
     string ->
     ?post:bool ->
     ?headers:(string * string) list ->
@@ -39,7 +43,7 @@ module type RAWGEN = sig
 
   val post0 :
     EzAPI.base_url ->                 (* API url *)
-    ('input, 'output, 'error) post_service0 -> (* POST service *)
+    ('input, 'output, 'error, 'security) post_service0 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -50,7 +54,7 @@ module type RAWGEN = sig
 
   val post1 :
     EzAPI.base_url ->                 (* API url *)
-    ('arg, 'input, 'output, 'error) post_service1 -> (* POST service *)
+    ('arg, 'input, 'output, 'error, 'security) post_service1 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -63,24 +67,24 @@ module type RAWGEN = sig
 end
 
 module type RAW = RAWGEN
-  with type ('output, 'error) service0 :=
-    ('output, 'error) EzAPI.service0
-   and type ('arg, 'output, 'error) service1 :=
-     ('arg, 'output, 'error) EzAPI.service1
-   and type ('input, 'output, 'error) post_service0 :=
-     ('input, 'output, 'error) EzAPI.post_service0
-   and type ('arg, 'input, 'output, 'error) post_service1 :=
-     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+  with type ('output, 'error, 'security) service0 :=
+    ('output, 'error, 'security) EzAPI.service0
+   and type ('arg, 'output, 'error, 'security) service1 :=
+     ('arg, 'output, 'error, 'security) EzAPI.service1
+   and type ('input, 'output, 'error, 'security) post_service0 :=
+     ('input, 'output, 'error, 'security) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error, 'security) post_service1 :=
+     ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1
    and type ('output, 'error) reply_handler := ('output, 'error) Result.result -> unit
 
 module type LEGACY = RAWGEN
-  with type ('output, 'error) service0 :=
+  with type ('output, 'error, 'security) service0 =
     ('output) EzAPI.Legacy.service0
-   and type ('arg, 'output, 'error) service1 :=
+   and type ('arg, 'output, 'error, 'security) service1 =
      ('arg, 'output) EzAPI.Legacy.service1
-   and type ('input, 'output, 'error) post_service0 :=
+   and type ('input, 'output, 'error, 'security) post_service0 =
      ('input, 'output) EzAPI.Legacy.post_service0
-   and type ('arg, 'input, 'output, 'error) post_service1 :=
+   and type ('arg, 'input, 'output, 'error, 'security) post_service1 =
      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
    and type ('output, 'error) reply_handler := 'output -> unit
 
