@@ -691,7 +691,11 @@ let paths_of_sections ?(docs=[]) sections =
         | None -> None
         | Some name -> List.assoc_opt name docs in
       let summary, description = match doc_infos with
-        | None -> "Summary of service", "Description of service"
+        | None ->
+          let path = get_path sd in
+          Format.eprintf
+            "Warning: no description provided for service %s@." path;
+          path, ""
         | Some (summary, description) -> summary, description in
       let parameters =
         List.map (fun p ->
