@@ -303,6 +303,30 @@ let merge_errs_same_code errors =
     ) code_map
   |> IntMap.bindings
 
+(* This (ploymorphic) case is used when there is no
+   declared error for the service but one is produced *)
+let catch_all_error_case () = ErrCase {
+    code = 500;
+    name = "AnyError";
+    encoding = (
+      let open Json_encoding in
+      conv
+        (fun x ->
+           let s =
+             Marshal.to_string x [Marshal.No_sharing]
+             |> Digest.string |> Digest.to_hex in
+           Format.eprintf "No corresponding error case (MD5 %s)@." s;
+           ((), s)
+        )
+        (fun ((), _) ->
+           failwith "Cannot parse from undeclared error")
+        (obj2
+           (req "error" (constant "Server Error"))
+           (req "digest" string))
+    );
+    select = (fun x -> Some x);
+    deselect = (fun x -> x);
+  }
 
 let post_service ?(section=default_section)
     ?name
@@ -333,25 +357,19 @@ let post_service ?(section=default_section)
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
-  let resto_output = match error_outputs with
-    | [] ->
-      Json_encoding.conv
-        (function Ok r -> r | _ -> assert false)
-        (fun r -> Ok r)
-        output
-    | _ ->
-      let err_cases =
-        List.map (function ErrCase { encoding;  select;  deselect; _} ->
+  let resto_output =
+    let err_cases =
+      List.map (function ErrCase { encoding;  select;  deselect; _} ->
           Json_encoding.case encoding select deselect
-        ) error_outputs in
-      Json_encoding.(union [
-          case output
-            (function Ok r -> Some r | Error _ -> None)
-            (fun r -> Ok r);
-          case (Json_encoding.union err_cases)
-           (function Error e -> Some e | Ok _ -> None)
-           (fun e -> Error e)
-        ]) in
+        ) (error_outputs @ [catch_all_error_case ()]) in
+    Json_encoding.(union [
+        case output
+          (function Ok r -> Some r | Error _ -> None)
+          (fun r -> Ok r);
+        case (Json_encoding.union err_cases)
+          (function Error e -> Some e | Ok _ -> None)
+          (fun e -> Error e)
+      ]) in
   let service = {
       s = Resto.service ~input ~output:resto_output path1;
       s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output:resto_output path1;

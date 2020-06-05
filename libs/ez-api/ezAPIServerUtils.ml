@@ -1,5 +1,5 @@
 open EzAPI.TYPES
-open Lwt
+open Lwt.Infix
 
 type 'a directory = {
   meth_GET :'a RestoDirectory1.directory;
