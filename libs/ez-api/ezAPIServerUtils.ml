@@ -95,7 +95,7 @@ exception EzReturnOPTIONS of (string * string) list
 let register ?(options_headers=[]) service handler dir =
   let handler_GET a b =
     try
-      handler a b
+      handler a (EzAPI.service_security service) b
     with
     | (EzRawReturn _ | EzRawError _ | EzContentError _) as exn -> Lwt.fail exn
     | exn ->
@@ -279,8 +279,8 @@ module Legacy = struct
       (service : ('a, 'b, 'c, 'd) service)
       handler dir =
     let open RestoDirectory1.Answer in
-    let handler a b =
-      handler a b >>= fun { code ; body } ->
+    let handler a sec b =
+      handler a sec b >>= fun { code ; body } ->
       let body = match body with
         | Empty -> Empty
         | Single res -> Single (Ok res)

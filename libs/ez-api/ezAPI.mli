@@ -41,21 +41,6 @@ module TYPES : sig
   type base_url = BASE of string
   type url = URL of string
 
-
-  type no_security = [ `Nosecurity of uninhabited ]
-  type 'a apikey_security = {
-    ref_name : string;
-    in_: 'a;
-    name : string
-  }
-  type bearer_security = { ref_name : string ; format : string option }
-  type basic_security = { ref_name : string }
-  type security_scheme =
-    [ no_security
-    | `Basic of basic_security
-    | `Bearer of bearer_security
-    | `ApiKey of [`Header | `Cookie |`Query ] apikey_security
-    ]
 end
 
 open TYPES
@@ -66,7 +51,6 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
-type security_scheme = TYPES.security_scheme
 
 type path =
   | ROOT
@@ -81,6 +65,27 @@ type param = {
   param_required : bool;
   param_examples : string list
 }
+
+type no_security = [ `Nosecurity of uninhabited ]
+type 'a apikey_security = {
+  ref_name : string;
+  name : 'a
+}
+type bearer_security_desc = { ref_name : string ; format : string option }
+type basic_security_desc = { ref_name : string }
+type bearer_security = [ `Bearer of bearer_security_desc ]
+type basic_security = [ `Basic of basic_security_desc ]
+type header_security = [ `Header of string apikey_security ]
+type cookie_security = [ `Cookie of string apikey_security ]
+type query_security = [ `Query of param apikey_security ]
+type security_scheme =
+  [ no_security
+  | basic_security
+  | bearer_security
+  | header_security
+  | cookie_security
+  | query_security
+  ]
 
 type service_doc = {
   doc_id : int; (* uniq service identifier *)
@@ -238,6 +243,10 @@ val service_output : (_, _, _, 'output, _, _) service -> 'output Json_encoding.e
 val service_errors :
   (_, _, _, _, 'error, _) service ->
   code:int -> 'error Json_encoding.encoding option
+val service_security :
+  (_, _, _, _, _, [< security_scheme ] as 'security) service ->
+  'security list
+
 
 (* swagger *)
 val paths_of_sections : ?docs:((string * string * string) list) ->

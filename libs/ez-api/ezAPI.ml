@@ -45,21 +45,6 @@ module TYPES = struct
     | S of string
     | LS of string list
 
-  type no_security = [ `Nosecurity of uninhabited ]
-  type 'a apikey_security = {
-    ref_name : string;
-    in_: 'a;
-    name : string
-  }
-  type bearer_security = { ref_name : string ; format : string option }
-  type basic_security = { ref_name : string }
-  type security_scheme =
-    [ no_security
-    | `Basic of basic_security
-    | `Bearer of bearer_security
-    | `ApiKey of [`Header | `Cookie |`Query ] apikey_security
-    ]
-
 end
 
 open TYPES
@@ -70,8 +55,6 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
-type security_scheme = TYPES.security_scheme
-
 
 type param = {
     param_value : string;
@@ -81,6 +64,27 @@ type param = {
     param_required : bool;
     param_examples : string list;
   }
+
+type no_security = [ `Nosecurity of uninhabited ]
+type 'a apikey_security = {
+  ref_name : string;
+  name : 'a
+}
+type bearer_security_desc = { ref_name : string ; format : string option }
+type basic_security_desc = { ref_name : string }
+type bearer_security = [ `Bearer of bearer_security_desc ]
+type basic_security = [ `Basic of basic_security_desc ]
+type header_security = [ `Header of string apikey_security ]
+type cookie_security = [ `Cookie of string apikey_security ]
+type query_security = [ `Query of param apikey_security ]
+type security_scheme =
+  [ no_security
+  | basic_security
+  | bearer_security
+  | header_security
+  | cookie_security
+  | query_security
+  ]
 
 type path =
   | ROOT
@@ -343,6 +347,13 @@ let catch_all_error_case () = ErrCase {
     deselect = (fun x -> x);
   }
 
+let params_of_query_security (l : [< security_scheme ] list) =
+  List.fold_left (fun acc -> function
+      | `Query { name = param ; _ } -> param :: acc
+      | `Nosecurity _ | `Basic _ | `Bearer _
+      | `Header _ | `Cookie _  -> acc
+    ) [] l
+
 let post_service ?(section=default_section)
     ?name
     ?descr
@@ -355,6 +366,7 @@ let post_service ?(section=default_section)
     (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   incr nservices;
+  let params = List.rev_append (params_of_query_security security) params in
   let doc = {
       doc_path;
       doc_params = params;
@@ -574,6 +586,8 @@ let service_errors s ~code =
         ) l in
     Some (Json_encoding.union cases)
 
+let service_security s = s.s_security
+
 let get_path sd =
   let rec buf_path b p =
     match p with
@@ -608,22 +622,32 @@ let schema_security_scheme = function
       | None -> []
       | Some format -> ["bearerFormat", `String format]
       )
-  | `ApiKey { ref_name; in_; name } ->
-    let in_ = match in_ with
-      | `Header -> "header"
-      | `Cookie -> "cookie"
-      | `Query -> "query" in
+  | `Header { ref_name; name } ->
     ref_name , `O [
       "type", `String "apiKey";
-      "in", `String in_;
+      "in", `String "header";
       "name", `String name;
+    ]
+  | `Cookie { ref_name; name } ->
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String "cookie";
+      "name", `String name;
+    ]
+  | `Query { ref_name; name } ->
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String "query";
+      "name", `String name.param_value;
     ]
 
 let security_ref_name = function
   | `Nosecurity u -> unreachable u
-  | `Basic { ref_name; _ }
+  | `Basic { ref_name }
   | `Bearer { ref_name; format=_  }
-  | `ApiKey { ref_name; in_=_; _ } ->
+  | `Cookie { ref_name; name=_ }
+  | `Header { ref_name; name=_ }
+  | `Query { ref_name; name=_ } ->
     ref_name
 
 let paths_of_sections ?(docs=[]) sections =

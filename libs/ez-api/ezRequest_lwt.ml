@@ -248,19 +248,19 @@ module Make(S : sig
 
     type ('output, 'error, 'security) service0 =
       ('output) EzAPI.Legacy.service0
-      constraint 'security = [< security_scheme ]
+      constraint 'security = [< EzAPI.security_scheme ]
 
     type ('arg, 'output, 'error, 'security) service1 =
       ('arg, 'output) EzAPI.Legacy.service1
-      constraint 'security = [< security_scheme ]
+      constraint 'security = [< EzAPI.security_scheme ]
 
     type ('input, 'output, 'error, 'security) post_service0 =
       ('input, 'output) EzAPI.Legacy.post_service0
-      constraint 'security = [< security_scheme ]
+      constraint 'security = [< EzAPI.security_scheme ]
 
     type ('arg, 'input, 'output, 'error, 'security) post_service1 =
       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
-      constraint 'security = [< security_scheme ]
+      constraint 'security = [< EzAPI.security_scheme ]
 
     open EzAPI.Legacy
 
