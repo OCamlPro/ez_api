@@ -202,7 +202,7 @@ let add_headers_response headers =
   let h = StringMap.add "access-control-allow-origin" [ "*" ] headers in
   let h =
     StringMap.add "access-control-allow-headers" [ "Accept, Content-Type" ] h in
-  StringMap.add "access-control-allow-methods" [ "POST, GET, OPTIONS" ] h
+  StringMap.add "access-control-allow-methods" [ "POST, GET, OPTIONS, PATCH, PUT, DELETE" ] h
 
 let read_body body =
   let body_str = ref "" in
@@ -294,7 +294,8 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                         EzAPI.add_params ez_request ( EzUrl.decode_args content );
                         None
                       | _, BodyString (Some mime, content) when
-                          Re.Str.(string_match (regexp "image") mime 0) ->
+                          Re.Str.(string_match (regexp "image") mime 0)
+                          || mime = "multipart/form-data" ->
                         Some (`String content)
                       | _, BodyString (_, content) ->
                         try Some (Ezjsonm.from_string content) with _ -> None

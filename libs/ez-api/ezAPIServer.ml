@@ -145,7 +145,7 @@ let dispatch s (io, _conn) req body =
             "access-control-allow-origin" "*")
          [
            ("access-control-allow-headers", "Accept, Content-Type");
-           ("access-control-allow-methods", "POST, GET, OPTIONS, PUT, DELETE")
+           ("access-control-allow-methods", "POST, GET, OPTIONS, PATCH, PUT, DELETE")
          ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
   if verbose > 1 then
