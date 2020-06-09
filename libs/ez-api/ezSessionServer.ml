@@ -59,12 +59,6 @@ module Make(S: Arg) : sig
   val get_request_session :
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
-  val register :
-    ('arg, 'b, 'input, 'd, 'e, [< EzAPI.security_scheme] as 'security) EzAPI.service ->
-    ('arg -> 'security list -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
-    EzAPI.request EzAPIServerUtils.directory ->
-    EzAPI.request EzAPIServerUtils.directory
-
 end = struct
 
   let find_user = S.find_user
@@ -218,20 +212,11 @@ end = struct
          request_auth_base req (fun auth_needed -> Ok auth_needed, None)
   end
 
-  let register service handler =
-    let options_headers =
-      match S.token_kind with
-      | `Cookie _name -> []
-      | `CSRF header ->
-          ["access-control-allow-headers", header]
-    in
-    EzAPIServerUtils.register service handler
-      ~options_headers
-
   let register_handlers dir =
+    let open EzAPIServerUtils in
     dir
     |> register Service.connect Handler.connect
-    |> EzAPIServerUtils.register Service.login Handler.login
+    |> register Service.login Handler.login
     |> register Service.logout Handler.logout
 
   let get_request_session req =
