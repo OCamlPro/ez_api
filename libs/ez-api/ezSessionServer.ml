@@ -76,6 +76,7 @@ end = struct
     with Not_found -> None
 
   let cookie_of_header req (`Header { EzAPI.name ; _ }) =
+    let name = String.lowercase_ascii name in
     match StringMap.find name req.req_headers with
     | exception Not_found -> None
     | [] -> None

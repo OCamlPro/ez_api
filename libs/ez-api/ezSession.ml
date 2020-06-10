@@ -120,7 +120,7 @@ module Make(S : SessionArg) = struct
       EzAPI.ErrCase {
         code = 440;
         name = "SessionExpired";
-        encoding = (obj1 (req "error" (constant "sSessionExpired")));
+        encoding = (obj1 (req "error" (constant "SessionExpired")));
         select = (function `Session_expired -> Some () | _ -> None);
         deselect = (fun () -> `Session_expired);
       }
