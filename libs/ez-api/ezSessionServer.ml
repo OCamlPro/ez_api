@@ -1,8 +1,7 @@
 open StringCompat
 open EzAPI.TYPES
 open EzSession.TYPES
-
-let (>>=) = Lwt.(>>=)
+open Lwt.Infix
 
 let verbose = EzAPIServerUtils.verbose
 
@@ -60,54 +59,41 @@ module Make(S: Arg) : sig
   val get_request_session :
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
-  val register :
-           ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
-           ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
-           EzAPI.request EzAPIServerUtils.directory ->
-           EzAPI.request EzAPIServerUtils.directory
-
 end = struct
 
   let find_user = S.find_user
   open S.SessionStore
   module S = S.SessionArg
 
-  let token_kind =
-    match S.token_kind with
-    | `Cookie name -> `Cookie name
-    | `CSRF name -> `CSRF (String.lowercase_ascii name)
-
   module M = EzSession.Make(S)
   include M
 
-  let get_request_session req =
-    begin
-      match EzAPI.find_param Service.param_token req with
-      | None ->
-        Lwt.return None
-      | Some cookie ->
-        get_session ~cookie >>= function
-        | Some s -> Lwt.return (Some s)
-        | None -> Lwt.return None
-    end >>= function
-    | Some _ as res -> Lwt.return res
-    | None ->
-      match token_kind with
-      | `Cookie name ->
-        begin
-          match StringMap.find name (EzCookieServer.get req) with
-          | exception Not_found ->
-            Lwt.return None
-          | cookie ->
-            get_session ~cookie
-        end
-      | `CSRF name ->
-        match StringMap.find name req.req_headers with
-        | exception Not_found ->
-          Lwt.return None
-        | [] -> Lwt.return None
-        | cookie :: _ ->
-          get_session ~cookie
+  let cookie_of_param req (`Query { EzAPI.name = param ; _}) =
+    EzAPI.find_param param req
+
+  let cookie_of_cookie req (`Cookie { EzAPI.name ; _ }) =
+    try Some (StringMap.find name (EzCookieServer.get req))
+    with Not_found -> None
+
+  let cookie_of_header req (`Header { EzAPI.name ; _ }) =
+    let name = String.lowercase_ascii name in
+    match StringMap.find name req.req_headers with
+    | exception Not_found -> None
+    | [] -> None
+    | cookie :: _ -> Some cookie
+
+  let get_request_session security req =
+    List.map (function
+        | `Query _ as s -> cookie_of_param req s
+        | `Cookie _ as s -> cookie_of_cookie req s
+        | `Header _ as s -> cookie_of_header req s
+      ) security
+    |> Lwt_list.fold_left_s (function
+        | Some s -> fun _ -> Lwt.return_some s
+        | None -> function
+          | None -> Lwt.return_none
+          | Some cookie -> get_session ~cookie
+      ) None
 
   module Handler = struct
 
@@ -179,8 +165,8 @@ end = struct
       return_auth_base req ?cookie ~login user_id user_info
         (fun auth -> Ok auth)
 
-    let connect req () =
-      get_request_session req >>= function
+    let connect req security () =
+      get_request_session security req >>= function
       | None ->
         request_auth req
       | Some { session_cookie = cookie;
@@ -192,7 +178,7 @@ end = struct
         | Some (_pwhash, user_id, user_info) ->
           return_auth req ~cookie ~login user_id user_info
 
-    let login req { login_user; login_challenge_id; login_challenge_reply } =
+    let login req _ { login_user; login_challenge_id; login_challenge_reply } =
       find_user ~login:login_user >>= function
       | None ->
          if verbose > 1 then
@@ -219,29 +205,24 @@ end = struct
                 return_auth req ~login:login_user user_id user_info
               end
 
-    let logout req () =
-       get_request_session req >>= function
+    let logout req security () =
+       get_request_session security req >>= function
       | None -> EzAPIServerUtils.return ~code:403 (Error `Invalid_session)
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
          request_auth_base req (fun auth_needed -> Ok auth_needed, None)
   end
 
-  let register service handler =
-    let options_headers =
-      match S.token_kind with
-      | `Cookie _name -> []
-      | `CSRF header ->
-          ["access-control-allow-headers", header]
-    in
-    EzAPIServerUtils.register service handler
-      ~options_headers
-
   let register_handlers dir =
+    let open EzAPIServerUtils in
     dir
     |> register Service.connect Handler.connect
-    |> EzAPIServerUtils.register Service.login Handler.login
+    |> register Service.login Handler.login
     |> register Service.logout Handler.logout
+
+  let get_request_session req =
+    get_request_session Service.security req
+
 
 end
 

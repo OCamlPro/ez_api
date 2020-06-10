@@ -6,6 +6,10 @@ module IntMap = Map.Make(struct type t = int let compare = compare end)
 
 exception ResultNotfound
 
+type uninhabited = |
+
+let unreachable = function (_ : uninhabited) -> .
+
 module TYPES = struct
 
   type ip_info = {
@@ -41,11 +45,6 @@ module TYPES = struct
     | S of string
     | LS of string list
 
-  type security_scheme =
-    | Basic of { ref_name : string }
-    | Bearer of { ref_name : string ; format : string option }
-    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
-
 end
 
 open TYPES
@@ -56,8 +55,6 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
-type security_scheme = TYPES.security_scheme
-
 
 type param = {
     param_value : string;
@@ -67,6 +64,27 @@ type param = {
     param_required : bool;
     param_examples : string list;
   }
+
+type no_security = [ `Nosecurity of uninhabited ]
+type 'a apikey_security = {
+  ref_name : string;
+  name : 'a
+}
+type bearer_security_desc = { ref_name : string ; format : string option }
+type basic_security_desc = { ref_name : string }
+type bearer_security = [ `Bearer of bearer_security_desc ]
+type basic_security = [ `Basic of basic_security_desc ]
+type header_security = [ `Header of string apikey_security ]
+type cookie_security = [ `Cookie of string apikey_security ]
+type query_security = [ `Query of param apikey_security ]
+type security_scheme =
+  [ no_security
+  | basic_security
+  | bearer_security
+  | header_security
+  | cookie_security
+  | query_security
+  ]
 
 type path =
   | ROOT
@@ -110,7 +128,7 @@ type _ err_case =
     } -> 'b err_case
 
 (* All our services use 'params' as 'prefix of the service *)
-type ('params, 'params2, 'input, 'output, 'error) service
+type ('params, 'params2, 'input, 'output, 'error, 'security) service
   = {
     s : (request, 'params, 'input, ('output, 'error) result) Resto.service;
     s_OPTIONS : (request, 'params, unit, ('output, 'error) result) Resto.service;
@@ -120,16 +138,17 @@ type ('params, 'params2, 'input, 'output, 'error) service
     enc_input : 'input Json_encoding.encoding;
     enc_output : 'output Json_encoding.encoding;
     enc_error : 'error err_case list;
+    s_security : ([< security_scheme ] as 'security) list;
   }
 
-type ('output, 'error) service0 = (request, unit, unit, 'output, 'error) service
-type ('arg, 'output, 'error) service1 =
-  (request * 'arg, unit * 'arg, unit, 'output, 'error) service
+type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
+type ('arg, 'output, 'error, 'security) service1 =
+  (request * 'arg, unit * 'arg, unit, 'output, 'error, 'security) service
 
-type ('input, 'output, 'error) post_service0 =
-  (request, unit, 'input, 'output, 'error) service
-type ('arg,'input,'output, 'error) post_service1 =
-  (request * 'arg, unit * 'arg, 'input, 'output, 'error) service
+type ('input, 'output, 'error, 'security) post_service0 =
+  (request, unit, 'input, 'output, 'error, 'security) service
+type ('arg,'input,'output, 'error, 'security) post_service1 =
+  (request * 'arg, unit * 'arg, 'input, 'output, 'error, 'security) service
 
 let arg_string ?descr name example: string Resto.Arg.arg * string =
   Resto.Arg.make
@@ -328,6 +347,13 @@ let catch_all_error_case () = ErrCase {
     deselect = (fun x -> x);
   }
 
+let params_of_query_security (l : [< security_scheme ] list) =
+  List.fold_left (fun acc -> function
+      | `Query { name = param ; _ } -> param :: acc
+      | `Nosecurity _ | `Basic _ | `Bearer _
+      | `Header _ | `Cookie _  -> acc
+    ) [] l
+
 let post_service ?(section=default_section)
     ?name
     ?descr
@@ -340,6 +366,7 @@ let post_service ?(section=default_section)
     (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   incr nservices;
+  let params = List.rev_append (params_of_query_security security) params in
   let doc = {
       doc_path;
       doc_params = params;
@@ -353,7 +380,7 @@ let post_service ?(section=default_section)
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
       doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = (match meth with None -> "post" | Some meth -> meth);
-      doc_security = security;
+      doc_security = (security :> security_scheme list);
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
@@ -379,6 +406,7 @@ let post_service ?(section=default_section)
       enc_input = input;
       enc_output = output;
       enc_error = error_outputs;
+      s_security = security;
     } in
   begin
     let make_sample url = forge url service sample [] in
@@ -558,6 +586,8 @@ let service_errors s ~code =
         ) l in
     Some (Json_encoding.union cases)
 
+let service_security s = s.s_security
+
 let get_path sd =
   let rec buf_path b p =
     match p with
@@ -578,12 +608,13 @@ let get_path sd =
 module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
 
 let schema_security_scheme = function
-  | Basic { ref_name } ->
+  | `Nosecurity u -> unreachable u
+  | `Basic { ref_name } ->
     ref_name, `O [
       "type", `String "http";
       "scheme", `String "basic";
     ]
-  | Bearer { ref_name; format } ->
+  | `Bearer { ref_name; format } ->
     ref_name, `O ([
         "type", `String "http";
         "scheme", `String "bearer"
@@ -591,19 +622,32 @@ let schema_security_scheme = function
       | None -> []
       | Some format -> ["bearerFormat", `String format]
       )
-  | ApiKey { ref_name; in_; name } ->
-    let in_ = match in_ with
-      | `Header -> "header"
-      | `Cookie -> "cookie"
-      | `Query -> "query" in
+  | `Header { ref_name; name } ->
     ref_name , `O [
       "type", `String "apiKey";
-      "in", `String in_;
+      "in", `String "header";
       "name", `String name;
+    ]
+  | `Cookie { ref_name; name } ->
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String "cookie";
+      "name", `String name;
+    ]
+  | `Query { ref_name; name } ->
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String "query";
+      "name", `String name.param_value;
     ]
 
 let security_ref_name = function
-  | Basic { ref_name; _ } | Bearer { ref_name; _ } | ApiKey { ref_name; _ } ->
+  | `Nosecurity u -> unreachable u
+  | `Basic { ref_name }
+  | `Bearer { ref_name; format=_  }
+  | `Cookie { ref_name; name=_ }
+  | `Header { ref_name; name=_ }
+  | `Query { ref_name; name=_ } ->
     ref_name
 
 let paths_of_sections ?(docs=[]) sections =
@@ -851,12 +895,8 @@ let paths_of_sections ?(docs=[]) sections =
 
 module Legacy = struct
 
-  type uninhabited = |
-
-  let unreachable = function (_ : uninhabited) -> .
-
   type nonrec ('params, 'params2, 'input, 'output) service =
-    ('params, 'params2, 'input, 'output, uninhabited) service
+    ('params, 'params2, 'input, 'output, uninhabited, no_security) service
 
   type 'output service0 =
     (request, unit, unit, 'output) service

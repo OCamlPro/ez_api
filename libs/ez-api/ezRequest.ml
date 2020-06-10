@@ -4,15 +4,19 @@ type error_handler = (int -> string option -> unit)
 
 module type RAWGEN = sig
 
-  type ('output, 'error) service0
-  type ('arg, 'output, 'error) service1
-  type ('input, 'output, 'error) post_service0
-  type ('arg, 'input, 'output, 'error) post_service1
+  type ('output, 'error, 'security) service0
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg, 'output, 'error, 'security) service1
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('input, 'output, 'error, 'security) post_service0
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg, 'input, 'output, 'error, 'security) post_service1
+    constraint 'security = [< EzAPI.security_scheme ]
   type ('output, 'error) reply_handler
 
   val get0 :
     EzAPI.base_url ->                   (* API url *)
-    ('output, 'error) service0 -> (* GET service *)
+    ('output, 'error, 'security) service0 -> (* GET service *)
     string ->                           (* debug msg *)
     ?post:bool ->
     ?headers:(string * string) list ->
@@ -24,7 +28,7 @@ module type RAWGEN = sig
 
   val get1 :
     EzAPI.base_url ->
-    ('arg, 'output, 'error) service1 ->
+    ('arg, 'output, 'error, 'security) service1 ->
     string ->
     ?post:bool ->
     ?headers:(string * string) list ->
@@ -36,7 +40,7 @@ module type RAWGEN = sig
 
   val post0 :
     EzAPI.base_url ->                 (* API url *)
-    ('input, 'output, 'error) post_service0 -> (* POST service *)
+    ('input, 'output, 'error, 'security) post_service0 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -47,7 +51,7 @@ module type RAWGEN = sig
 
   val post1 :
     EzAPI.base_url ->                 (* API url *)
-    ('arg, 'input, 'output, 'error) post_service1 -> (* POST service *)
+    ('arg, 'input, 'output, 'error, 'security) post_service1 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -60,24 +64,24 @@ module type RAWGEN = sig
 end
 
 module type RAW = RAWGEN
-  with type ('output, 'error) service0 :=
-    ('output, 'error) EzAPI.service0
-   and type ('arg, 'output, 'error) service1 :=
-     ('arg, 'output, 'error) EzAPI.service1
-   and type ('input, 'output, 'error) post_service0 :=
-     ('input, 'output, 'error) EzAPI.post_service0
-   and type ('arg, 'input, 'output, 'error) post_service1 :=
-     ('arg, 'input, 'output, 'error) EzAPI.post_service1
+  with type ('output, 'error, 'security) service0 :=
+    ('output, 'error, 'security) EzAPI.service0
+   and type ('arg, 'output, 'error, 'security) service1 :=
+     ('arg, 'output, 'error, 'security) EzAPI.service1
+   and type ('input, 'output, 'error, 'security) post_service0 :=
+     ('input, 'output, 'error, 'security) EzAPI.post_service0
+   and type ('arg, 'input, 'output, 'error, 'security) post_service1 :=
+     ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1
    and type ('output, 'error) reply_handler := ('output, 'error) Result.result -> unit
 
 module type LEGACY = RAWGEN
-  with type ('output, 'error) service0 :=
+  with type ('output, 'error, 'security) service0 =
     ('output) EzAPI.Legacy.service0
-   and type ('arg, 'output, 'error) service1 :=
+   and type ('arg, 'output, 'error, 'security) service1 =
      ('arg, 'output) EzAPI.Legacy.service1
-   and type ('input, 'output, 'error) post_service0 :=
+   and type ('input, 'output, 'error, 'security) post_service0 =
      ('input, 'output) EzAPI.Legacy.post_service0
-   and type ('arg, 'input, 'output, 'error) post_service1 :=
+   and type ('arg, 'input, 'output, 'error, 'security) post_service1 =
      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
    and type ('output, 'error) reply_handler := 'output -> unit
 
@@ -211,7 +215,7 @@ module Make(S : sig
   module Raw = struct
 
     let get0 api
-        ( service : ('output, 'error) EzAPI.service0 )
+        ( service : ('output, 'error, 'security) EzAPI.service0 )
         msg
         ?(post=false)
         ?headers
@@ -230,7 +234,7 @@ module Make(S : sig
         internal_get msg url ?headers ~error ok
 
     let get1 api
-        ( service : ('arg, 'output, 'error) EzAPI.service1 )
+        ( service : ('arg, 'output, 'error, 'security) EzAPI.service1 )
         msg
         ?(post=false)
         ?headers
@@ -250,7 +254,7 @@ module Make(S : sig
         internal_get msg url ?headers ~error ok
 
     let post0 api
-        ( service : ('input, 'output, 'error) EzAPI.post_service0 )
+        ( service : ('input, 'output, 'error, 'security) EzAPI.post_service0 )
         msg
         ?headers
         ?error
@@ -267,7 +271,7 @@ module Make(S : sig
       internal_post msg url ~content ~content_type ?headers ~error ok
 
     let post1 api
-        (service : ('arg, 'input, 'output, 'error) EzAPI.post_service1 )
+        (service : ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1 )
         msg
         ?headers
         ?error
@@ -289,25 +293,39 @@ module Make(S : sig
 
   module Legacy = struct
 
-    open EzAPI.Legacy
+    type ('output, 'error, 'security) service0 =
+      ('output) EzAPI.Legacy.service0
+      constraint 'security = [< EzAPI.security_scheme ]
+
+    type ('arg, 'output, 'error, 'security) service1 =
+      ('arg, 'output) EzAPI.Legacy.service1
+      constraint 'security = [< EzAPI.security_scheme ]
+
+    type ('input, 'output, 'error, 'security) post_service0 =
+      ('input, 'output) EzAPI.Legacy.post_service0
+      constraint 'security = [< EzAPI.security_scheme ]
+
+    type ('arg, 'input, 'output, 'error, 'security) post_service1 =
+      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+      constraint 'security = [< EzAPI.security_scheme ]
 
     let unresultize f = function
       | Ok res -> f res
-      | Error u -> unreachable u
+      | Error u -> EzAPI.unreachable u
 
-    let get0 api ( service : 'output service0 )
+    let get0 api service
         msg ?post ?headers ?error ?params f () =
       Raw.get0 api service msg ?post ?headers ?error ?params (unresultize f) ()
 
-    let get1 api ( service : ('arg, 'output) service1 )
+    let get1 api service
         msg ?post ?headers ?error ?params f arg =
       Raw.get1 api service msg ?post ?headers ?error ?params (unresultize f) arg
 
-    let post0 api ( service : ('input, 'output) post_service0 )
+    let post0 api service
         msg ?headers ?error ?params ~input f =
       Raw.post0 api service msg ?headers ?error ?params ~input (unresultize f)
 
-    let post1 api (service : ('arg, 'input, 'output) post_service1 )
+    let post1 api service
         msg ?headers ?error ?params ~input arg f =
       Raw.post1 api service msg ?headers ?error ?params ~input arg (unresultize f)
 

@@ -29,13 +29,6 @@ module Make(S: Arg) : sig
   val get_request_session :
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
-  (* Use this one to be sure that OPTIONS requests are correctly replied to *)
-  val register :
-    ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
-    ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
-    EzAPI.request EzAPIServerUtils.directory ->
-    EzAPI.request EzAPIServerUtils.directory
-
 end
 
 

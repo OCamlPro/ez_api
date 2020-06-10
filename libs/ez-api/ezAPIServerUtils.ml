@@ -13,6 +13,8 @@ let empty = {
   meth_OPTIONS = RestoDirectory1.empty;
 }
 
+module StringSet = Set.Make(String)
+
 let return ?code x = RestoDirectory1.Answer.return ?code x
 let return_raw ?code s = RestoDirectory1.Answer.return_raw ?code s
 
@@ -92,10 +94,29 @@ let register_ip ip =
 
 exception EzReturnOPTIONS of (string * string) list
 
+let options_headers_of_security (sec : [< EzAPI.security_scheme ] list) =
+  let values =
+    List.fold_left (fun headers -> function
+        | `Nosecurity _ -> headers
+        | `Basic _ | `Bearer _ -> StringSet.add "Authorization" headers
+        | `Query _ -> headers
+        | `Header { EzAPI.name; _ } -> StringSet.add name headers
+        | `Cookie _ -> StringSet.add "Cookie" headers
+      ) StringSet.empty sec
+    |> StringSet.elements in
+  match values with
+  | [] -> []
+  | _ -> ["access-control-allow-headers", String.concat ", " values]
+
 let register ?(options_headers=[]) service handler dir =
+  let security = EzAPI.service_security service in
+  let options_headers =
+    options_headers @
+    options_headers_of_security security
+  in
   let handler_GET a b =
     try
-      handler a b
+      handler a security b
     with
     | (EzRawReturn _ | EzRawError _ | EzContentError _) as exn -> Lwt.fail exn
     | exn ->
@@ -279,8 +300,8 @@ module Legacy = struct
       (service : ('a, 'b, 'c, 'd) service)
       handler dir =
     let open RestoDirectory1.Answer in
-    let handler a b =
-      handler a b >>= fun { code ; body } ->
+    let handler a sec b =
+      handler a sec b >>= fun { code ; body } ->
       let body = match body with
         | Empty -> Empty
         | Single res -> Single (Ok res)
