@@ -2,6 +2,7 @@
 module Resto = Resto1
 
 open StringCompat
+module IntMap = Map.Make(struct type t = int let compare = compare end)
 
 exception ResultNotfound
 
@@ -40,6 +41,11 @@ module TYPES = struct
     | S of string
     | LS of string list
 
+  type security_scheme =
+    | Basic of { ref_name : string }
+    | Bearer of { ref_name : string ; format : string option }
+    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
+
 end
 
 open TYPES
@@ -50,6 +56,7 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
+type security_scheme = TYPES.security_scheme
 
 
 type param = {
@@ -83,7 +90,9 @@ type service_doc = {
     doc_section : section;
     doc_input : Json_schema.schema Lazy.t;
     doc_output : Json_schema.schema Lazy.t;
+    doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
     doc_meth : string;
+    doc_security : security_scheme list;
   }
 
 and section = {
@@ -91,26 +100,36 @@ and section = {
     mutable section_docs : service_doc list;
   }
 
+type _ err_case =
+    ErrCase : {
+      code : int;
+      name : string;
+      encoding : 'a Json_encoding.encoding;
+      select : 'b -> 'a option;
+      deselect: 'a -> 'b;
+    } -> 'b err_case
+
 (* All our services use 'params' as 'prefix of the service *)
-type ('params, 'params2, 'input, 'output) service
+type ('params, 'params2, 'input, 'output, 'error) service
   = {
-    s : (request, 'params, 'input, 'output) Resto.service;
-    s_OPTIONS : (request, 'params, unit, 'output) Resto.service;
-    s_internal : (unit, 'params2, unit, 'output) Resto.service;
+    s : (request, 'params, 'input, ('output, 'error) result) Resto.service;
+    s_OPTIONS : (request, 'params, unit, ('output, 'error) result) Resto.service;
+    s_internal : (unit, 'params2, unit, ('output, 'error) result) Resto.service;
     params : param list;
     doc : service_doc;
     enc_input : 'input Json_encoding.encoding;
     enc_output : 'output Json_encoding.encoding;
+    enc_error : 'error err_case list;
   }
 
-type 'output service0 = (request, unit, unit, 'output) service
-type ('arg,'output) service1 =
-  (request * 'arg, unit * 'arg, unit, 'output) service
+type ('output, 'error) service0 = (request, unit, unit, 'output, 'error) service
+type ('arg, 'output, 'error) service1 =
+  (request * 'arg, unit * 'arg, unit, 'output, 'error) service
 
-type ('input,'output) post_service0 =
-  (request, unit, 'input, 'output) service
-type ('arg,'input,'output) post_service1 =
-  (request * 'arg, unit * 'arg, 'input, 'output) service
+type ('input, 'output, 'error) post_service0 =
+  (request, unit, 'input, 'output, 'error) service
+type ('arg,'input,'output, 'error) post_service1 =
+  (request * 'arg, unit * 'arg, 'input, 'output, 'error) service
 
 let arg_string ?descr name example: string Resto.Arg.arg * string =
   Resto.Arg.make
@@ -253,7 +272,61 @@ let rec update_service_list services doc = match services with
   | h :: t when h.doc_path = doc.doc_path -> doc :: t
   | h :: t -> h :: (update_service_list t doc)
 
- let definitions_path = "/components/schemas/"
+let definitions_path = "/components/schemas/"
+let responses_path = "/components/responses/"
+(* let security_path = "/components/securitySchemes/" *)
+
+let merge_errs_same_code errors =
+  let code_map =
+    List.fold_left (fun acc (ErrCase { code; _ } as c) ->
+        let encs = match IntMap.find_opt code acc with
+          | Some l -> l
+          | None -> [] in
+        IntMap.add code (c :: encs) acc
+      ) IntMap.empty errors in
+  IntMap.map (fun l ->
+      let encoding = match l with
+        | [ErrCase { encoding; select; deselect; _ }] ->
+          Json_encoding.conv
+            (fun x -> match select x with
+               | None -> assert false
+               | Some x -> x)
+            deselect
+            encoding
+        | _ ->
+          let err_cases =
+            List.map (function ErrCase { encoding;  select;  deselect; _} ->
+                Json_encoding.case encoding select deselect
+              ) l in
+          Json_encoding.union err_cases in
+      lazy (Json_encoding.schema ~definitions_path:responses_path encoding)
+    ) code_map
+  |> IntMap.bindings
+
+(* This (ploymorphic) case is used when there is no
+   declared error for the service but one is produced *)
+let catch_all_error_case () = ErrCase {
+    code = 500;
+    name = "AnyError";
+    encoding = (
+      let open Json_encoding in
+      conv
+        (fun x ->
+           let s =
+             Marshal.to_string x [Marshal.No_sharing]
+             |> Digest.string |> Digest.to_hex in
+           Format.eprintf "No corresponding error case (MD5 %s)@." s;
+           ((), s)
+        )
+        (fun ((), _) ->
+           failwith "Cannot parse from undeclared error")
+        (obj2
+           (req "error" (constant "Server Error"))
+           (req "digest" string))
+    );
+    select = (fun x -> Some x);
+    deselect = (fun x -> x);
+  }
 
 let post_service ?(section=default_section)
     ?name
@@ -261,7 +334,10 @@ let post_service ?(section=default_section)
     ?meth
     ~input
     ~output
-    ?(params = []) (doc_path,path1,path2,sample) =
+    ?(error_outputs=[])
+    ?(params = [])
+    ?(security=[])
+    (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   incr nservices;
   let doc = {
@@ -275,18 +351,34 @@ let post_service ?(section=default_section)
       doc_section = section;
       doc_input = lazy (Json_encoding.schema ~definitions_path input);
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
+      doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = (match meth with None -> "post" | Some meth -> meth);
+      doc_security = security;
     } in
   section.section_docs <- update_service_list section.section_docs doc;
   services := update_service_list !services doc;
+  let resto_output =
+    let err_cases =
+      List.map (function ErrCase { encoding;  select;  deselect; _} ->
+          Json_encoding.case encoding select deselect
+        ) (error_outputs @ [catch_all_error_case ()]) in
+    Json_encoding.(union [
+        case output
+          (function Ok r -> Some r | Error _ -> None)
+          (fun r -> Ok r);
+        case (Json_encoding.union err_cases)
+          (function Error e -> Some e | Ok _ -> None)
+          (fun e -> Error e)
+      ]) in
   let service = {
-      s = Resto.service ~input ~output path1;
-      s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output path1;
-      s_internal = Resto.service ~input:Json_encoding.empty ~output path2;
+      s = Resto.service ~input ~output:resto_output path1;
+      s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output:resto_output path1;
+      s_internal = Resto.service ~input:Json_encoding.empty ~output:resto_output path2;
       params;
       doc;
       enc_input = input;
       enc_output = output;
+      enc_error = error_outputs;
     } in
   begin
     let make_sample url = forge url service sample [] in
@@ -294,11 +386,11 @@ let post_service ?(section=default_section)
   end;
   service
 
-let service ?section ?name ?descr ?meth ~output ?params arg =
+let service ?section ?name ?descr ?meth ~output ?error_outputs ?params ?security arg =
   let meth = match meth with None -> "get" | Some s -> s in
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
-    ~output ~meth ?params arg
+    ~output ?error_outputs ~meth ?params ?security arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
@@ -447,9 +539,26 @@ let services () =
 
 let service_input s = s.enc_input
 let service_output s = s.enc_output
+let service_errors s ~code =
+  match
+    List.find_all (function ErrCase { code = c; _ } -> c = code) s.enc_error
+  with
+  | [] -> None
+  | [ ErrCase { encoding = enc; select; deselect; _ } ] ->
+    Some (Json_encoding.conv
+            (fun x -> match select x with
+               | None -> assert false
+               | Some x -> x)
+            deselect
+            enc)
+  | l ->
+    let cases =
+      List.map (function ErrCase { encoding = enc; select; deselect; _ } ->
+          Json_encoding.case enc select deselect
+        ) l in
+    Some (Json_encoding.union cases)
 
 let get_path sd =
-
   let rec buf_path b p =
     match p with
     | ROOT -> ()
@@ -468,6 +577,34 @@ let get_path sd =
 
 module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
 
+let schema_security_scheme = function
+  | Basic { ref_name } ->
+    ref_name, `O [
+      "type", `String "http";
+      "scheme", `String "basic";
+    ]
+  | Bearer { ref_name; format } ->
+    ref_name, `O ([
+        "type", `String "http";
+        "scheme", `String "bearer"
+      ] @ match format with
+      | None -> []
+      | Some format -> ["bearerFormat", `String format]
+      )
+  | ApiKey { ref_name; in_; name } ->
+    let in_ = match in_ with
+      | `Header -> "header"
+      | `Cookie -> "cookie"
+      | `Query -> "query" in
+    ref_name , `O [
+      "type", `String "apiKey";
+      "in", `String in_;
+      "name", `String name;
+    ]
+
+let security_ref_name = function
+  | Basic { ref_name; _ } | Bearer { ref_name; _ } | ApiKey { ref_name; _ } ->
+    ref_name
 
 let paths_of_sections ?(docs=[]) sections =
   let docs = List.map (fun (name, summary, descr) -> name, (summary, descr)) docs in
@@ -487,7 +624,7 @@ let paths_of_sections ?(docs=[]) sections =
   let definitions_schema =
     ref (Json_schema.create (Json_schema.element Json_schema.Any))
   in
-  let input_output_schemas =
+  let io_schemas =
     List.map (fun sd ->
         let output_schema = Lazy.force sd.doc_output in
         let input_schema = Lazy.force sd.doc_input in
@@ -497,52 +634,73 @@ let paths_of_sections ?(docs=[]) sections =
         let input_schema, updated =
           Json_schema.merge_definitions
             (input_schema, updated) in
+        let error_codes_schemas, updated =
+          List.fold_left (fun (acc, updated) (code, error_schema) ->
+              let error_schema, updated =
+                Json_schema.merge_definitions
+                  (Lazy.force error_schema, updated) in
+              (code, Json_schema.root error_schema) :: acc, updated
+            ) ([], updated) sd.doc_error_outputs in
         definitions_schema := updated;
         Json_schema.root input_schema,
-        Json_schema.root output_schema
+        Json_schema.root output_schema,
+        List.rev error_codes_schemas
       ) services
   in
-  let input_schemas, output_schemas = List.split input_output_schemas in
-  let input_schemas, output_schemas, definitions =
+  (* let input_schemas, output_schemas = List.split input_output_schemas in *)
+  let io_schemas, definitions =
     let sch = Json_schema.update
         (Json_schema.element
            (Json_schema.Combine
-              (Json_schema.All_of, [
-                  (Json_schema.element
-                     (Json_schema.Array (input_schemas,
-                                         Json_schema.array_specs)));
-                  (Json_schema.element
-                     (Json_schema.Array (output_schemas,
-                                         Json_schema.array_specs)));
-
-                ])))
+              (Json_schema.All_of,
+               List.map (fun (input_schema, output_schema, error_codes_schemas) ->
+                   Json_schema.element @@
+                   Json_schema.Object {
+                     Json_schema.object_specs with
+                     properties = [
+                       "input", input_schema, true, None;
+                       "output", output_schema, true, None;
+                       "errors",
+                       Json_schema.element @@
+                       Json_schema.Object {
+                         Json_schema.object_specs with
+                         properties =  List.map (fun (code, err_sch) ->
+                             string_of_int code, err_sch, false, None
+                           ) error_codes_schemas
+                       }, false, None;
+                     ]
+                   }
+                 ) io_schemas
+              )))
         !definitions_schema
     in
     match JsonSchema.to_json sch with
     | `O (
         ("$schema", _) ::
-        ("allOf", `A [
-            `O [
-              "type", `String "array";
-              "items", `A input_schemas;
-              "additionalItems", _;
-            ];
-            `O [
-              "type", `String "array";
-              "items", `A output_schemas;
-              "additionalItems", _;
-            ];
-        ]) ::
-        defs) ->
+        ("allOf", `A services_sch) ::
+        defs
+      ) ->
       let definitions = match defs with
         | [] -> []
-        | ("components", `O [ "schemas", `O definitions ]) :: _ -> definitions
+        | ("components", `O definitions) :: _ -> definitions
         | _ -> assert false in
-      input_schemas, output_schemas, definitions
-    | (`O _ | `A _) as j ->
-      Printf.eprintf "%s\n%!" (Ezjsonm.to_string ~minify:false j);
+      let io_json_schemas = List.map (function
+          | `O ( ("type", `String "object") ::
+                 ("properties", `O [ "input", input;
+                                     "output", output;
+                                     "errors", `O ( ("type", `String "object") ::
+                                                    ("properties", `O errs) :: _)
+                                   ]) ::
+                 _ ) ->
+            input, output, errs
+          | j ->
+            Printf.eprintf "%s\n%!" (Ezjsonm.value_to_string ~minify:false j);
+            assert false
+        ) services_sch in
+      io_json_schemas, definitions
+    | j ->
+      Printf.eprintf "%s\n%!" (Ezjsonm.value_to_string ~minify:false j);
       assert false
-    | _ -> assert false
   in
 
   let paths = List.mapi (fun i sd ->
@@ -551,7 +709,11 @@ let paths_of_sections ?(docs=[]) sections =
         | None -> None
         | Some name -> List.assoc_opt name docs in
       let summary, description = match doc_infos with
-        | None -> "Summary of service", "Description of service"
+        | None ->
+          let path = get_path sd in
+          Format.eprintf
+            "Warning: no description provided for service %s@." path;
+          path, ""
         | Some (summary, description) -> summary, description in
       let parameters =
         List.map (fun p ->
@@ -603,8 +765,7 @@ let paths_of_sections ?(docs=[]) sections =
         in
         iter sd.doc_path parameters
       in
-      let in_schema = List.nth input_schemas i in
-      let out_schema = List.nth output_schemas i in
+      let in_schema, out_schema, err_schemas = List.nth io_schemas i in
       let request_schema = match in_schema with
         | `O ["type", `String "object";
               "properties", `O [];
@@ -618,6 +779,53 @@ let paths_of_sections ?(docs=[]) sections =
               ]
             ]]
       in
+      let success_response =
+        "200",
+        `O [
+          "description", `String "Success";
+          "content", `O [
+            "application/json", `O [
+              "schema", out_schema
+            ]
+          ]
+        ] in
+      let error_responses =
+        err_schemas
+        |> List.filter (fun (code, _) -> int_of_string code < 500)
+        |> List.map (fun (code, (err_schema : Ezjsonm.value)) ->
+            let descr = (* Hackish *)
+              try match err_schema with
+                | `O ["$ref", `String refname] ->
+                  (match String.split_on_char '/' refname with
+                   | [_; _; _; s] -> s
+                   | _ -> raise Not_found
+                  )
+                | `O (("type", `String "object") :: ("properties", `O l) :: _) -> (
+                    List.find (function
+                        | ("kind" | "error" | "description"),
+                          `O ( ("type", `String "string") :: ("enum", `A [_]) :: _) -> true
+                        | _ -> false
+                      ) l
+                    |> function
+                    | (_, `O (_ :: (_, `A [`String s]) :: _)) -> s
+                    | _ -> assert false
+                  )
+                | _ -> raise Not_found
+              with Not_found -> "Error " ^ code in
+            code,
+            `O [
+              "description", `String descr;
+              "content", `O [
+                "application/json", `O [
+                  "schema", err_schema
+                ]
+              ]
+            ]
+          ) in
+      let security = `A (List.map (fun secscheme ->
+          `O [security_ref_name secscheme, `A []]
+        ) sd.doc_security)
+      in
       get_path sd,
       `O [
         sd.doc_meth, `O ([
@@ -626,19 +834,44 @@ let paths_of_sections ?(docs=[]) sections =
           "description", `String description;
           "operationId", `String (string_of_int sd.doc_id);
           "parameters", `A parameters;
-          "responses", `O [
-            "200",
-            `O [
-              "description", `String "Success";
-              "content", `O [
-                "application/json", `O [
-                  "schema", out_schema
-                ]
-              ]
-            ]
-          ];
+          "responses", `O (success_response :: error_responses);
+          "security", security;
         ] @ request_schema)
       ]
     ) services
   in
+  let security_schemes = List.fold_left (fun acc sd ->
+      let security = List.map schema_security_scheme sd.doc_security in
+      List.rev_append security acc
+    ) [] (List.rev services)
+  in
+  let definitions = definitions @ [ "securitySchemes", `O security_schemes ] in
   paths, definitions
+
+
+module Legacy = struct
+
+  type uninhabited = |
+
+  let unreachable = function (_ : uninhabited) -> .
+
+  type nonrec ('params, 'params2, 'input, 'output) service =
+    ('params, 'params2, 'input, 'output, uninhabited) service
+
+  type 'output service0 =
+    (request, unit, unit, 'output) service
+  type ('arg, 'output) service1 =
+    (request * 'arg, unit * 'arg, unit, 'output) service
+
+  type ('input, 'output) post_service0 =
+    (request, unit, 'input, 'output) service
+  type ('arg,'input,'output) post_service1 =
+    (request * 'arg, unit * 'arg, 'input, 'output) service
+
+  let post_service ?section ?name ?descr ?meth ~input ~output ?params arg =
+    post_service ?section ?name ?descr ?meth ~input ~output ?params arg
+
+  let service ?section ?name ?descr ?meth ~output ?params arg =
+    service ?section ?name ?descr ?meth ~output ?params arg
+
+end

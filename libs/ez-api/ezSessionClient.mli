@@ -1,16 +1,6 @@
 
 module Make(S: EzSession.TYPES.SessionArg) : sig
 
-  module TYPES : sig
-    type auth = {
-      auth_login : string;
-      auth_user_id : S.user_id;
-      auth_user : S.user_info;
-      auth_token : string;
-    }
-  end
-  open TYPES
-
 (* If cookies are in use on server-side, `connect` might return
   an already authenticated user. Otherwise (CSRF protection),
   a token can be provided (saved in local storage).
@@ -18,17 +8,18 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
   val connect :
     EzAPI.base_url ->
     ?token:string ->
-    ((auth option, exn) result -> unit) -> unit
+    ((S.auth option, [`Session_expired]) result -> unit) -> unit
 
   val login :
     ?format:(string -> string) ->
     EzAPI.base_url ->
     login:string -> (* login *)
     password:string -> (* password *)
-    ((auth, exn) result -> unit) -> unit
+    ((S.auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
 
-  val logout : EzAPI.base_url -> token:string ->
-    ((bool, exn) result -> unit) -> unit
+  val logout :
+    EzAPI.base_url ->
+    token:string -> ((bool, EzSession.TYPES.logout_error) result -> unit) -> unit
 
   (* Tell the network layer that we think that the session has ended
      (a request probably returned an error status for missing auth).
@@ -41,6 +32,6 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
     need authentication *)
   val auth_headers : token:string -> (string * string) list
 
-  val get : unit -> TYPES.auth option
+  val get : unit -> S.auth option
 
   end

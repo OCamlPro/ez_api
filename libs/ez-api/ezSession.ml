@@ -21,6 +21,13 @@ module TYPES = struct
     type user_id
     type user_info
 
+    type auth = {
+      auth_login : string;
+      auth_user_id : user_id;
+      auth_token : string;
+      auth_user_info : user_info;
+    }
+
     val user_id_encoding : user_id Json_encoding.encoding
     val user_info_encoding : user_info Json_encoding.encoding
 
@@ -34,6 +41,28 @@ module TYPES = struct
 
     val token_kind : [`Cookie of string | `CSRF of string ]
   end
+
+  type auth_needed = {
+    challenge_id : string;
+    challenge : string;
+  }
+
+  type login_message = {
+    login_user : string;
+    login_challenge_id : string;
+    login_challenge_reply : string;
+  }
+
+  type login_error =
+    [ `Bad_user_or_password
+    | `Challenge_not_found_or_expired of string ]
+
+  type logout_error =
+    [ `Invalid_session ]
+
+  type connect_error =
+    [ `Auth_needed of auth_needed
+    | `Session_expired ]
 
 end
 
@@ -63,62 +92,51 @@ end
 
 module Make(S : SessionArg) = struct
 
-  type s2c_message =
-    (* Authentication failed, here is a new challenge *)
-    | AuthNeeded of
-        (* challenge_id *) string *
-                           (* challenge *) string
-    (* Authentication succeeded, here is user info *)
-    | AuthOK of
-        (* login *) string *
-                    S.user_id *
-                    (* cookie *) string *
-                    S.user_info
-
-  type login_message = {
-      login_user : string;
-      login_challenge_id : string;
-      login_challenge_reply : string;
-    }
-
   module Encoding = struct
     open Json_encoding
 
     let auth_needed =
+      conv
+        (fun { challenge_id; challenge } ->
+           (challenge_id, challenge))
+        (fun (challenge_id, challenge) ->
+           { challenge_id; challenge }) @@
       obj2
         (req "challenge_id" string)
         (req "challenge" string)
 
+    let auth_needed_case =
+      EzAPI.ErrCase {
+        code = 401;
+        name = "AuthNeeded";
+        encoding = (merge_objs
+                      (obj1 (req "error" (constant "AuthNeeded")))
+                      auth_needed);
+        select = (function `Auth_needed s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Auth_needed s);
+      }
+
+    let session_expired_case =
+      EzAPI.ErrCase {
+        code = 440;
+        name = "SessionExpired";
+        encoding = (obj1 (req "error" (constant "sSessionExpired")));
+        select = (function `Session_expired -> Some () | _ -> None);
+        deselect = (fun () -> `Session_expired);
+      }
+
     let auth_ok =
+      let open S in
+      conv
+        (fun { auth_login; auth_user_id; auth_token; auth_user_info } ->
+           (auth_login, auth_user_id, auth_token, auth_user_info))
+        (fun (auth_login, auth_user_id, auth_token, auth_user_info) ->
+           { auth_login; auth_user_id; auth_token; auth_user_info }) @@
       obj4
         (req "login" EzEncoding.encoded_string)
         (req "user_id" S.user_id_encoding)
         (req "token" string)
         (req "user_info" S.user_info_encoding)
-
-    let s2c_message =
-      union [
-          case
-            auth_needed
-            (function
-             | AuthNeeded (challenge_id, challenge) ->
-                Some (challenge_id, challenge)
-             | _ -> None)
-            (fun (challenge_id, challenge) ->
-              AuthNeeded (challenge_id, challenge)
-            );
-
-          case
-            auth_ok
-            (function
-             | AuthOK (login, user_id, cookie, user_info) ->
-                Some (login, user_id, cookie, user_info)
-             | _ -> None)
-            (fun (login, user_id, cookie, user_info) ->
-              AuthOK (login, user_id, cookie, user_info)
-            );
-
-        ]
 
     let login_message =
       conv
@@ -136,6 +154,36 @@ module Make(S : SessionArg) = struct
            (req "user" EzEncoding.encoded_string)
            (req "challenge_id" string)
            (req "challenge_reply" EzEncoding.encoded_string))
+
+    let bad_user_case =
+      EzAPI.ErrCase {
+        code = 403;
+        name = "BadUserOrPassword";
+        encoding = (obj1 (req "error" (constant "BadUserOrPassword")));
+        select = (function `Bad_user_or_password -> Some () | _ -> None);
+        deselect = (fun () -> `Bad_user_or_password);
+      }
+
+    let challenge_not_found_case =
+      EzAPI.ErrCase {
+        code = 401;
+        name = "ChallengeNotFoundOrExpired";
+        encoding = (obj2
+                      (req "error" (constant "ChallengeNotFoundOrExpired"))
+                      (req "challenge_id" string));
+        select = (function `Challenge_not_found_or_expired s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Challenge_not_found_or_expired s);
+      }
+
+    let invalid_session_case =
+      EzAPI.ErrCase {
+        code = 403;
+        name = "InvalidSession";
+        encoding = (obj1 (req "error" (constant "InvalidSession")));
+        select = (function `Invalid_session -> Some () (* | _ -> None *));
+        deselect = (fun () -> `Invalid_session);
+      }
+
   end
 
   module Service = struct
@@ -145,36 +193,59 @@ module Make(S : SessionArg) = struct
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
+    let security = [
+      (let (`CSRF name | `Cookie name) = S.token_kind in
+       let in_ = match S.token_kind with
+         | `CSRF _ -> `Header
+         | `Cookie _ -> `Cookie in
+       let ref_name = match S.token_kind with
+         | `CSRF name -> name ^ " Header"
+         | `Cookie name -> name ^ " Cookie" in
+       EzAPI.TYPES.(ApiKey { ref_name; in_; name}));
+      EzAPI.TYPES.(ApiKey {
+          ref_name = "Token parameter";
+          in_ = `Query;
+          name = param_token.param_value});
+    ]
+
     let rpc_root =
       List.fold_left (fun path s ->
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
-    let connect : s2c_message EzAPI.service0  =
+    let connect : (S.auth, connect_error) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"connect"
         ~params:[param_token]
-        ~output:Encoding.s2c_message
+        ~output:Encoding.auth_ok
+        ~error_outputs: [Encoding.auth_needed_case;
+                         Encoding.session_expired_case]
+        ~security
         EzAPI.Path.(rpc_root // "connect")
 
     let login : (login_message,
-                 string * S.user_id * string * S.user_info) EzAPI.post_service0  =
+                 S.auth,
+                 login_error) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
         ~params:[param_token]
         ~input:Encoding.login_message
         ~output:Encoding.auth_ok
+        ~error_outputs: [Encoding.bad_user_case;
+                         Encoding.challenge_not_found_case]
         EzAPI.Path.(rpc_root // "login")
 
-    let logout : (string * string) EzAPI.service0  =
+    let logout : (auth_needed, logout_error) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"logout"
         ~params:[param_token]
         ~meth:"put"
         ~output:Encoding.auth_needed
+        ~error_outputs: [Encoding.invalid_session_case]
+        ~security
         EzAPI.Path.(rpc_root // "logout")
   end
 

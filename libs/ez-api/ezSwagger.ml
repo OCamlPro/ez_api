@@ -41,7 +41,7 @@ let json
     "servers", `A servers;
     "tags", `A tags;
     "paths", `O paths;
-    "components", `O [ "schemas", `O definitions ];
+    "components", `O definitions;
   ]
 
 let to_string

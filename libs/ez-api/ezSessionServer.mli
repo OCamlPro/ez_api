@@ -13,7 +13,7 @@ module type Arg = sig
   val find_user : login:string ->
     (string * SessionArg.user_id *
      SessionArg.user_info) option Lwt.t
-  val error_wrapper : (string -> string) option
+  (* val error_wrapper : (string -> string) option *)
 end
 
 module Make(S: Arg) : sig
@@ -31,8 +31,8 @@ module Make(S: Arg) : sig
 
   (* Use this one to be sure that OPTIONS requests are correctly replied to *)
   val register :
-    ('arg, 'b, 'input, 'd) EzAPI.service ->
-    ('arg -> 'input -> 'd EzAPIServerUtils.answer Lwt.t) ->
+    ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
+    ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
     EzAPI.request EzAPIServerUtils.directory ->
     EzAPI.request EzAPIServerUtils.directory
 

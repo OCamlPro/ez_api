@@ -48,7 +48,7 @@ module type Arg = sig
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
     (string * SessionArg.user_id * SessionArg.user_info) option Lwt.t
-  val error_wrapper : (string -> string) option
+  (* val error_wrapper : (string -> string) option *)
 end
 
 module Make(S: Arg) : sig
@@ -61,15 +61,14 @@ module Make(S: Arg) : sig
     EzAPI.request -> S.SessionArg.user_id session option Lwt.t
 
   val register :
-           ('arg, 'b, 'input, 'd) EzAPI.service ->
-           ('arg -> 'input -> 'd EzAPIServerUtils.answer Lwt.t) ->
+           ('arg, 'b, 'input, 'd, 'e) EzAPI.service ->
+           ('arg -> 'input -> ('d, 'e) result EzAPIServerUtils.answer Lwt.t) ->
            EzAPI.request EzAPIServerUtils.directory ->
            EzAPI.request EzAPIServerUtils.directory
 
 end = struct
 
   let find_user = S.find_user
-  let error_wrapper = S.error_wrapper
   open S.SessionStore
   module S = S.SessionArg
 
@@ -128,7 +127,7 @@ end = struct
           end;
         Hashtbl.add challenges challenge_id (challenge, t0);
         Queue.add challenge_id challenge_queue;
-        (challenge_id, challenge)
+        { challenge_id; challenge }
 
     let add_auth_header ?cookie req =
       match S.token_kind with
@@ -145,15 +144,18 @@ end = struct
 
     let request_auth_base req f =
       add_auth_header req;
-      EzAPIServerUtils.return (f @@ new_challenge ())
+      let res, code = f @@ new_challenge () in
+      EzAPIServerUtils.return ?code res
 
     let request_auth req =
-      request_auth_base req (fun (id, challenge) -> AuthNeeded (id, challenge))
+      request_auth_base req (fun auth_needed ->
+          Error (`Auth_needed auth_needed), Some 401
+        )
 
-    let request_error ?(code=401) req msg =
+    let request_error ~code req msg =
       add_auth_header req;
-      let content = match error_wrapper with None -> msg | Some f -> f msg in
-      EzAPIServerUtils.return_error ~content code
+      (* let content = match error_wrapper with None -> msg | Some f -> f msg in *)
+      EzAPIServerUtils.return ~code (Error msg)
 
     let return_auth_base req ?cookie ~login user_id user_info f =
       begin
@@ -165,12 +167,17 @@ end = struct
       end
       >>= function cookie ->
         add_auth_header ~cookie req;
-        EzAPIServerUtils.return
-          (f (login, user_id, cookie, user_info))
+        let auth = {
+          S.auth_login = login;
+          auth_user_id = user_id;
+          auth_token = cookie;
+          auth_user_info = user_info;
+        } in
+        EzAPIServerUtils.return (f auth)
 
     let return_auth req ?cookie ~login user_id user_info =
       return_auth_base req ?cookie ~login user_id user_info
-        (fun (login, id, cookie, info) -> AuthOK (login, id, cookie, info))
+        (fun auth -> Ok auth)
 
     let connect req () =
       get_request_session req >>= function
@@ -181,7 +188,7 @@ end = struct
                _ } ->
         find_user ~login >>= function
         | None ->
-          request_error req "Session expired"
+          request_error req ~code:440 `Session_expired
         | Some (_pwhash, user_id, user_info) ->
           return_auth req ~cookie ~login user_id user_info
 
@@ -190,13 +197,14 @@ end = struct
       | None ->
          if verbose > 1 then
            EzDebug.printf "/login: could not find user %S\n%!" login_user;
-         request_error req "Bad user or password"
+         request_error req ~code:401 `Bad_user_or_password
       | Some (pwhash, user_id, user_info) ->
          match Hashtbl.find challenges login_challenge_id with
          | exception Not_found ->
             if verbose > 1 then
               EzDebug.printf "/login: could not find challenge\n%!";
-            request_error req "Challenge not found or expired"
+            request_error req ~code:403
+              (`Challenge_not_found_or_expired login_challenge_id)
          | (challenge, _t0) ->
             let expected_reply =
               EzSession.Hash.challenge
@@ -205,18 +213,18 @@ end = struct
             if expected_reply <> login_challenge_reply then begin
                 if verbose > 1 then
                   EzDebug.printf "/login: challenge failed\n%!";
-                request_error req "Bad user or password"
+                request_error req ~code:401 `Bad_user_or_password
               end else begin
                 Hashtbl.remove challenges login_challenge_id;
-                return_auth_base req ~login:login_user user_id user_info (fun x -> x)
+                return_auth req ~login:login_user user_id user_info
               end
 
     let logout req () =
        get_request_session req >>= function
-      | None -> EzAPIServerUtils.return_error 403
+      | None -> EzAPIServerUtils.return ~code:403 (Error `Invalid_session)
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
-         request_auth_base req (fun x -> x)
+         request_auth_base req (fun auth_needed -> Ok auth_needed, None)
   end
 
   let register service handler =

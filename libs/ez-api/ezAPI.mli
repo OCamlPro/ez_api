@@ -36,6 +36,11 @@ module TYPES : sig
 
   type base_url = BASE of string
   type url = URL of string
+
+  type security_scheme =
+    | Basic of { ref_name : string }
+    | Bearer of { ref_name : string ; format : string option }
+    | ApiKey of { ref_name : string; in_: [`Header|`Cookie|`Query]; name : string }
 end
 
 open TYPES
@@ -46,6 +51,7 @@ type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
 type url = TYPES.url
+type security_scheme = TYPES.security_scheme
 
 type path =
   | ROOT
@@ -72,7 +78,9 @@ type service_doc = {
   doc_section : section;
   doc_input : Json_schema.schema Lazy.t;
   doc_output : Json_schema.schema Lazy.t;
+  doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
   doc_meth : string;
+  doc_security : security_scheme list;
 }
 
 and section = {
@@ -82,18 +90,27 @@ and section = {
 
 (* All our services use 'params' as 'prefix of the service, and
    'unit' as 'input of the service (i.e. no input) *)
-type ('params, 'params2, 'input, 'output) service
+type ('params, 'params2, 'input, 'output, 'error) service
 
-type 'output service0 = (request, unit, unit, 'output) service
-type ('arg,'output) service1 =
-  (request * 'arg, unit * 'arg, unit, 'output) service
+type ('output, 'error) service0 = (request, unit, unit, 'output, 'error) service
+type ('arg, 'output, 'error) service1 =
+  (request * 'arg, unit * 'arg, unit, 'output, 'error) service
 
-type ('input,'output) post_service0 =
-  (request, unit, 'input, 'output) service
-type ('arg,'input,'output) post_service1 =
-  (request * 'arg, unit * 'arg, 'input, 'output) service
+type ('input, 'output, 'error) post_service0 =
+  (request, unit, 'input, 'output, 'error) service
+type ('arg,'input,'output, 'error) post_service1 =
+  (request * 'arg, unit * 'arg, 'input, 'output, 'error) service
 
 type ('a, 'b) p
+
+type _ err_case =
+    ErrCase : {
+      code : int;
+      name : string;
+      encoding : 'a Json_encoding.encoding;
+      select : 'b -> 'a option;
+      deselect: 'a -> 'b;
+    } -> 'b err_case
 
 val request :
   ?version:http_version ->
@@ -130,9 +147,11 @@ val service :
   ?descr: string ->
   ?meth:string ->
   output: 'output Json_encoding.encoding ->
+  ?error_outputs: 'error err_case list ->
   ?params:param list ->
+  ?security:security_scheme list ->
   ('b, 'c) p ->
-  ('b, 'c, unit, 'output) service
+  ('b, 'c, unit, 'output, 'error) service
 
 val post_service :
   ?section: section ->
@@ -141,23 +160,25 @@ val post_service :
   ?meth:string (* meth type: get, post *) ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
+  ?error_outputs: 'error err_case list ->
   ?params:param list ->
+  ?security:security_scheme list ->
   ('b, 'c) p ->
-  ('b, 'c, 'input, 'output) service
+  ('b, 'c, 'input, 'output, 'error) service
 
 val register :
-  ('a, 'b, 'input, 'output) service ->
-    (request, 'a, 'input, 'output) Resto.service *
-    (request, 'a, unit, 'output) Resto.service
+  ('a, 'b, 'input, 'output, 'error) service ->
+    (request, 'a, 'input, ('output, 'error) Result.result) Resto.service *
+    (request, 'a, unit, ('output, 'error) Result.result) Resto.service
 
 val all_services_registered : unit -> bool
 
 val warnings : (string -> unit) -> unit
 
 val forge0 :
-  base_url -> (_, unit, _ ,_) service -> (param * arg_value) list -> url
+  base_url -> (_, unit, _ ,_ , _) service -> (param * arg_value) list -> url
 val forge1 :
-  base_url -> (_, unit * 'a, _, _) service ->
+  base_url -> (_, unit * 'a, _, _, _) service ->
   'a -> (param * arg_value) list -> url
 val printf : base_url -> ('a, unit, string, url) format4 -> 'a
 
@@ -193,13 +214,59 @@ val services : unit -> string array
 exception ResultNotfound
 
 val encode_args :
-  ('a, 'b, 'c, 'd) service ->
+  ('a, 'b, 'c, 'd, 'e) service ->
   url -> (param * arg_value) list -> string
 
-val service_input : (_, _, 'input, _) service -> 'input Json_encoding.encoding
-val service_output : (_, _, _, 'output) service -> 'output Json_encoding.encoding
+val service_input : (_, _, 'input, _, _) service -> 'input Json_encoding.encoding
+val service_output : (_, _, _, 'output, _) service -> 'output Json_encoding.encoding
+val service_errors :
+  (_, _, _, _, 'error) service ->
+  code:int -> 'error Json_encoding.encoding option
 
 (* swagger *)
 val paths_of_sections : ?docs:((string * string * string) list) ->
   section list ->
   (string * Ezjsonm.value) list * (string * Ezjsonm.value) list
+
+
+module Legacy : sig
+
+  type uninhabited
+
+  val unreachable : uninhabited -> 'a
+
+  type nonrec ('params, 'params2, 'input, 'output) service =
+    ('params, 'params2, 'input, 'output, uninhabited) service
+
+  type nonrec 'output service0 =
+    (request, unit, unit, 'output) service
+  type ('arg, 'output) service1 =
+    (request * 'arg, unit * 'arg, unit, 'output) service
+
+  type ('input, 'output) post_service0 =
+    (request, unit, 'input, 'output) service
+  type ('arg,'input,'output) post_service1 =
+    (request * 'arg, unit * 'arg, 'input, 'output) service
+
+  val service :
+    ?section: section ->
+    ?name: string ->
+    ?descr: string ->
+    ?meth:string ->
+    output: 'output Json_encoding.encoding ->
+    ?params:param list ->
+    ('b, 'c) p ->
+    ('b, 'c, unit, 'output) service
+
+  val post_service :
+    ?section: section ->
+    ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+    ?descr: string ->
+    ?meth:string (* meth type: get, post *) ->
+    input:'input Json_encoding.encoding ->
+    output: 'output Json_encoding.encoding ->
+    ?params:param list ->
+    ('b, 'c) p ->
+    ('b, 'c, 'input, 'output) service
+
+end

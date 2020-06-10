@@ -1,5 +1,5 @@
 open EzAPI.TYPES
-open Lwt
+open Lwt.Infix
 
 type 'a directory = {
   meth_GET :'a RestoDirectory1.directory;
@@ -268,3 +268,34 @@ let return_error ?content code =
   match content with
   | None -> raise (EzRawError code)
   | Some content -> raise (EzContentError (code, content))
+
+
+module Legacy = struct
+
+  open Lwt.Infix
+  open EzAPI.Legacy
+
+  let register ?options_headers
+      (service : ('a, 'b, 'c, 'd) service)
+      handler dir =
+    let open RestoDirectory1.Answer in
+    let handler a b =
+      handler a b >>= fun { code ; body } ->
+      let body = match body with
+        | Empty -> Empty
+        | Single res -> Single (Ok res)
+        | Single_raw s -> Single_raw s
+        | Stream { next; shutdown } ->
+          Stream {
+            next = (fun () ->
+                next () >|= function
+                | None -> None
+                | Some res -> Some (Ok res)
+              );
+            shutdown = shutdown;
+          } in
+      Lwt.return { code ; body }
+    in
+    register ?options_headers service handler dir
+
+end
