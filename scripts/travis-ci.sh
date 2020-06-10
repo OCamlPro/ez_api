@@ -14,5 +14,6 @@ opam --git-version
 PREFIX=$HOME/.opam/$OCAML_VERSION
 
 opam pin add .
+opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
 opam install .
 opam remove .
