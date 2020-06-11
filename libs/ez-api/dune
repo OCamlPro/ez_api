@@ -1,21 +1,10 @@
-(library
- (name ezEncoding)
- (public_name ez-api.encoding)
- (modules ezEncoding)
- (libraries ocplib-json-typed ezjsonm))
 
 (library
  (name ezAPI)
  (public_name ez-api.common)
  (wrapped false)
- (modules stringCompat resto1 restoDirectory1 ezDebug ezUrl ezAPI)
+ (modules stringCompat resto1 ezDebug ezUrl ezAPI)
  (libraries lwt ezEncoding))
-
-(library
- (name ezSession)
- (public_name ez-api.session)
- (modules ezSession)
- (libraries ezAPI))
 
 (library
  (name ezRequest)
@@ -30,63 +19,6 @@
  (libraries ezAPI))
 
 (library
- (name ezAPIServerUtils)
- (public_name ez-api.server-utils)
- (wrapped false)
- (optional)
- (modules gMTime timings ezAPIServerUtils ezSwagger)
- (libraries ezSession geoip lwt_log re.str))
-
-(library
- (name ezSessionServer)
- (public_name ez-api.server-session)
- (wrapped false)
- (optional)
- (modules ezCookieServer ezSessionServer)
- (libraries ezAPIServerUtils cohttp-lwt-unix))
-
-(library
- (name ezAPIServer)
- (public_name ez-api.server)
- (optional)
- (modules ezAPIServer)
- (libraries ezAPIServerUtils cohttp-lwt-unix))
-
-(library
- (name ezAPIServerHttpAf)
- (public_name ez-api.server-httpaf)
- (optional)
- (modules ezAPIServerHttpAf)
- (libraries ezAPIServerUtils httpaf-lwt-unix extunix))
-
-(library
- (name ezAPIJSCommon)
- (public_name ez-api.js)
- (optional)
- (wrapped false)
- (modules ezDebugJS ezEncodingJS)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest js_of_ocaml))
-
-(library
- (name ezAPIJS)
- (public_name ez-api.xhr)
- (optional)
- (wrapped false)
- (modules ezXhr)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest js_of_ocaml ezAPIJSCommon))
-
-(library
- (name ezAPIJS_lwt)
- (public_name ez-api.xhr-lwt)
- (optional)
- (wrapped false)
- (modules ezXhr_lwt)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest_lwt js_of_ocaml-lwt))
-
-(library
  (name ezCohttp_base)
  (public_name ez-api.cohttp-base)
  (optional)
@@ -94,61 +26,8 @@
  (libraries cohttp-lwt))
 
 (library
- (name ezAPICohttp_xhr_lwt)
- (public_name ez-api.coxhr-lwt)
- (optional)
- (wrapped false)
- (modules ezCoXhr_lwt)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo))
-
-(library
- (name ezAPICohttp_xhr)
- (public_name ez-api.coxhr)
- (optional)
- (wrapped false)
- (modules ezCoXhr)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo))
-
-(library
- (name ezSessionClient)
- (public_name ez-api.session-client)
- (optional)
- (modules ezSessionClient)
- (libraries ezRequest ezSession))
-
-(library
- (name ezCurl)
- (public_name ez-api.curl)
- (optional)
- (modules ezCurl)
- (libraries curl ezRequest))
-
-(library
- (name ezCurl_lwt)
- (public_name ez-api.curl-lwt)
- (optional)
- (modules ezCurl_lwt)
- (libraries curl.lwt ezRequest_lwt))
-
-(library
- (name ezCohttp)
- (public_name ez-api.cohttp)
- (optional)
- (modules ezCohttp)
- (libraries cohttp-lwt-unix ezRequest ezCohttp_base))
-
-(library
- (name ezCohttp_lwt)
- (public_name ez-api.cohttp-lwt)
- (optional)
- (modules ezCohttp_lwt)
- (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))
-
-(library
  (name ezRecaptcha)
  (public_name ez-api.recaptcha)
  (optional)
- (modules recaptcha)
+ (modules ezRecaptcha)
  (libraries ezCurl calendar))

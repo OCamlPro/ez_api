@@ -13,7 +13,7 @@ let meth_of_str ?(default=`GET) = function
   | "PATCH" -> `PATCH
   | "DELETE" -> `DELETE
   | "OPTIONS" -> `OPTIONS
-  | s -> default
+  | _ -> default
 
 let log ?(meth="GET") ?msg url = match msg with
   | None -> ()
@@ -45,4 +45,4 @@ let init () =
   EzDebugJS.init ();
   init ();
   EzRequest_lwt.log := (fun s -> Firebug.console##log (Js.string s));
-  !EzRequest.log "ezXhr Loaded"
+  !EzRequest_lwt.log "ezXhr Loaded"
