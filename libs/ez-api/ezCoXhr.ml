@@ -1,7 +1,7 @@
 open Lwt.Infix
 open EzRequest
 
-module Base = EzCohttp_base.Make(Cohttp_lwt_unix.Client)
+module Base = EzCohttp_base.Make(Cohttp_lwt_xhr.Client)
 
 include Make(struct
 
@@ -18,3 +18,13 @@ include Make(struct
       | Error (code, content) -> f (CodeError (code, content))
 
   end)
+
+let init () =
+  EzEncodingJS.init ();
+  EzDebugJS.init ();
+  init ();
+  EzRequest.log := (fun s -> Js_of_ocaml.(Firebug.console##log (Js.string s)));
+  !EzRequest.log "ezCoXhr Loaded";
+  ()
+
+let () = init ()

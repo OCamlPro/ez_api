@@ -199,7 +199,3 @@ let string_of_json ?(minify=true) (j : value) : string =
 
 let init () =
   EzEncoding.json_of_string := json_of_string
-
-let () =
-  EzDebugJS.init ();
-  init ()
