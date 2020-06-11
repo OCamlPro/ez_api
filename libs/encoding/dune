@@ -1,0 +1,12 @@
+(library
+ (name ezEncoding)
+ (public_name ez-api.encoding)
+ (modules ezEncoding)
+ (libraries ocplib-json-typed ezjsonm))
+
+(library
+ (name ezEncodingJS)
+ (public_name ez-api.encoding-js)
+ (modules ezEncodingJS)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezEncoding js_of_ocaml))

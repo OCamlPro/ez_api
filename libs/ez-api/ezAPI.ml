@@ -230,8 +230,6 @@ let encode_args s (URL parts) args =
       ) args in
   EzUrl.encode_args args
 
-let print_str_list name l = Printf.printf "%s: [ %s ]\n%!" name @@ String.concat ", " l
-
 let forge url s params args =
   let parts, _json = Resto.forge_request s.s_internal params () in
   let parts = String.concat "/" parts in

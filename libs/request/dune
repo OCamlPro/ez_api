@@ -1,0 +1,27 @@
+(library
+ (name ezCurl)
+ (public_name ez-api.curl)
+ (optional)
+ (modules ezCurl)
+ (libraries curl ezRequest))
+
+(library
+ (name ezCurl_lwt)
+ (public_name ez-api.curl-lwt)
+ (optional)
+ (modules ezCurl_lwt)
+ (libraries curl.lwt ezRequest_lwt))
+
+(library
+ (name ezCohttp)
+ (public_name ez-api.cohttp)
+ (optional)
+ (modules ezCohttp)
+ (libraries cohttp-lwt-unix ezRequest ezCohttp_base))
+
+(library
+ (name ezCohttp_lwt)
+ (public_name ez-api.cohttp-lwt)
+ (optional)
+ (modules ezCohttp_lwt)
+ (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))

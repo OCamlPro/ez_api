@@ -1,0 +1,60 @@
+(library
+ (name ezAPIJSCommon)
+ (public_name ez-api.js)
+ (optional)
+ (wrapped false)
+ (modules ezDebugJS)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPI ezEncodingJS))
+
+(library
+ (name ezAPIJS)
+ (public_name ez-api.xhr)
+ (optional)
+ (wrapped false)
+ (modules ezXhr)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezRequest ezAPIJSCommon))
+
+(library
+ (name ezAPIJS_lwt)
+ (public_name ez-api.xhr-lwt)
+ (optional)
+ (wrapped false)
+ (modules ezXhr_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt js_of_ocaml-lwt))
+
+(library
+ (name ezAPICohttp_xhr_lwt)
+ (public_name ez-api.coxhr-lwt)
+ (optional)
+ (wrapped false)
+ (modules ezCoXhr_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo))
+
+(library
+ (name ezAPICohttp_xhr)
+ (public_name ez-api.coxhr)
+ (optional)
+ (wrapped false)
+ (modules ezCoXhr)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo))
+
+(library
+ (name ezFetch)
+ (public_name ez-api.fetch)
+ (optional)
+ (modules ezFetch)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest ezjs-fetch))
+
+(library
+ (name ezFetch_lwt)
+ (public_name ez-api.fetch-lwt)
+ (optional)
+ (modules ezFetch_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt ezjs-fetch))

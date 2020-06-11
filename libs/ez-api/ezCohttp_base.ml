@@ -1,7 +1,6 @@
 open Lwt.Infix
 
-let meth_of_str s =
-  let open Cohttp.Code in match s with
+let meth_of_str = function
   | "GET" -> `GET
   | "HEAD" -> `HEAD
   | "PUT" -> `PUT

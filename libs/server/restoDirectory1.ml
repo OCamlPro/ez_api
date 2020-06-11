@@ -596,7 +596,7 @@ module Make(Repr : Json_repr.Repr) = struct
       pr directory -> (pr, pr, bool option, Description.directory_descr) service ->
       pr directory
     = fun root service ->
-      let { description ; path ; output ; input } =
+      let { description ; path ; output ; input; _ } =
         Resto1.Internal.to_service service in
       let descr : Description.service_descr = {
         Description.description ;
