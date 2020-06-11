@@ -44,4 +44,5 @@ let init () =
   EzEncodingJS.init ();
   EzDebugJS.init ();
   init ();
-  EzRequest_lwt.log := (fun s -> Firebug.console##log (Js.string s))
+  EzRequest_lwt.log := (fun s -> Firebug.console##log (Js.string s));
+  !EzRequest.log "ezXhr Loaded"

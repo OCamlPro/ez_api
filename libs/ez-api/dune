@@ -60,29 +60,63 @@
  (libraries ezAPIServerUtils httpaf-lwt-unix extunix))
 
 (library
- (name ezAPIJS)
+ (name ezAPIJSCommon)
  (public_name ez-api.js)
  (optional)
  (wrapped false)
- (modules ezDebugJS ezEncodingJS ezXhr ezJS)
+ (modules ezDebugJS ezEncodingJS)
  (preprocess (pps js_of_ocaml-ppx))
  (libraries ezRequest js_of_ocaml))
 
 (library
- (name ezAPIJS_lwt)
- (public_name ez-api.js-lwt)
+ (name ezAPIJS)
+ (public_name ez-api.xhr)
  (optional)
  (wrapped false)
- (modules ezXhr_lwt ezJS_lwt)
+ (modules ezXhr)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJS ezRequest_lwt js_of_ocaml-lwt))
+ (libraries ezRequest js_of_ocaml ezAPIJSCommon))
+
+(library
+ (name ezAPIJS_lwt)
+ (public_name ez-api.xhr-lwt)
+ (optional)
+ (wrapped false)
+ (modules ezXhr_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt js_of_ocaml-lwt))
+
+(library
+ (name ezCohttp_base)
+ (public_name ez-api.cohttp-base)
+ (optional)
+ (modules ezCohttp_base)
+ (libraries cohttp-lwt))
+
+(library
+ (name ezAPICohttp_xhr_lwt)
+ (public_name ez-api.coxhr-lwt)
+ (optional)
+ (wrapped false)
+ (modules ezCoXhr_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo))
+
+(library
+ (name ezAPICohttp_xhr)
+ (public_name ez-api.coxhr)
+ (optional)
+ (wrapped false)
+ (modules ezCoXhr)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo))
 
 (library
  (name ezSessionClient)
  (public_name ez-api.session-client)
  (optional)
  (modules ezSessionClient)
- (libraries ezAPIJS ezSession))
+ (libraries ezRequest ezSession))
 
 (library
  (name ezCurl)
@@ -103,14 +137,14 @@
  (public_name ez-api.cohttp)
  (optional)
  (modules ezCohttp)
- (libraries cohttp-lwt-unix ezRequest))
+ (libraries cohttp-lwt-unix ezRequest ezCohttp_base))
 
 (library
  (name ezCohttp_lwt)
  (public_name ez-api.cohttp-lwt)
  (optional)
  (modules ezCohttp_lwt)
- (libraries cohttp-lwt-unix ezRequest_lwt))
+ (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))
 
 (library
  (name ezRecaptcha)
