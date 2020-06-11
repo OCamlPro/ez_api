@@ -245,7 +245,9 @@ val service_errors :
 val service_security :
   (_, _, _, _, _, [< security_scheme ] as 'security) service ->
   'security list
+val service_meth : _ service -> Resto1.method_type
 
+val str_of_method : Resto1.method_type -> string
 
 (* swagger *)
 val paths_of_sections : ?docs:((string * string * string) list) ->

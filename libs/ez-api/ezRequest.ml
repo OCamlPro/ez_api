@@ -97,6 +97,7 @@ module type S = sig
   val add_hook : (unit -> unit) -> unit
 
   val get :
+    ?meth:Resto1.method_type ->
     string ->                 (* debug msg *)
     EzAPI.url ->              (* url *)
     ?headers:(string * string) list ->
@@ -106,6 +107,7 @@ module type S = sig
     unit
 
   val post :
+    ?meth:Resto1.method_type ->
     ?content_type:string ->
     ?content:string ->
     string ->
@@ -138,18 +140,20 @@ let decode_result ?error encoding f res =
         error (-2) (Some msg)
 
 
-let any_xhr_get = ref (fun _msg _url ?headers:_ f -> f (CodeError (-1,None)))
-let any_xhr_post = ref (fun ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
+let any_xhr_get = ref (fun ?meth:_m _msg _url ?headers:_ f -> f (CodeError (-1,None)))
+let any_xhr_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
                   f (CodeError (-1,None)))
 
 module Make(S : sig
 
     val xhr_get :
+      ?meth:string ->
       string -> string ->
       ?headers:(string * string) list ->
       (rep -> unit) -> unit
 
     val xhr_post :
+      ?meth:string ->
       ?content_type:string ->
        ?content:string ->
       string -> string ->
@@ -167,9 +171,11 @@ module Make(S : sig
 
   (* print warnings generated when building the URL before
    sending the request *)
-  let internal_get msg (URL url) ?headers ?error f =
+  let internal_get ?meth msg (URL url) ?headers ?error f =
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-    S.xhr_get msg url ?headers
+    let meth = match meth with None -> None | Some m ->
+      Some (String.uppercase_ascii @@ EzAPI.str_of_method m) in
+    S.xhr_get ?meth msg url ?headers
       (fun code ->
          !request_reply_hook ();
          match code with
@@ -179,10 +185,12 @@ module Make(S : sig
            | None -> ()
            | Some f -> f n body)
 
-  let internal_post ?content_type ?content
+  let internal_post ?meth ?content_type ?content
       msg (URL url) ?headers ?error f =
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-    S.xhr_post ?content_type ?content ?headers msg url
+    let meth = match meth with None -> None | Some m -> Some (
+        String.uppercase_ascii @@ EzAPI.str_of_method m) in
+    S.xhr_post ?meth ?content_type ?content ?headers msg url
       (fun code ->
          !request_reply_hook ();
          match code with
@@ -224,14 +232,15 @@ module Make(S : sig
         f () =
       !before_xhr_hook ();
       let ok, error = handlers ?error service f in
+      let meth = EzAPI.service_meth service in
       if post then
         let url = EzAPI.forge0 api service [] in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        internal_post msg url ~content ~content_type ?headers ~error ok
+        internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge0 api service params in
-        internal_get msg url ?headers ~error ok
+        internal_get ~meth msg url ?headers ~error ok
 
     let get1 api
         ( service : ('arg, 'output, 'error, 'security) EzAPI.service1 )
@@ -244,14 +253,15 @@ module Make(S : sig
         (arg : 'arg) =
       !before_xhr_hook ();
       let ok, error = handlers ?error service f in
+      let meth = EzAPI.service_meth service in
       if post then
         let url = EzAPI.forge1 api service arg []  in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        internal_post msg url ~content ~content_type ?headers ~error ok
+        internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge1 api service arg params in
-        internal_get msg url ?headers ~error ok
+        internal_get ~meth msg url ?headers ~error ok
 
     let post0 api
         ( service : ('input, 'output, 'error, 'security) EzAPI.post_service0 )
@@ -264,11 +274,12 @@ module Make(S : sig
       =
       !before_xhr_hook ();
       let ok, error = handlers ?error service f in
+      let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge0 api service params in
       let content = EzEncoding.construct input_encoding input in
       let content_type = "application/json" in
-      internal_post msg url ~content ~content_type ?headers ~error ok
+      internal_post ~meth msg url ~content ~content_type ?headers ~error ok
 
     let post1 api
         (service : ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1 )
@@ -282,11 +293,12 @@ module Make(S : sig
       =
       !before_xhr_hook ();
       let ok, error = handlers ?error service f in
+      let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge1 api service arg params in
       let content = EzEncoding.construct input_encoding input in
       let content_type = "application/json" in
-      internal_post msg url ~content ~content_type ?headers ~error ok
+      internal_post msg ~meth url ~content ~content_type ?headers ~error ok
   end
 
   include Raw
@@ -334,16 +346,16 @@ module Make(S : sig
 end
 
 module ANY : S = Make(struct
-    let xhr_get msg url ?headers f =
-      !any_xhr_get msg url ?headers f
-    let xhr_post ?content_type ?content msg url ?headers f =
-      !any_xhr_post ?content_type ?content msg url ?headers f
+    let xhr_get ?meth msg url ?headers f =
+      !any_xhr_get ?meth msg url ?headers f
+    let xhr_post ?meth ?content_type ?content msg url ?headers f =
+      !any_xhr_post ?meth ?content_type ?content msg url ?headers f
     end)
 
 module Default = Make(struct
 
-    let xhr_get _msg _url ?headers:_ f = f (CodeError (-1,None))
-    let xhr_post ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
+    let xhr_get ?meth:_meth _msg _url ?headers:_ f = f (CodeError (-1,None))
+    let xhr_post ?meth:_meth ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
       =
       f (CodeError (-1,None))
 

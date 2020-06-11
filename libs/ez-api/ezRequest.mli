@@ -103,6 +103,7 @@ module type S = sig
   val add_hook : (unit -> unit) -> unit
 
   val get :
+    ?meth:Resto1.method_type ->
     string ->                 (* debug msg *)
     EzAPI.url ->              (* url *)
     ?headers:(string * string) list ->
@@ -112,6 +113,7 @@ module type S = sig
     unit
 
   val post :
+    ?meth:Resto1.method_type ->
     ?content_type:string ->
     ?content:string ->
     string ->
@@ -140,11 +142,13 @@ module ANY : S
 module Make(S : sig
 
     val xhr_get :
+      ?meth:string ->
       string -> string ->
       ?headers:(string * string) list ->
       (rep -> unit) -> unit
 
     val xhr_post :
+      ?meth:string ->
       ?content_type:string ->
       ?content:string ->
       string -> string ->

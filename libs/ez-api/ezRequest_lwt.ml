@@ -92,12 +92,14 @@ module type S = sig
   val init : unit -> unit
 
   val get :
+    ?meth:Resto1.method_type ->
     ?headers:(string * string) list ->
     ?msg:string ->
     EzAPI.url ->              (* url *)
     (string, int * string option) result Lwt.t
 
   val post :
+    ?meth:Resto1.method_type ->
     ?content_type:string ->
     ?content:string ->
     ?headers:(string * string) list ->
@@ -139,10 +141,10 @@ let handle_result service res =
   let encoding = EzAPI.service_output service in
   decode_result encoding err_encodings res
 
-let any_get = ref (fun ?headers:_ ?msg:_ _url ->
+let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url ->
     return (Error (-2, None))
   )
-let any_post = ref (fun ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
+let any_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
     return (Error (-2, None))
   )
 
@@ -150,11 +152,13 @@ let any_post = ref (fun ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_
 module Make(S : sig
 
     val get :
+      ?meth:string ->
       ?headers:(string * string) list ->
       ?msg:string -> string ->
       (string, int * string option) result Lwt.t
 
     val post :
+      ?meth:string ->
       ?content_type:string ->
       ?content:string ->
       ?headers:(string * string) list ->
@@ -172,15 +176,19 @@ module Make(S : sig
 
   (* print warnings generated when building the URL before
    sending the request *)
-  let internal_get ?headers ?msg (URL url) =
+  let internal_get ?meth ?headers ?msg (URL url) =
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-    S.get ?headers ?msg url >|= fun code ->
+    let meth = match meth with None -> None | Some m -> Some (
+        String.uppercase_ascii @@ EzAPI.str_of_method m) in
+    S.get ?meth ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
 
-  let internal_post ?content_type ?content ?headers ?msg (URL url) =
+  let internal_post ?meth ?content_type ?content ?headers ?msg (URL url) =
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
-    S.post ?content_type ?content ?headers ?msg url >|= fun code ->
+    let meth = match meth with None -> None | Some m -> Some (
+        String.uppercase_ascii @@ EzAPI.str_of_method m) in
+    S.post ?meth ?content_type ?content ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
 
@@ -197,47 +205,51 @@ module Make(S : sig
     let get0 ?(post=false) ?headers ?(params=[]) ?msg
         api (service: ('output, 'error, 'security) EzAPI.service0) =
       !before_hook ();
+      let meth = EzAPI.service_meth service in
       if post then
         let url = EzAPI.forge0 api service [] in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        internal_post ~content ~content_type ?headers ?msg url >|=
+        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
         handle_result service
       else
         let url = EzAPI.forge0 api service params in
-        internal_get ?headers ?msg url >|= handle_result service
+        internal_get ~meth ?headers ?msg url >|= handle_result service
 
     let get1 ?(post=false) ?headers ?(params=[]) ?msg
         api (service : ('arg,'output, 'error, 'security) EzAPI.service1) (arg : 'arg) =
       !before_hook ();
+      let meth = EzAPI.service_meth service in
       if post then
         let url = EzAPI.forge1 api service arg []  in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        internal_post ~content ~content_type ?headers ?msg url >|=
+        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
         handle_result service
       else
         let url = EzAPI.forge1 api service arg params in
-        internal_get ?headers ?msg url >|= handle_result service
+        internal_get ~meth ?headers ?msg url >|= handle_result service
 
     let post0 ?headers ?(params=[]) ?msg ~(input : 'input)
         api (service : ('input,'output, 'error, 'security) EzAPI.post_service0) =
       !before_hook ();
+      let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge0 api service params in
       let content = EzEncoding.construct input_encoding input in
       let content_type = "application/json" in
-      internal_post ~content ~content_type ?headers ?msg url >|=
+      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
     let post1 ?headers ?(params=[]) ?msg ~(input : 'input)
         api (service : ('arg, 'input,'output, 'error, 'security) EzAPI.post_service1) (arg : 'arg) =
       !before_hook ();
+      let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge1 api service arg params in
       let content = EzEncoding.construct input_encoding input in
       let content_type = "application/json" in
-      internal_post ~content ~content_type ?headers ?msg url >|=
+      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
   end
 
@@ -295,14 +307,14 @@ module Make(S : sig
 end
 
 module ANY : S = Make(struct
-    let get ?headers ?msg url = !any_get ?headers ?msg url
-    let post ?content_type ?content ?headers ?msg url =
-      !any_post ?content_type ?content ?headers ?msg url
+    let get ?meth ?headers ?msg url = !any_get ?meth ?headers ?msg url
+    let post ?meth ?content_type ?content ?headers ?msg url =
+      !any_post ?meth ?content_type ?content ?headers ?msg url
   end)
 
 module Default = Make(struct
-    let get ?headers:_ ?msg:_ _url = return (Error (-2, None))
-    let post ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
+    let get ?meth:_ ?headers:_ ?msg:_ _url = return (Error (-2, None))
+    let post ?meth:_ ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
       return (Error (-2, None))
   end)
 

@@ -34,14 +34,14 @@ let make ~headers prepare url =
   Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
 include Make(struct
-    let get ?(headers=[]) ?msg:_ url =
+    let get ?meth:_ ?(headers=[]) ?msg:_ url =
       make ~headers (fun c -> Curl.set_post c false) url
 
-    let post ?(content_type = "application/json") ?(content="{}") ?(headers=[])
+    let post ?(meth="POST") ?(content_type = "application/json") ?(content="{}") ?(headers=[])
         ?msg:_ url =
       let headers = ("Content-Type", content_type) :: headers in
       make ~headers (fun c ->
-          Curl.set_post c true;
+          if meth = "PUT" then Curl.set_put c true else Curl.set_post c true;
           Curl.set_postfields c content;
           Curl.set_postfieldsize c (String.length content);
         ) url

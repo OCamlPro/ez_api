@@ -138,6 +138,7 @@ type ('params, 'params2, 'input, 'output, 'error, 'security) service
     enc_output : 'output Json_encoding.encoding;
     enc_error : 'error err_case list;
     s_security : ([< security_scheme ] as 'security) list;
+    s_meth : Resto1.method_type;
   }
 
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
@@ -420,6 +421,7 @@ let post_service ?(section=default_section)
       enc_output = output;
       enc_error = error_outputs;
       s_security = security;
+      s_meth = meth;
     } in
   begin
     let make_sample url = forge url service sample [] in
@@ -599,6 +601,7 @@ let service_errors s ~code =
     Some (Json_encoding.union cases)
 
 let service_security s = s.s_security
+let service_meth s = s.s_meth
 
 let get_path sd =
   let rec buf_path b p =
