@@ -140,7 +140,7 @@ module Make(Repr : Json_repr.Repr) = struct
 
   and _ registred_service =
     | RegistredService:
-        string option *
+        string option * Resto1.method_type *
         'i Json_encoding.encoding * 'o Json_encoding.encoding *
         ('key -> 'i -> 'o answer Lwt.t) ->
       'key registred_service
@@ -189,8 +189,8 @@ module Make(Repr : Json_repr.Repr) = struct
       (a -> b) -> b registred_service -> a registred_service
     = fun f t ->
       match t with
-      | RegistredService (d,i,o,h) ->
-          RegistredService (d, i, o, (fun p i -> h (f p) i))
+      | RegistredService (d,m,i,o,h) ->
+          RegistredService (d, m, i, o, (fun p i -> h (f p) i))
 
   let map = map_directory
 
@@ -332,7 +332,7 @@ module Make(Repr : Json_repr.Repr) = struct
       a registred_service -> Description.service_descr
     = fun service ->
       match service with
-      | RegistredService (description,input,output,_) ->
+      | RegistredService (description,_meth,input,output,_) ->
           { Description.description ;
             input = Json_encoding.schema input ;
             output = Json_encoding.schema output }
@@ -375,27 +375,30 @@ module Make(Repr : Json_repr.Repr) = struct
 
   let lookup
     : type a _p.
+      ?meth : 'method_type ->
       a directory -> a -> string list ->
       (Repr.value option -> Repr.value answer Lwt.t) Lwt.t
-    = fun dir args path ->
+    = fun ?meth dir args path ->
       resolve [] dir args path >>= fun (Dir (dir, args)) ->
       match dir with
       | StaticD dir -> begin
           match dir.service with
           | None -> raise Not_found
-          | Some (RegistredService (_, input, output, handler)) ->
+          | Some (RegistredService (_, method_type, input, output, handler)) ->
               let call (json: Repr.value option) : Repr.value answer Lwt.t =
-                match json with
-                | None -> begin
+                match json, meth with
+                | _, Some meth when meth <> method_type ->
+                  Lwt.return { code = 405 ; body = Empty }
+                | None, _ -> begin
                     match destruct input (Repr.repr (`O [])) with
-                    | exception _exn ->
-                        Lwt.return { code = 405 ; body = Empty }
+                    | exception exn ->
+                        Lwt.fail exn
                     | input ->
                         Lwt.map
                           (Answer.map (fun x -> construct output x))
                           (handler args input)
                   end
-                | Some json -> begin
+                | Some json, _ -> begin
                     match destruct input json with
                     | exception exn ->
                         let body =
@@ -524,7 +527,7 @@ module Make(Repr : Json_repr.Repr) = struct
         fun path handler ->
           let dir, insert = insert path root in
           let service =
-            Some (RegistredService (s.description, s.input, s.output, handler)) in
+            Some (RegistredService (s.description, s.meth, s.input, s.output, handler)) in
           match dir with
           | Map _ -> failwith "Not implemented"
           | StaticD ({ service = None ; subdirs = _ } as dir) ->

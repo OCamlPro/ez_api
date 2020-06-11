@@ -92,12 +92,14 @@ module type S = sig
   val init : unit -> unit
 
   val get :
+    ?meth:Resto1.method_type ->
     ?headers:(string * string) list ->
     ?msg:string ->
     EzAPI.url ->              (* url *)
     (string, int * string option) result Lwt.t
 
   val post :
+    ?meth:Resto1.method_type ->
     ?content_type:string ->
     ?content:string ->
     ?headers:(string * string) list ->
@@ -121,11 +123,13 @@ module ANY : S
 module Make(S : sig
 
     val get :
+      ?meth:string ->
       ?headers:(string * string) list ->
       ?msg:string -> string ->
       (string, int * string option) result Lwt.t
 
     val post :
+      ?meth:string ->
       ?content_type:string ->
       ?content:string ->
       ?headers:(string * string) list ->

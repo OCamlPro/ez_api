@@ -7,8 +7,20 @@ module Header = Cohttp.Header
 module Request = Cohttp.Request
 module Server = Cohttp_lwt_unix.Server
 
+let of_cohttp_meth = function
+  | `GET -> Resto1.GET
+  | `HEAD -> HEAD
+  | `POST -> POST
+  | `PUT -> PUT
+  | `DELETE -> DELETE
+  | `CONNECT -> CONNECT
+  | `OPTIONS -> OPTIONS
+  | `TRACE -> TRACE
+  | `PATCH -> PATCH
+  | `Other s -> OTHER s
+
 (* Resolve handler matching request and run it *)
-let dispatch s (io, _conn) req body =
+let dispatch ~require_method s (io, _conn) req body =
   set_req_time ();
   begin
     match io with
@@ -78,7 +90,7 @@ let dispatch s (io, _conn) req body =
             Printf.eprintf "  %s: %s\n%!" s v;
           ) v
       ) headers;
-  let meth = Cohttp.Request.meth req in
+  let meth = of_cohttp_meth @@ Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
        if path = ["debug"] then
@@ -96,7 +108,7 @@ let dispatch s (io, _conn) req body =
            )
        else
          match s.server_kind, meth with
-         | API dir, `OPTIONS ->
+         | API dir, OPTIONS ->
            RestoDirectory1.lookup dir.meth_OPTIONS request path
            >>= fun handler -> handler None >>= fun _answer ->
            (* Note: this path always fails with EzReturnOPTIONS *)
@@ -104,7 +116,7 @@ let dispatch s (io, _conn) req body =
          | API dir, _ ->
            let content =
              match meth, request.req_body with
-             | `GET, BodyString (_, "") -> None
+             | GET, BodyString (_, "") -> None
              | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
                EzAPI.add_params request ( EzUrl.decode_args content );
                None
@@ -114,7 +126,8 @@ let dispatch s (io, _conn) req body =
              | _, BodyString (_, content) ->
                try Some (Ezjsonm.from_string content) with _ -> None
            in
-           RestoDirectory1.lookup dir.meth_GET request path >>= fun handler ->
+           let meth = if require_method then Some meth else None in
+           RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun handler ->
            handler content
            >>= reply_answer
          | Root (root, default), meth ->
@@ -128,8 +141,7 @@ let dispatch s (io, _conn) req body =
          reply_none 200
        | EzRawReturn s -> reply_raw_json 200 s
        | EzRawError code -> reply_none code
-       | EzContentError (code, json) ->
-         reply_raw_json code json
+       | EzContentError (code, json) -> reply_raw_json code json
        | Not_found -> reply_none 404
        | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
          reply_answer (RestoDirectory1.response_of_cannot_parse descr msg rpath)
@@ -172,14 +184,14 @@ let dispatch s (io, _conn) req body =
 (* HTTP Server                                                       *)
 (*********************************************************************)
 
-let server servers =
+let server ?(require_method=false) servers =
   let create_server port kind =
     let s = { server_port = port;
               server_kind = kind;
             } in
     if not (EzAPI.all_services_registered ()) then (* exit 2 *) ();
     init_timings (EzAPI.nservices());
-    let callback conn req body = dispatch s conn req body in
+    let callback conn req body = dispatch ~require_method s conn req body in
     let dont_crash_on_exn exn =
       try
         raise exn

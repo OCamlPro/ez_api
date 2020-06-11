@@ -46,7 +46,6 @@ end
 open TYPES
 
 type request = TYPES.request
-type params = TYPES.request (* TODO: remove this alias *)
 type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
@@ -166,7 +165,7 @@ val service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
   ?descr: string ->
-  ?meth:string ->
+  ?meth:Resto.method_type ->
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
@@ -178,7 +177,7 @@ val post_service :
   ?section: section ->
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
   ?descr: string ->
-  ?meth:string (* meth type: get, post *) ->
+  ?meth:Resto.method_type (* meth type: get, post *) ->
   input:'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
@@ -246,7 +245,9 @@ val service_errors :
 val service_security :
   (_, _, _, _, _, [< security_scheme ] as 'security) service ->
   'security list
+val service_meth : _ service -> Resto1.method_type
 
+val str_of_method : Resto1.method_type -> string
 
 (* swagger *)
 val paths_of_sections : ?docs:((string * string * string) list) ->
@@ -273,7 +274,7 @@ module Legacy : sig
     ?section: section ->
     ?name: string ->
     ?descr: string ->
-    ?meth:string ->
+    ?meth:Resto.method_type ->
     output: 'output Json_encoding.encoding ->
     ?params:param list ->
     ('b, 'c) p ->
@@ -283,7 +284,7 @@ module Legacy : sig
     ?section: section ->
     ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
     ?descr: string ->
-    ?meth:string (* meth type: get, post *) ->
+    ?meth:Resto.method_type (* meth type: get, post *) ->
     input:'input Json_encoding.encoding ->
     output: 'output Json_encoding.encoding ->
     ?params:param list ->

@@ -5,6 +5,16 @@ open EzRequest_lwt
 
 let (>|=) = Lwt.(>|=)
 
+let meth_of_str ?(default=`GET) = function
+  | "GET" -> `GET
+  | "HEAD" -> `HEAD
+  | "PUT" -> `PUT
+  | "POST" -> `POST
+  | "PATCH" -> `PATCH
+  | "DELETE" -> `DELETE
+  | "OPTIONS" -> `OPTIONS
+  | s -> default
+
 let log ?(meth="GET") ?msg url = match msg with
   | None -> ()
   | Some msg -> Firebug.console##log (
@@ -12,16 +22,17 @@ let log ?(meth="GET") ?msg url = match msg with
 
 include Make(struct
 
-    let get ?headers ?msg url =
-      log ?msg url;
-      perform_raw_url ?headers url >|= fun frame ->
+    let get ?(meth="GET") ?headers ?msg url =
+      log ~meth ?msg url;
+      perform_raw_url ?headers ~override_method:(meth_of_str meth) url >|= fun frame ->
       log ~meth:("RECV " ^ string_of_int frame.code) ?msg url;
       if frame.code >= 200 && frame.code < 300 then Ok frame.content
       else Error (frame.code, Some frame.content)
 
-    let post ?(content_type="application/json") ?(content="{}") ?headers ?msg url =
-      log ~meth:"POST" ?msg url;
-      perform_raw_url ?headers ~content_type ~contents:(`String content) url >|= fun frame ->
+    let post ?(meth="POST") ?(content_type="application/json") ?(content="{}") ?headers ?msg url =
+      log ~meth ?msg url;
+      perform_raw_url ?headers ~content_type ~contents:(`String content)
+        ~override_method:(meth_of_str ~default:`POST meth) url >|= fun frame ->
       log ~meth:("RECV " ^ string_of_int frame.code) ?msg url;
       if frame.code >= 200 && frame.code < 300 then Ok frame.content
       else Error (frame.code, Some frame.content)

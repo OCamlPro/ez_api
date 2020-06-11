@@ -50,7 +50,6 @@ end
 open TYPES
 
 type request = TYPES.request
-type params = TYPES.request
 type ip_info = TYPES.ip_info
 type base_url = TYPES.base_url
 type arg_value = TYPES.arg_value
@@ -139,6 +138,7 @@ type ('params, 'params2, 'input, 'output, 'error, 'security) service
     enc_output : 'output Json_encoding.encoding;
     enc_error : 'error err_case list;
     s_security : ([< security_scheme ] as 'security) list;
+    s_meth : Resto1.method_type;
   }
 
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
@@ -229,6 +229,8 @@ let encode_args s (URL parts) args =
         | LS s ->  (arg.param_value, s)
       ) args in
   EzUrl.encode_args args
+
+let print_str_list name l = Printf.printf "%s: [ %s ]\n%!" name @@ String.concat ", " l
 
 let forge url s params args =
   let parts, _json = Resto.forge_request s.s_internal params () in
@@ -354,10 +356,22 @@ let params_of_query_security (l : [< security_scheme ] list) =
       | `Header _ | `Cookie _  -> acc
     ) [] l
 
+let str_of_method = function
+  | Resto.GET -> "get"
+  | HEAD -> "head"
+  | POST -> "post"
+  | PUT -> "put"
+  | DELETE -> "delete"
+  | CONNECT -> "connect"
+  | OPTIONS -> "options"
+  | TRACE -> "trace"
+  | PATCH -> "patch"
+  | OTHER s -> s
+
 let post_service ?(section=default_section)
     ?name
     ?descr
-    ?meth
+    ?(meth=Resto.POST)
     ~input
     ~output
     ?(error_outputs=[])
@@ -379,7 +393,7 @@ let post_service ?(section=default_section)
       doc_input = lazy (Json_encoding.schema ~definitions_path input);
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
       doc_error_outputs = merge_errs_same_code error_outputs;
-      doc_meth = (match meth with None -> "post" | Some meth -> meth);
+      doc_meth = str_of_method meth;
       doc_security = (security :> security_scheme list);
     } in
   section.section_docs <- update_service_list section.section_docs doc;
@@ -398,8 +412,8 @@ let post_service ?(section=default_section)
           (fun e -> Error e)
       ]) in
   let service = {
-      s = Resto.service ~input ~output:resto_output path1;
-      s_OPTIONS = Resto.service ~input:Json_encoding.empty ~output:resto_output path1;
+      s = Resto.service ~meth ~input ~output:resto_output path1;
+      s_OPTIONS = Resto.service ~meth:Resto.OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
       s_internal = Resto.service ~input:Json_encoding.empty ~output:resto_output path2;
       params;
       doc;
@@ -407,6 +421,7 @@ let post_service ?(section=default_section)
       enc_output = output;
       enc_error = error_outputs;
       s_security = security;
+      s_meth = meth;
     } in
   begin
     let make_sample url = forge url service sample [] in
@@ -414,8 +429,7 @@ let post_service ?(section=default_section)
   end;
   service
 
-let service ?section ?name ?descr ?meth ~output ?error_outputs ?params ?security arg =
-  let meth = match meth with None -> "get" | Some s -> s in
+let service ?section ?name ?descr ?(meth=Resto.GET) ~output ?error_outputs ?params ?security arg =
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
     ~output ?error_outputs ~meth ?params ?security arg
@@ -587,6 +601,7 @@ let service_errors s ~code =
     Some (Json_encoding.union cases)
 
 let service_security s = s.s_security
+let service_meth s = s.s_meth
 
 let get_path sd =
   let rec buf_path b p =

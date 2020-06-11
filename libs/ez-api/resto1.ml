@@ -67,11 +67,12 @@ module Internal = struct
   let from_path x = x
   let to_path x = x
 
-  type ('prefix, 'params, 'input, 'output) iservice = {
+  type ('prefix, 'params, 'input, 'output, 'method_type) iservice = {
     description : string option ;
     path : ('prefix, 'params) path ;
     input : 'input Json_encoding.encoding ;
     output : 'output Json_encoding.encoding ;
+    meth : 'method_type ;
   }
 
   let from_service x = x
@@ -204,11 +205,13 @@ module Path = struct
 
 end
 
-type ('prefix, 'params, 'input, 'output) service =
-  ('prefix, 'params, 'input, 'output) Internal.iservice
+type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | OTHER of string
 
-let service ?description ~input ~output path =
-  { description ; path ; input ; output }
+type ('prefix, 'params, 'input, 'output) service =
+  ('prefix, 'params, 'input, 'output, method_type) Internal.iservice
+
+let service ?description ?(meth=GET) ~input ~output path =
+  { description ; path ; input ; output; meth }
 
 let prefix path s = { s with path = Path.prefix path s.path }
 

@@ -246,7 +246,7 @@ module Make(S : SessionArg) = struct
       EzAPI.service
         ~section:section_session
         ~name:"logout"
-        ~meth:"put"
+        ~meth:Resto1.PUT
         ~output:Encoding.auth_needed
         ~error_outputs: [Encoding.invalid_session_case]
         ~security
