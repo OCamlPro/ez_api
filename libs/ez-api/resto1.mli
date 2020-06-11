@@ -63,10 +63,13 @@ end
 
 
 (** Services. *)
+type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | OTHER of string
+
 type ('prefix, 'params, 'input, 'output) service
 
 val service:
   ?description: string ->
+  ?meth: method_type ->
   input: 'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ('prefix, 'params) Path.path ->
@@ -171,19 +174,20 @@ module Internal : sig
   val from_path : ('a, 'b) path -> ('a, 'b) Path.path
   val to_path : ('a, 'b) Path.path -> ('a, 'b) path
 
-  type ('prefix, 'params, 'input, 'output) iservice = {
+  type ('prefix, 'params, 'input, 'output, 'method_type) iservice = {
     description : string option ;
     path : ('prefix, 'params) path ;
     input : 'input Json_encoding.encoding ;
     output : 'output Json_encoding.encoding ;
+    meth : 'method_type ;
   }
 
   val from_service:
-    ('prefix, 'params, 'input, 'output) iservice ->
+    ('prefix, 'params, 'input, 'output, method_type) iservice ->
      ('prefix, 'params, 'input, 'output) service
   val to_service:
     ('prefix, 'params, 'input, 'output) service ->
-    ('prefix, 'params, 'input, 'output) iservice
+    ('prefix, 'params, 'input, 'output, method_type) iservice
 
 end
 

@@ -65,7 +65,7 @@ module Make (Repr : Json_repr.Repr) : sig
 
   (** Resolve a service. *)
   val lookup:
-    'prefix directory -> 'prefix -> string list ->
+    ?meth : Resto1.method_type -> 'prefix directory -> 'prefix -> string list ->
     (Repr.value option -> Repr.value Answer.answer Lwt.t) Lwt.t
 
   val response_of_cannot_parse :

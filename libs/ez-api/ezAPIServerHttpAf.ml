@@ -8,6 +8,19 @@ type lwt_server = {
   shutdown : unit Lwt.t Lazy.t;
 }
 
+let of_httpaf_meth = function
+  | `GET -> Resto1.GET
+  | `HEAD -> HEAD
+  | `POST -> POST
+  | `PUT -> PUT
+  | `DELETE -> DELETE
+  | `CONNECT -> CONNECT
+  | `OPTIONS -> OPTIONS
+  | `TRACE -> TRACE
+  | `Other "patch" -> PATCH
+  | `Other s -> OTHER s
+
+
 let () =
   Lwt.async_exception_hook := (fun exn -> Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn))
 
@@ -214,8 +227,9 @@ let read_body body =
   !body_str
 
 
-let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
-  fun s sockaddr fd ->
+let connection_handler :
+  require_method:bool -> server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
+  fun ~require_method s sockaddr fd ->
     let module Body = Httpaf.Body in
     let module Headers = Httpaf.Headers in
     let module Reqd = Httpaf.Reqd in
@@ -282,8 +296,9 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                 )
             else
               Lwt.catch (fun () ->
-                  match s.server_kind, request.Request.meth with
-                  | API dir, `OPTIONS ->
+                  let meth = of_httpaf_meth request.Request.meth in
+                  match s.server_kind, meth with
+                  | API dir, OPTIONS ->
                     RestoDirectory1.lookup dir.meth_OPTIONS ez_request path >>= fun handler ->
                     handler None >>= fun _answer -> reply_none 200
                   | API dir, _ ->
@@ -300,7 +315,8 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
                       | _, BodyString (_, content) ->
                         try Some (Ezjsonm.from_string content) with _ -> None
                     in
-                    RestoDirectory1.lookup dir.meth_GET ez_request path >>= fun handler ->
+                    let meth = if require_method then Some meth else None in
+                    RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun handler ->
                     (* Lwt.pick [ *)
                     handler content >>= reply_answer ;
                     (* Lwt_unix.sleep 0.1 >>= fun () -> reply_none 408 *) (* ] *)
@@ -391,7 +407,7 @@ let connection_handler : server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit 
 (* HTTP Server                                                       *)
 (*********************************************************************)
 
-let server servers =
+let server ?(require_method=false) servers =
   let create_server port kind =
     let s = { server_port = port;
               server_kind = kind;
@@ -409,7 +425,7 @@ let server servers =
     establish_server_with_client_socket
       ~nb_max_connections
       listen_address (fun sockaddr fd ->
-          connection_handler s sockaddr fd) >>= fun _server ->
+          connection_handler ~require_method s sockaddr fd) >>= fun _server ->
     Lwt.return_unit
   in
   Lwt.join (List.map (fun (port,kind) ->
