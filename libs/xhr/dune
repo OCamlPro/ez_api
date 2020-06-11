@@ -42,3 +42,19 @@
  (modules ezCoXhr)
  (preprocess (pps js_of_ocaml-ppx))
  (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo))
+
+(library
+ (name ezFetch)
+ (public_name ez-api.fetch)
+ (optional)
+ (modules ezFetch)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest ezjs-fetch))
+
+(library
+ (name ezFetch_lwt)
+ (public_name ez-api.fetch-lwt)
+ (optional)
+ (modules ezFetch_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezAPIJSCommon ezRequest_lwt ezjs-fetch))
