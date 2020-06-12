@@ -78,10 +78,10 @@ module Make(S: SessionArg) : sig
          ?headers
          ~params:[]
          (function
-          | Ok auth ->
+          | Ok (AuthOk auth) ->
              state := User auth;
              f (Ok (Some auth))
-          | Error `Auth_needed auth_needed ->
+          | Ok (AuthNeeded auth_needed) ->
              state := Connected auth_needed;
              f (Ok None)
           | Error `Session_expired ->

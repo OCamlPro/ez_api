@@ -47,6 +47,8 @@ module TYPES = struct
     challenge : string;
   }
 
+  type 'auth connect_response = AuthOk of 'auth | AuthNeeded of auth_needed
+
   type login_message = {
     login_user : string;
     login_challenge_id : string;
@@ -61,8 +63,7 @@ module TYPES = struct
     [ `Invalid_session ]
 
   type connect_error =
-    [ `Auth_needed of auth_needed
-    | `Session_expired ]
+    [ `Session_expired ]
 
 end
 
@@ -105,23 +106,12 @@ module Make(S : SessionArg) = struct
         (req "challenge_id" string)
         (req "challenge" string)
 
-    let auth_needed_case =
-      EzAPI.ErrCase {
-        code = 401;
-        name = "AuthNeeded";
-        encoding = (merge_objs
-                      (obj1 (req "error" (constant "AuthNeeded")))
-                      auth_needed);
-        select = (function `Auth_needed s -> Some ((), s) | _ -> None);
-        deselect = (fun ((), s) -> `Auth_needed s);
-      }
-
     let session_expired_case =
       EzAPI.ErrCase {
         code = 440;
         name = "SessionExpired";
         encoding = (obj1 (req "error" (constant "SessionExpired")));
-        select = (function `Session_expired -> Some () | _ -> None);
+        select = (function `Session_expired -> Some () (* | _ -> None *));
         deselect = (fun () -> `Session_expired);
       }
 
@@ -137,6 +127,14 @@ module Make(S : SessionArg) = struct
         (req "user_id" S.user_id_encoding)
         (req "token" string)
         (req "user_info" S.user_info_encoding)
+
+    let connect_response = union [
+        case auth_ok
+          (function AuthOk x -> Some x | _ -> None)
+          (fun x -> AuthOk x);
+        case auth_needed
+          (function AuthNeeded x -> Some x | _ -> None)
+          (fun x -> AuthNeeded x) ]
 
     let login_message =
       conv
@@ -219,13 +217,12 @@ module Make(S : SessionArg) = struct
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
-    let connect : (S.auth, connect_error, token_security) EzAPI.service0  =
+    let connect : (S.auth connect_response, connect_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"connect"
-        ~output:Encoding.auth_ok
-        ~error_outputs: [Encoding.auth_needed_case;
-                         Encoding.session_expired_case]
+        ~output:Encoding.connect_response
+        ~error_outputs: [Encoding.session_expired_case]
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
