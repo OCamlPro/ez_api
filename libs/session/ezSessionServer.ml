@@ -135,7 +135,7 @@ end = struct
 
     let request_auth req =
       request_auth_base req (fun auth_needed ->
-          Error (`Auth_needed auth_needed), Some 401
+          Ok (AuthNeeded auth_needed), Some 200
         )
 
     let request_error ~code req msg =
@@ -176,7 +176,7 @@ end = struct
         | None ->
           request_error req ~code:440 `Session_expired
         | Some (_pwhash, user_id, user_info) ->
-          return_auth req ~cookie ~login user_id user_info
+          return_auth_base req ~cookie ~login user_id user_info (fun a -> Ok (AuthOk a))
 
     let login req _ { login_user; login_challenge_id; login_challenge_reply } =
       find_user ~login:login_user >>= function
