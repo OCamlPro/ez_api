@@ -8,6 +8,9 @@ install:
 clean:
 	dune clean
 
+doc:
+	dune build @doc
+
 -include autoconf/Makefile.config
 -include ocp-autoconf.d/Makefile
 
