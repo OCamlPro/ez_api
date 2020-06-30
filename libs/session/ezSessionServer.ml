@@ -189,7 +189,7 @@ end = struct
          | exception Not_found ->
             if verbose > 1 then
               EzDebug.printf "/login: could not find challenge\n%!";
-            request_error req ~code:403
+            request_error req ~code:401
               (`Challenge_not_found_or_expired login_challenge_id)
          | (challenge, _t0) ->
             let expected_reply =
@@ -207,7 +207,7 @@ end = struct
 
     let logout req security () =
        get_request_session security req >>= function
-      | None -> EzAPIServerUtils.return ~code:403 (Error `Invalid_session)
+      | None -> EzAPIServerUtils.return ~code:401 (Error `Invalid_session)
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
          request_auth_base req (fun auth_needed -> Ok auth_needed, None)
