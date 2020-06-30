@@ -155,7 +155,7 @@ module Make(S : SessionArg) = struct
 
     let bad_user_case =
       EzAPI.ErrCase {
-        code = 403;
+        code = 401;
         name = "BadUserOrPassword";
         encoding = (obj1 (req "error" (constant "BadUserOrPassword")));
         select = (function `Bad_user_or_password -> Some () | _ -> None);
@@ -175,7 +175,7 @@ module Make(S : SessionArg) = struct
 
     let invalid_session_case =
       EzAPI.ErrCase {
-        code = 403;
+        code = 401;
         name = "InvalidSession";
         encoding = (obj1 (req "error" (constant "InvalidSession")));
         select = (function `Invalid_session -> Some () (* | _ -> None *));
