@@ -1,6 +1,5 @@
 (lang dune 2.0)
 (name ez-api)
-(allow_approximate_merlin)
 
 (generate_opam_files true)
 
@@ -26,6 +25,7 @@
   (calendar (>= 2.03))
   (geoip (>= 0.0.3))
   (cohttp-lwt-unix (>= 2.0.0))
+  tls
   (re (>= 1.0))
   (httpaf-lwt-unix (>= 0.6.0))
   (extunix (>= 0.2.0))
