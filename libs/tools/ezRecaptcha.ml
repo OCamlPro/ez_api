@@ -42,9 +42,6 @@ let recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
 let verify secret_key token =
   let url = EzAPI.TYPES.URL (
       recaptcha_url ^ "?secret=" ^ secret_key ^ "&response=" ^ token) in
-  let waiter, notifier = Lwt.wait () in
-  EzCurl.post "" url
-    (fun r ->
-       Lwt.wakeup notifier @@
-       EzEncoding.destruct Encoding.captcha r);
-  waiter
+  Lwt.map
+    (function Error e -> Error e | Ok x -> Ok (EzEncoding.destruct Encoding.captcha x))
+    (EzRequest_lwt.ANY.post url)
