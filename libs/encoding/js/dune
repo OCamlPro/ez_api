@@ -3,4 +3,4 @@
  (public_name ez-api.encoding-js)
  (modules ezEncodingJS)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezEncoding js_of_ocaml))
+ (libraries ezEncoding js_of_ocaml-ppx))
