@@ -1,0 +1,14 @@
+(library
+ (name ezRecaptcha)
+ (public_name ez-api.recaptcha)
+ (optional)
+ (modules ezRecaptcha)
+ (libraries ezRequest_lwt calendar))
+
+(library
+ (name ezSendgrid)
+ (public_name ez-api.sendgrid)
+ (wrapped false)
+ (optional)
+ (modules ezSendgrid_encoding ezSendgrid)
+ (libraries ezRequest_lwt calendar))

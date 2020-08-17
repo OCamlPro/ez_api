@@ -1,0 +1,6 @@
+(library
+ (name ezAPI)
+ (public_name ez-api.common)
+ (wrapped false)
+ (modules stringCompat resto1 ezDebug ezUrl ezAPI)
+ (libraries lwt ezEncoding))
