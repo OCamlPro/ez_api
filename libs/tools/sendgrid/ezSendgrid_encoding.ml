@@ -1,45 +1,5 @@
+open EzSendgrid_types
 open Json_encoding
-
-type email_address = {
-  email : string;
-  name : string option
-}
-
-type content_element = {
-  content_type : string;
-  content_value : string;
-}
-
-type person = {
-  dst : email_address list;
-  cc : email_address list option;
-  bcc : email_address list option;
-  psubject: string option;
-  data : Json_repr.any option;
-}
-
-type 'a mail = {
-  person: person list;
-  from: email_address;
-  subject : string option;
-  content: content_element list option;
-  template_id : string option;
-  more_fields : 'a option;
-}
-
-type contact = {
-  addr_line1 : string option;
-  addr_line2 : string option;
-  alternate_emails : string list option;
-  city : string option;
-  country : string option;
-  c_email : string;
-  first_name : string option;
-  last_name : string option;
-  postal_code : string option;
-  state_province_region : string option;
-  custom_field : Json_repr.any option
-}
 
 let opt_encoding encoding =
   let unit_opt_encoding = case unit (function None -> Some () | Some _ -> None) (fun _ -> None) in
@@ -112,6 +72,41 @@ let contact = conv
     (opt "state_province_region" string)
     (opt "custom_fields" Json_encoding.any_value)
 
+let contact_more = conv
+    (fun {c_id; phone_number; whatsapp; line; facebook; unique_name; list_ids;
+          segment_ids; created_at; updated_at}
+      -> (c_id, phone_number, whatsapp, line, facebook, unique_name, list_ids,
+          segment_ids, created_at, updated_at))
+    (fun (c_id, phone_number, whatsapp, line, facebook, unique_name, list_ids,
+          segment_ids, created_at, updated_at)
+      -> {c_id; phone_number; whatsapp; line; facebook; unique_name; list_ids;
+          segment_ids; created_at; updated_at}) @@
+  obj10
+    (req "id" string)
+    (opt "phone_number" string)
+    (opt "whatsapp" string)
+    (opt "line" string)
+    (opt "facebook" string)
+    (opt "unique_nname" string)
+    (req "list_ids" (list string))
+    (dft "segment_ids" (option @@ list string) None)
+    (req "created_at" string)
+    (req "updated_at" string)
+
 let add_contacts_enc = obj2
     (opt "list_ids" (list string))
     (req "contacts" (list contact))
+
+let job_output = obj1 (req "job_id" string)
+
+let contacts_count = EzEncoding.ignore_enc (obj1 (req "contact_count" int))
+
+let get_contact =
+  EzEncoding.ignore_enc (merge_objs contact contact_more)
+
+let search_output encoding =
+  EzEncoding.ignore_enc @@ obj2
+    (req "contact_count" int)
+    (dft "result" (list encoding) [])
+
+let query = obj1 (req "query" string)

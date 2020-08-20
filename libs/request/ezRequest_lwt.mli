@@ -55,7 +55,7 @@ end
 
 type 'a api_error =
   | KnownError of { code : int ; error : 'a }
-  | UnknwownError of { code : int ; msg : string option }
+  | UnknownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
 module type RAW = RAWGEN
