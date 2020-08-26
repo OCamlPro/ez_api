@@ -23,6 +23,7 @@ depopts: [
   "calendar" {>= "2.03"}
   "geoip" {>= "0.0.3"}
   "cohttp-lwt-unix" {>= "2.0.0"}
+  "cohttp-lwt-jsoo" {>= "2.0.0"}
   "tls"
   "re" {>= "1.0"}
   "httpaf-lwt-unix" {>= "0.6.0"}

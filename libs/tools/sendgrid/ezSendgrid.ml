@@ -1,5 +1,4 @@
 open EzSendgrid_types
-open EzSendgrid_encoding
 open EzSendgrid_services
 
 let sendgrid_url = "https://api.sendgrid.com/v3"
