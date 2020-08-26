@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.opam
+          key: ez-api-opam-cache
+
+      - name: Use OCaml
+        uses: avsm/setup-ocaml@v1
+        with:
+          ocaml-version: 4.10.0
+
+      - name: Depext
+        run: |
+          sudo apt update
+          opam depext -y geoip ocurl tls
+
+      - name: Opam install
+        run: |
+          opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
+          opam install .
+          opam remove .
