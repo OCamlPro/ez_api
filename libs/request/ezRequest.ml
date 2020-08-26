@@ -129,6 +129,7 @@ let request_reply_hook = ref (fun () -> ())
 let before_xhr_hook = ref (fun () -> ())
 
 let decode_result ?error encoding f res =
+  let res = match res with "" -> "{}" | res -> res in
   match EzEncoding.destruct encoding res with
   | res -> f res
   | exception exn ->
@@ -137,12 +138,13 @@ let decode_result ?error encoding f res =
      | Some error ->
        let msg = Printf.sprintf "Decoding error: %s in\n%s"
            (Printexc.to_string exn) res in
-        error (-2) (Some msg)
+        error (-3) (Some msg)
 
 
-let any_xhr_get = ref (fun ?meth:_m _msg _url ?headers:_ f -> f (CodeError (-1,None)))
+let any_xhr_get = ref (fun ?meth:_m _msg _url ?headers:_ f ->
+    f (CodeError (-2,Some "No http client loaded")))
 let any_xhr_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
-                  f (CodeError (-1,None)))
+                  f (CodeError (-2,Some "No http client loaded")))
 
 module Make(S : sig
 
@@ -354,10 +356,10 @@ module ANY : S = Make(struct
 
 module Default = Make(struct
 
-    let xhr_get ?meth:_meth _msg _url ?headers:_ f = f (CodeError (-1,None))
+    let xhr_get ?meth:_meth _msg _url ?headers:_ f = f (CodeError (-2,Some "No http client loaded"))
     let xhr_post ?meth:_meth ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
       =
-      f (CodeError (-1,None))
+      f (CodeError (-2,Some "No http client loaded"))
 
     end)
 

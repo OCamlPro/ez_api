@@ -347,3 +347,5 @@ val merge_objs :
 
 val result : 'a Json_encoding.encoding -> 'b Json_encoding.encoding ->
   ('a, 'b) result Json_encoding.encoding
+
+val ignore_enc : 'a Json_encoding.encoding -> 'a Json_encoding.encoding

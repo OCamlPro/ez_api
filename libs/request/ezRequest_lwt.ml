@@ -57,7 +57,7 @@ end
 
 type 'a api_error =
   | KnownError of { code : int ; error : 'a }
-  | UnknwownError of { code : int ; msg : string option }
+  | UnknownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
 module type RAW = RAWGEN
@@ -119,22 +119,23 @@ let request_reply_hook = ref (fun () -> ())
 let before_hook = ref (fun () -> ())
 
 let decode_result encoding err_encodings = function
-  | Error (code, None) -> Error (UnknwownError { code ; msg = None })
+  | Error (code, None) -> Error (UnknownError { code ; msg = None })
   | Error (code, Some msg) ->
     (match err_encodings ~code with
-      | None -> Error (UnknwownError { code ; msg = Some msg })
+      | None -> Error (UnknownError { code ; msg = Some msg })
       | Some encoding ->
         try Error (
             KnownError { code ; error = EzEncoding.destruct encoding msg })
-        with _ -> Error (UnknwownError { code ; msg = Some msg })
+        with _ -> Error (UnknownError { code ; msg = Some msg })
     )
   | Ok res ->
+    let res = match res with "" -> "{}" | res -> res in
     match EzEncoding.destruct encoding res with
     | res -> (Ok res)
     | exception exn ->
       let msg = Printf.sprintf "Decoding error: %s in\n%s"
           (Printexc.to_string exn) res in
-      Error (UnknwownError { code = -2; msg = Some msg })
+      Error (UnknownError { code = -3; msg = Some msg })
 
 let handle_result service res =
   let err_encodings = EzAPI.service_errors service in
@@ -142,10 +143,10 @@ let handle_result service res =
   decode_result encoding err_encodings res
 
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url ->
-    return (Error (-2, None))
+    return (Error (-2, Some "No http client loaded"))
   )
 let any_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
-    return (Error (-2, None))
+    return (Error (-2, Some "No http client loaded"))
   )
 
 
@@ -278,7 +279,7 @@ module Make(S : sig
 
     let unresultize = function
       | Ok res -> Ok res
-      | Error UnknwownError { code ; msg } -> Error (code, msg)
+      | Error UnknownError { code ; msg } -> Error (code, msg)
       | Error KnownError { error ; _ } -> EzAPI.unreachable error
 
 
@@ -313,9 +314,10 @@ module ANY : S = Make(struct
   end)
 
 module Default = Make(struct
-    let get ?meth:_ ?headers:_ ?msg:_ _url = return (Error (-2, None))
+    let get ?meth:_ ?headers:_ ?msg:_ _url =
+      return (Error (-2, Some "No http client loaded"))
     let post ?meth:_ ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
-      return (Error (-2, None))
+      return (Error (-2, Some "No http client loaded"))
   end)
 
 let () = Default.init ()

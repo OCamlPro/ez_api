@@ -445,3 +445,7 @@ let result ok_enc err_enc =
       (function Error s -> Some s | Ok _ -> None)
       (fun s -> Error s)
   ]
+
+let ignore_enc encoding =
+  conv (fun x -> x, ()) (fun (x, _) -> x) @@
+  merge_objs encoding unit
