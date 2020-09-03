@@ -39,7 +39,7 @@ include EzRequest.Make(struct
         with _ -> -1, ""
       in
       log ~meth:("RECV " ^ string_of_int rc) url msg;
-      if rc = 200 then
+      if rc >= 200 && rc < 300 then
         try f (CodeOk data) with _ -> ()
       else
         try f (CodeError (rc, Some data)) with _ -> ()

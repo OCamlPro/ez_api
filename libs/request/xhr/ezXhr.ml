@@ -19,7 +19,7 @@ include Make(struct
             if xhr##.readyState = XmlHttpRequest.DONE then
               let status = xhr##.status in
               if msg <> "" then log ~meth:("RECV " ^ string_of_int status) msg url;
-              if status = 200 then
+              if status >= 200 && status < 300 then
                 f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
               else
                 f (CodeError (
@@ -44,7 +44,7 @@ include Make(struct
             if xhr##.readyState = XmlHttpRequest.DONE then
               let status = xhr##.status in
               if msg <> "" then log ~meth:("RECV " ^ string_of_int status) msg url;
-              if status = 200 then
+              if status >= 200 && status < 300 then
                 f (CodeOk (Js.Opt.case xhr##.responseText (fun () -> "") Js.to_string))
               else
                 f (CodeError (
