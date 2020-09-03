@@ -375,9 +375,10 @@ let post_service ?(section=default_section)
     ?(error_outputs=[])
     ?(params = [])
     ?(security=[])
+    ?(register=true)
     (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
-  incr nservices;
+  if register then incr nservices;
   let params = List.rev_append (params_of_query_security security) params in
   let doc = {
       doc_path;
@@ -394,8 +395,9 @@ let post_service ?(section=default_section)
       doc_meth = str_of_method meth;
       doc_security = (security :> security_scheme list);
     } in
-  section.section_docs <- update_service_list section.section_docs doc;
-  services := update_service_list !services doc;
+  if register then (
+    section.section_docs <- update_service_list section.section_docs doc;
+    services := update_service_list !services doc);
   let resto_output =
     let err_cases =
       List.map (function ErrCase { encoding;  select;  deselect; _} ->
@@ -421,16 +423,14 @@ let post_service ?(section=default_section)
       s_security = security;
       s_meth = meth;
     } in
-  begin
-    let make_sample url = forge url service sample [] in
-    doc.doc_sample <- make_sample
-  end;
+  let make_sample url = forge url service sample [] in
+  doc.doc_sample <- make_sample;
   service
 
-let service ?section ?name ?descr ?(meth=Resto.GET) ~output ?error_outputs ?params ?security arg =
+let service ?section ?name ?descr ?(meth=Resto.GET) ~output ?error_outputs ?params ?security ?register arg =
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
-    ~output ?error_outputs ~meth ?params ?security arg
+    ~output ?error_outputs ~meth ?params ?security ?register arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
