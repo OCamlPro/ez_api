@@ -239,6 +239,7 @@ module Make(S : sig
         let url = EzAPI.forge0 api service [] in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
+        let meth = if meth = Resto1.GET then Resto1.POST else meth in
         internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge0 api service params in
@@ -260,6 +261,7 @@ module Make(S : sig
         let url = EzAPI.forge1 api service arg []  in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
+        let meth = if meth = Resto1.GET then Resto1.POST else meth in
         internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge1 api service arg params in
