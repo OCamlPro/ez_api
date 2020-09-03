@@ -2,6 +2,10 @@ open EzRequest_lwt
 
 let (>|=) = Lwt.(>|=)
 
+let log ?(meth="GET") url = function
+  | None -> ()
+  | Some msg -> Printf.printf "[>%s %s %s ]\n%!" msg meth url
+
 let writer_callback a d =
   Buffer.add_string a d;
   String.length d
@@ -19,7 +23,7 @@ let initialize_connection url =
   Curl.set_url c url;
   r,c
 
-let make ~headers prepare url =
+let make ?msg ~headers prepare url =
   let r () =
     let r, c = initialize_connection url in
     prepare c;
@@ -29,18 +33,21 @@ let make ~headers prepare url =
     let rc = Curl.get_responsecode c in
     Curl.cleanup c;
     let data = Buffer.contents r in
+    log ~meth:("RECV " ^ string_of_int rc) url msg;
     if rc >= 200 && rc < 300 then Ok data
     else Error (rc, Some data) in
   Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
 include Make(struct
-    let get ?meth:_ ?(headers=[]) ?msg:_ url =
-      make ~headers (fun c -> Curl.set_post c false) url
+    let get ?(meth="GET") ?(headers=[]) ?msg url =
+      log ~meth url msg;
+      make ?msg ~headers (fun c -> Curl.set_post c false) url
 
     let post ?(meth="POST") ?(content_type = "application/json") ?(content="{}") ?(headers=[])
-        ?msg:_ url =
+        ?msg url =
+      log ~meth url msg;
       let headers = ("Content-Type", content_type) :: headers in
-      make ~headers (fun c ->
+      make ?msg ~headers (fun c ->
           if meth = "PUT" then Curl.set_put c true else Curl.set_post c true;
           Curl.set_postfields c content;
           Curl.set_postfieldsize c (String.length content);

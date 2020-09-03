@@ -60,6 +60,14 @@ type 'a api_error =
   | UnknownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
+let string_of_error kn = function
+  | KnownError {code; error} ->
+    let content = match kn error with None -> "" | Some s -> ": " ^ s in
+    Printf.sprintf "Error %d%s" code content
+  | UnknownError {code; msg} ->
+    let content = match msg with None -> "" | Some s -> ": " ^ s in
+    Printf.sprintf "Unknown Error %d%s" code content
+
 module type RAW = RAWGEN
   with type ('output, 'error, 'security) service0 :=
     ('output, 'error, 'security) EzAPI.service0
