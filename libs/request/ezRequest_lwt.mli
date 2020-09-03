@@ -58,6 +58,8 @@ type 'a api_error =
   | UnknownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
+val string_of_error : ('a -> string option) -> 'a api_error -> string
+
 module type RAW = RAWGEN
   with type ('output, 'error, 'security) service0 :=
     ('output, 'error, 'security) EzAPI.service0
