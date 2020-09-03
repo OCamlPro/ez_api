@@ -170,6 +170,7 @@ val service :
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
   ?security:([< security_scheme ] as 'security) list ->
+  ?register:bool ->
   ('b, 'c) p ->
   ('b, 'c, unit, 'output, 'error, 'security) service
 
@@ -183,6 +184,7 @@ val post_service :
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
   ?security:([< security_scheme ] as 'security) list ->
+  ?register:bool ->
   ('b, 'c) p ->
   ('b, 'c, 'input, 'output, 'error, 'security) service
 
