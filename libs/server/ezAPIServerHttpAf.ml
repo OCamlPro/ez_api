@@ -239,7 +239,11 @@ let connection_handler :
     let request_handler client_address request_descriptor =
       set_req_time () ;
       let request = Reqd.request request_descriptor in
-      debug @@ Printf.sprintf "REQUEST: %s %S" (Method.to_string request.meth) request.target;
+      let uri = mk_uri request in
+      let req_params = Uri.query uri in
+      debug "REQUEST: %s %S"
+        (Method.to_string request.meth)
+        request.target;
       debugf ~v:1 (fun () ->
           List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
             (Headers.to_list request.headers));
@@ -254,10 +258,9 @@ let connection_handler :
           register_ip ip
         | Unix.ADDR_UNIX _ -> ()
       end ;
-      let uri = mk_uri request in
       let local_path = Uri.path uri in
       let path = local_path |> String.split_on_char '/' |> list_trim in
-      let req_params = Uri.query uri in
+
       let headers =
         let headers = ref StringMap.empty in
         Headers.iter ~f:(fun s v ->
@@ -308,7 +311,7 @@ let connection_handler :
                       match request.Request.meth, ez_request.req_body with
                       | `GET, BodyString (_, "") -> None
                       | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
-                        debug ~v:2 @@ Printf.sprintf "Request params:\n  %s" content;
+                        debug ~v:2 "Request params:\n  %s" content;
                         EzAPI.add_params ez_request ( EzUrl.decode_args content );
                         None
                       | _, BodyString (Some mime, content) when
@@ -316,7 +319,7 @@ let connection_handler :
                           || mime = "multipart/form-data" ->
                         Some (`String content)
                       | _, BodyString (_, content) ->
-                        debug ~v:2 @@ Printf.sprintf "Request content:\n  %s" content;
+                        debug ~v:2 "Request content:\n  %s" content;
                         Some (Ezjsonm.from_string content)
                     in
                     let meth = if require_method then Some meth else None in
@@ -344,19 +347,18 @@ let connection_handler :
                      reply_none 500)
           end >>= fun (code, reply) ->
           let status = Httpaf.Status.unsafe_of_code code in
-          debug ~v:(if code = 200 then 1 else 0) @@
-          Printf.sprintf "Reply computed to %S: %d" local_path code;
+          debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" local_path code;
           let headers = add_headers_response ez_request.req_headers in
           let headers = af_headers_from_string_map headers in
           let body_str, headers = match reply with
             | ReplyNone -> "", headers
             | ReplyJson json ->
               let content = Ezjsonm.to_string (json_root json) in
-              debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
+              debug ~v:3 "Reply content:\n  %s" content;
               content,
               Headers.add headers "Content-Type" "application/json"
             | ReplyString (content_type, content) ->
-              debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
+              debug ~v:3 "Reply content:\n  %s" content;
               content,
               Headers.add headers "Content-Type" content_type
           in
