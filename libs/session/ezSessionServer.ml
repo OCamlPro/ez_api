@@ -3,7 +3,7 @@ open EzAPI.TYPES
 open EzSession.TYPES
 open Lwt.Infix
 
-let verbose = EzAPIServerUtils.verbose
+let debug = EzAPIServerUtils.debug
 
 (* WARNINGS:
    * A user might try to fill the table of cookies with useless entries
@@ -181,14 +181,12 @@ end = struct
     let login req _ { login_user; login_challenge_id; login_challenge_reply } =
       find_user ~login:login_user >>= function
       | None ->
-         if verbose > 1 then
-           EzDebug.printf "/login: could not find user %S\n%!" login_user;
+         debug ~v:1 @@ Printf.sprintf "/login: could not find user %S" login_user;
          request_error req ~code:401 `Bad_user_or_password
       | Some (pwhash, user_id, user_info) ->
-         match Hashtbl.find challenges login_challenge_id with
-         | exception Not_found ->
-            if verbose > 1 then
-              EzDebug.printf "/login: could not find challenge\n%!";
+        match Hashtbl.find challenges login_challenge_id with
+        | exception Not_found ->
+          debug ~v:1 @@ "/login: could not find challenge\n%!";
             request_error req ~code:401
               (`Challenge_not_found_or_expired login_challenge_id)
          | (challenge, _t0) ->
@@ -197,13 +195,12 @@ end = struct
                 ~challenge ~pwhash
             in
             if expected_reply <> login_challenge_reply then begin
-                if verbose > 1 then
-                  EzDebug.printf "/login: challenge failed\n%!";
-                request_error req ~code:401 `Bad_user_or_password
-              end else begin
-                Hashtbl.remove challenges login_challenge_id;
-                return_auth req ~login:login_user user_id user_info
-              end
+              debug ~v:1 @@ "/login: challenge failed";
+              request_error req ~code:401 `Bad_user_or_password
+            end else begin
+              Hashtbl.remove challenges login_challenge_id;
+              return_auth req ~login:login_user user_id user_info
+            end
 
     let logout req security () =
        get_request_session security req >>= function
@@ -312,8 +309,7 @@ end = struct
   let create_user
       ?pwhash ?password ~login
       user_info =
-    if verbose > 1 then
-      EzDebug.printf "create_user %S ?" login;
+    debug ~v:1 @@ Printf.sprintf "create_user %S ?" login;
     if Hashtbl.mem users login then
       raise UserAlreadyDefined;
     let pwhash = match pwhash with
@@ -324,8 +320,7 @@ end = struct
         | Some password ->
           EzSession.Hash.password ~login ~password
     in
-    if verbose > 1 then
-      EzDebug.printf "create_user %S ok" login;
+    debug ~v:1 @@ Printf.sprintf "create_user %S ok" login;
     Hashtbl.add users login
       { login;
         pwhash;
@@ -333,14 +328,12 @@ end = struct
         user_info }
 
   let find_user ~login =
-    if verbose > 1 then
-      EzDebug.printf "find_user %S ?" login;
+    debug ~v:1 @@ Printf.sprintf "find_user %S ?" login;
     match Hashtbl.find users login with
     | exception Not_found ->
       Lwt.return None
     | u ->
-      if verbose > 1 then
-        EzDebug.printf "find_user %S ok" login;
+      debug ~v:1 @@ Printf.sprintf "find_user %S ok" login;
       Lwt.return ( Some (u.pwhash, u.user_id, u.user_info) )
 
 

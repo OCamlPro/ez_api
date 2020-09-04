@@ -22,7 +22,7 @@ let of_httpaf_meth = function
 
 
 let () =
-  Lwt.async_exception_hook := (fun exn -> Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn))
+  Lwt.async_exception_hook := (fun exn -> EzDebug.printf "Exception %s" (Printexc.to_string exn))
 
 let nb_live_connections = ref 0
 
@@ -239,8 +239,10 @@ let connection_handler :
     let request_handler client_address request_descriptor =
       set_req_time () ;
       let request = Reqd.request request_descriptor in
-      if verbose > 0 then Request.pp_hum (Format.str_formatter) request ;
-
+      debug @@ Printf.sprintf "REQUEST: %s %S" (Method.to_string request.meth) request.target;
+      debugf ~v:1 (fun () ->
+          List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
+            (Headers.to_list request.headers));
       begin match client_address with
         | Unix.ADDR_INET (iaddr, _port) ->
           let ip = Unix.string_of_inet_addr iaddr in
@@ -306,6 +308,7 @@ let connection_handler :
                       match request.Request.meth, ez_request.req_body with
                       | `GET, BodyString (_, "") -> None
                       | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
+                        debug ~v:2 @@ Printf.sprintf "Request params:\n  %s" content;
                         EzAPI.add_params ez_request ( EzUrl.decode_args content );
                         None
                       | _, BodyString (Some mime, content) when
@@ -313,7 +316,8 @@ let connection_handler :
                           || mime = "multipart/form-data" ->
                         Some (`String content)
                       | _, BodyString (_, content) ->
-                        try Some (Ezjsonm.from_string content) with _ -> None
+                        debug ~v:2 @@ Printf.sprintf "Request content:\n  %s" content;
+                        Some (Ezjsonm.from_string content)
                     in
                     let meth = if require_method then Some meth else None in
                     RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun handler ->
@@ -323,7 +327,6 @@ let connection_handler :
                   | Root (root, default), meth ->
                     reply_file ~meth root ?default path)
                 (fun exn ->
-                   Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn);
                    match exn with
                    | EzReturnOPTIONS _ -> reply_none 200
                    | EzRawReturn s -> reply_raw_json 200 s
@@ -336,26 +339,24 @@ let connection_handler :
                        (RestoDirectory1.response_of_cannot_parse
                           descr msg rpath)
                    | exn ->
-                     Printf.eprintf "In %s: exception %s\n%!"
+                     EzDebug.printf "In %s: exception %s"
                        local_path (Printexc.to_string exn);
                      reply_none 500)
           end >>= fun (code, reply) ->
           let status = Httpaf.Status.unsafe_of_code code in
-          if verbose > 1 then
-            Printf.eprintf "Reply computed %d\n%!" code;
+          debug ~v:(if code = 200 then 1 else 0) @@
+          Printf.sprintf "Reply computed to %S: %d" local_path code;
           let headers = add_headers_response ez_request.req_headers in
           let headers = af_headers_from_string_map headers in
           let body_str, headers = match reply with
             | ReplyNone -> "", headers
             | ReplyJson json ->
               let content = Ezjsonm.to_string (json_root json) in
-              if verbose > 2 then
-                Printf.eprintf "Content:\n%s\n%!" content;
+              debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
               content,
               Headers.add headers "Content-Type" "application/json"
             | ReplyString (content_type, content) ->
-              if verbose > 2 then
-                Printf.eprintf "Content:\n%s\n%!" content;
+              debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
               content,
               Headers.add headers "Content-Type" content_type
           in
@@ -419,7 +420,7 @@ let server ?(require_method=false) servers =
       | Some soft64 , _ ->
         let soft = Int64.to_int soft64 in
         let nb = soft - 100 in
-        Printf.eprintf "Setting max_connection to %d\n%!" nb  ;
+        EzDebug.printf "Setting max_connection to %d" nb  ;
         nb
       | _ -> assert false in
     establish_server_with_client_socket

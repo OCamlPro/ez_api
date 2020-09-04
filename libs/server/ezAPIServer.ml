@@ -80,16 +80,13 @@ let dispatch ~require_method s (io, _conn) req body =
       ~body
       req_params
   in
-  if verbose > 0 then
-    Printf.eprintf "REQUEST: %s %S\n%!"
-      (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
-      local_path;
-  if verbose > 1 then
-    StringMap.iter (fun s v ->
-        List.iter (fun v ->
-            Printf.eprintf "  %s: %s\n%!" s v;
-          ) v
-      ) headers;
+  debug @@ Printf.sprintf "REQUEST: %s %S"
+    (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
+    local_path;
+  debugf ~v:1 (fun () ->
+      StringMap.iter (fun s v ->
+          List.iter (fun v -> EzDebug.printf "  %s: %s" s v) v)
+        headers);
   let meth = of_cohttp_meth @@ Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
@@ -118,13 +115,15 @@ let dispatch ~require_method s (io, _conn) req body =
              match meth, request.req_body with
              | GET, BodyString (_, "") -> None
              | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
+               debug ~v:2 @@ Printf.sprintf "Request params:\n  %s" content;
                EzAPI.add_params request ( EzUrl.decode_args content );
                None
              | _, BodyString (Some mime, content)
                when Re.Str.(string_match (regexp "image") mime 0) || mime = "multipart/form-data"->
                Some (`String content)
              | _, BodyString (_, content) ->
-               try Some (Ezjsonm.from_string content) with _ -> None
+               debug ~v:2 @@ Printf.sprintf "Request content:\n  %s" content;
+               Some (Ezjsonm.from_string content)
            in
            let meth = if require_method then Some meth else None in
            RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun handler ->
@@ -134,7 +133,6 @@ let dispatch ~require_method s (io, _conn) req body =
            reply_file ~meth root ?default path
     )
     (fun exn ->
-       Printf.eprintf "Exception %s\n%!" (Printexc.to_string exn);
        match exn with
        | EzReturnOPTIONS headers ->
          request.rep_headers <- headers @ request.rep_headers;
@@ -146,7 +144,7 @@ let dispatch ~require_method s (io, _conn) req body =
        | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
          reply_answer (RestoDirectory1.response_of_cannot_parse descr msg rpath)
        | exn ->
-         Printf.eprintf "In %s: exception %s\n%!"
+         EzDebug.printf "In %s: exception %s"
            local_path (Printexc.to_string exn);
          reply_none 500)
   >>= fun (code, reply) ->
@@ -160,20 +158,18 @@ let dispatch ~require_method s (io, _conn) req body =
            ("access-control-allow-methods", "POST, GET, OPTIONS, PATCH, PUT, DELETE")
          ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
-  if verbose > 1 then
-    Printf.eprintf "Reply computed %d\n%!" code;
+  debug ~v:(if code = 200 then 1 else 0) @@
+  Printf.sprintf "Reply computed to %S: %d" local_path code;
   let body, headers = match reply with
     | ReplyNone ->
       Cohttp_lwt__Body.empty, headers
     | ReplyJson json ->
       let content = Ezjsonm.to_string (json_root json) in
-      if verbose > 2 then
-        Printf.eprintf "Content:\n%s\n%!" content;
+      debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
       Header.add headers "Content-Type" "application/json"
     | ReplyString (content_type, content) ->
-      if verbose > 2 then
-        Printf.eprintf "Content:\n%s\n%!" content;
+      debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
       Header.add headers "Content-Type" content_type
   in
@@ -199,7 +195,7 @@ let server ?(require_method=false) servers =
       (* Broken Pipe -> do nothing *)
       | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
       | exn ->
-        Printf.eprintf "Server Error: %s\n%!" (Printexc.to_string exn)
+        EzDebug.printf "Server Error: %s" (Printexc.to_string exn)
     in
     (*  Cache.set_error_handler (fun e -> return @@ dont_crash_on_exn e); *)
     Server.create
