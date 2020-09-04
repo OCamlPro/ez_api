@@ -26,8 +26,10 @@ let verbose = match Sys.getenv_opt "EZAPISERVER" with
 
 let set_verbose i = verbose := i
 
-let debug ?(v=0) msg =
-  if !verbose > v then EzDebug.printf "%s" msg
+let debug ?(v=0) fmt =
+  if !verbose > v then EzDebug.printf fmt
+  else Printf.ifprintf () fmt
+
 let debugf ?(v=0) f =
   if !verbose > v then f ()
 
@@ -216,7 +218,7 @@ let normalize_path path =
 
 let content_type_of_file file =
   let exts = rev_extensions file in
-  debug ~v:2 @@ Printf.sprintf "content_type_of_file: [%s]" (String.concat "," exts);
+  debug ~v:2 "content_type_of_file: [%s]" (String.concat "," exts);
   match exts with
   | "js" :: _ -> "application/javascript"
   | "pdf" :: _ -> "application/pdf"

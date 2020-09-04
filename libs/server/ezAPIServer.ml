@@ -80,9 +80,9 @@ let dispatch ~require_method s (io, _conn) req body =
       ~body
       req_params
   in
-  debug @@ Printf.sprintf "REQUEST: %s %S"
+  debug "REQUEST: %s %S"
     (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
-    local_path;
+    (req |> Cohttp.Request.uri |> Uri.path_and_query);
   debugf ~v:1 (fun () ->
       StringMap.iter (fun s v ->
           List.iter (fun v -> EzDebug.printf "  %s: %s" s v) v)
@@ -115,14 +115,14 @@ let dispatch ~require_method s (io, _conn) req body =
              match meth, request.req_body with
              | GET, BodyString (_, "") -> None
              | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
-               debug ~v:2 @@ Printf.sprintf "Request params:\n  %s" content;
+               debug ~v:2 "Request params:\n  %s" content;
                EzAPI.add_params request ( EzUrl.decode_args content );
                None
              | _, BodyString (Some mime, content)
                when Re.Str.(string_match (regexp "image") mime 0) || mime = "multipart/form-data"->
                Some (`String content)
              | _, BodyString (_, content) ->
-               debug ~v:2 @@ Printf.sprintf "Request content:\n  %s" content;
+               debug ~v:2 "Request content:\n  %s" content;
                Some (Ezjsonm.from_string content)
            in
            let meth = if require_method then Some meth else None in
@@ -158,18 +158,17 @@ let dispatch ~require_method s (io, _conn) req body =
            ("access-control-allow-methods", "POST, GET, OPTIONS, PATCH, PUT, DELETE")
          ]) request.rep_headers in
   let status = Cohttp.Code.status_of_code code in
-  debug ~v:(if code = 200 then 1 else 0) @@
-  Printf.sprintf "Reply computed to %S: %d" local_path code;
+  debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" local_path code;
   let body, headers = match reply with
     | ReplyNone ->
       Cohttp_lwt__Body.empty, headers
     | ReplyJson json ->
       let content = Ezjsonm.to_string (json_root json) in
-      debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
+      debug ~v:3 "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
       Header.add headers "Content-Type" "application/json"
     | ReplyString (content_type, content) ->
-      debug ~v:3 @@ Printf.sprintf "Reply content:\n  %s" content;
+      debug ~v:3 "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
       Header.add headers "Content-Type" content_type
   in
