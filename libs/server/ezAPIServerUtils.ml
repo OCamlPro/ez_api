@@ -18,14 +18,18 @@ module StringSet = Set.Make(String)
 let return ?code x = RestoDirectory1.Answer.return ?code x
 let return_raw ?code s = RestoDirectory1.Answer.return_raw ?code s
 
-let verbose =
-  try
-    let s = Sys.getenv "EZAPISERVER" in
-    try
-      int_of_string s
-    with _ -> 1
-  with _ -> 0
+let verbose = match Sys.getenv_opt "EZAPISERVER" with
+  | None -> ref 0
+  | Some s -> match int_of_string_opt s with
+    | None -> ref 1
+    | Some i -> ref i
 
+let set_verbose i = verbose := i
+
+let debug ?(v=0) msg =
+  if !verbose > v then EzDebug.printf "%s" msg
+let debugf ?(v=0) f =
+  if !verbose > v then f ()
 
 exception EzRawReturn of string
 exception EzRawError of int
@@ -212,9 +216,7 @@ let normalize_path path =
 
 let content_type_of_file file =
   let exts = rev_extensions file in
-  if verbose > 2 then
-    EzDebug.printf "content_type_of_file: [%s]"
-      (String.concat "," exts);
+  debug ~v:2 @@ Printf.sprintf "content_type_of_file: [%s]" (String.concat "," exts);
   match exts with
   | "js" :: _ -> "application/javascript"
   | "pdf" :: _ -> "application/pdf"
@@ -274,7 +276,7 @@ let rec reply_file ?(meth=Resto1.GET) ?default root path =
       else raise Not_found
     | _ ->
       let content = FileString.read_file file in
-      Printf.eprintf "Returning file %S of len %d\n%!" file
+      EzDebug.printf "Returning file %S of length %d" file
         (String.length content);
       Lwt.return (200, ReplyString (content_type, content))
   with _exn ->
