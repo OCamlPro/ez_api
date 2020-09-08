@@ -198,4 +198,5 @@ let string_of_json ?(minify=true) (j : value) : string =
     |> Js.to_string
 
 let init () =
-  EzEncoding.json_of_string := json_of_string
+  EzEncoding.json_of_string := json_of_string;
+  EzEncoding.string_of_json := string_of_json

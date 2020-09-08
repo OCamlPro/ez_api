@@ -9,7 +9,12 @@ val construct : ?compact:bool -> 'a Json_encoding.encoding -> 'a -> string
    from library `ezAPI-js`.
  *)
 val json_of_string : (string -> Json_repr.ezjsonm) ref
+val string_of_json : (?minify:bool -> Json_repr.ezjsonm -> string) ref
 
+module Ezjsonm : sig
+  val from_string : string -> Json_repr.ezjsonm
+  val to_string : ?minify:bool -> Json_repr.ezjsonm -> string
+end
 
 (* The `string` encoding works only for utf8 strings without '"' for
     example. This one works always. *)
