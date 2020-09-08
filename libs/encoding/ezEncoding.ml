@@ -2,14 +2,17 @@ module Ezjsonm_direct = Ezjsonm
 open Json_encoding
 
 let json_of_string = ref Ezjsonm.value_from_string
+let string_of_json = ref Ezjsonm.value_to_string
 
 module Ezjsonm : sig
 
   val from_string : string -> Json_repr.ezjsonm
+  val to_string : ?minify:bool -> Json_repr.ezjsonm -> string
 
   end = struct
 
   let from_string s = !json_of_string s
+  let to_string ?minify json = !string_of_json ?minify json
 end
 
 exception DestructError

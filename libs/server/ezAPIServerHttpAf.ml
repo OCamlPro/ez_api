@@ -319,8 +319,10 @@ let connection_handler :
                           || mime = "multipart/form-data" ->
                         Some (`String content)
                       | _, BodyString (_, content) ->
-                        debug ~v:2 "Request content:\n  %s" content;
-                        Some (Ezjsonm.from_string content)
+                        if content = "" then None
+                        else (
+                          debug ~v:2 "Request content:\n  %s" content;
+                          Some (Ezjsonm.from_string content))
                     in
                     let meth = if require_method then Some meth else None in
                     RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun handler ->
