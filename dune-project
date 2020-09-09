@@ -27,7 +27,7 @@
   (cohttp-lwt-unix (>= 2.0.0))
   (cohttp-lwt-jsoo (>= 2.0.0))
   tls
-  (re (>= 1.0))
+  lwt_log
   (httpaf-lwt-unix (>= 0.6.0))
   (extunix (>= 0.2.0))
   (ocurl (>= 0.8.0))))
