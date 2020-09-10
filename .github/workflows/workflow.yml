@@ -1,38 +1,56 @@
 name: CI
 
 on:
-  push:
+  pull_request:
     branches:
       - master
-  pull_request:
+  push:
     branches:
       - master
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+        ocaml-version:
+          - 4.10.1
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Cache
+      - name: Retrieve opam cache
         uses: actions/cache@v2
+        id: cache-opam
         with:
-          path: /home/runner/.opam
-          key: ez-api-opam-cache
+          path: ~/.opam
+          key: v1-${{ runner.os }}-opam-${{ matrix.ocaml-version }}-${{ hashFiles('ez-api.opam') }}
+          restore-keys: |
+            v1-${{ runner.os }}-opam-${{ matrix.ocaml-version }}-
 
-      - name: Use OCaml
+      - name: Use OCaml ${{ matrix.ocaml-version }}
         uses: avsm/setup-ocaml@v1
         with:
-          ocaml-version: 4.10.0
+          ocaml-version: ${{ matrix.ocaml-version }}
 
-      - name: Depext
-        run: |
-          sudo apt update
-          opam depext -y geoip ocurl tls
+      - name: Install system packages required by opam packages
+        run: opam depext geoip ocurl tls --yes
 
-      - name: Opam install
+      - name: Install opam packages
+        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
+          opam install . --deps-only --with-doc --with-test
           opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
-          opam install .
-          opam remove .
+
+      - name: Check the consistency of installed opam packages
+        if: steps.cache-opam.outputs.cache-hit == 'true'
+        run: opam upgrade --fixup
+
+      - name: Run build
+        run: opam exec -- make build
