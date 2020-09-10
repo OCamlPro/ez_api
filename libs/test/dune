@@ -1,14 +1,17 @@
 (library
  (name test)
+ (optional)
  (modules test)
  (libraries ez-api.request ez-api.server ez-api.server-session ez-api.session-client))
 
 (executable
  (name main_cohttp)
+ (optional)
  (modules main_cohttp)
  (libraries test ez-api.cohttp))
 
 (executable
  (name main_curl)
+ (optional)
  (modules main_curl)
  (libraries test ez-api.curl))
