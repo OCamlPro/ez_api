@@ -20,6 +20,7 @@ let send encoding : ('a mail, unit, string option, EzAPI.bearer_security) EzAPI.
 
 let add_contacts : (string list option * contact list, string, string option, EzAPI.bearer_security) EzAPI.post_service0 =
   EzAPI.post_service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_add_contacts"
     ~input:add_contacts_enc
@@ -29,6 +30,7 @@ let add_contacts : (string list option * contact list, string, string option, Ez
 
 let delete_contacts : (unit, string, string option, EzAPI.bearer_security) EzAPI.post_service0 =
   EzAPI.post_service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_delete_contacts"
     ~input:Json_encoding.empty
@@ -39,6 +41,7 @@ let delete_contacts : (unit, string, string option, EzAPI.bearer_security) EzAPI
 
 let contacts_count : (int, string option, EzAPI.bearer_security) EzAPI.service0 =
   EzAPI.service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_contacts_count"
     ~output:contacts_count
@@ -46,6 +49,7 @@ let contacts_count : (int, string option, EzAPI.bearer_security) EzAPI.service0 
 
 let get_contact : (string, contact * contact_more, string option, EzAPI.bearer_security) EzAPI.service1 =
   EzAPI.service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_get_contact"
     ~output:get_contact
@@ -53,6 +57,7 @@ let get_contact : (string, contact * contact_more, string option, EzAPI.bearer_s
 
 let search_contacts : (string, int * (contact * contact_more) list, string option, EzAPI.bearer_security) EzAPI.post_service0 =
   EzAPI.post_service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_search_contacts"
     ~input:query
@@ -61,6 +66,7 @@ let search_contacts : (string, int * (contact * contact_more) list, string optio
 
 let remove_contact_list : (string, string, string option, EzAPI.bearer_security) EzAPI.service1 =
   EzAPI.service
+    ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_remove_contact_list"
     ~output:job_output
