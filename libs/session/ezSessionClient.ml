@@ -74,7 +74,6 @@ module Make(S: SessionArg) : sig
        EzRequest.ANY.get0
          api
          Service.connect "connect"
-         ~post:true
          ?headers
          ~params:[]
          (function
