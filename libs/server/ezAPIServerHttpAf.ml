@@ -228,191 +228,193 @@ let read_body body =
 
 
 let connection_handler :
-  require_method:bool -> server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
-  fun ~require_method s sockaddr fd ->
-    let module Body = Httpaf.Body in
-    let module Headers = Httpaf.Headers in
-    let module Reqd = Httpaf.Reqd in
-    let module Response = Httpaf.Response in
-    let module Status = Httpaf.Status in
-    (* Lwt_unix.sleep 5. >>= fun () -> *)
-    let request_handler client_address request_descriptor =
-      set_req_time () ;
-      let request = Reqd.request request_descriptor in
-      let uri = mk_uri request in
-      let req_params = Uri.query uri in
-      debug "REQUEST: %s %S"
-        (Method.to_string request.meth)
-        request.target;
-      debugf ~v:1 (fun () ->
-          List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
-            (Headers.to_list request.headers));
-      begin match client_address with
-        | Unix.ADDR_INET (iaddr, _port) ->
-          let ip = Unix.string_of_inet_addr iaddr in
-          let ip =
-            match Headers.get (request.Request.headers) "x-forwarded-for" with
-            | None -> ip
-            | Some ip -> ip
-          in
-          register_ip ip
-        | Unix.ADDR_UNIX _ -> ()
-      end ;
-      let local_path = Uri.path uri in
-      let path = local_path |> String.split_on_char '/' |> list_trim in
+  require_method:bool -> ?catch:(string -> exn -> (int * reply) Lwt.t) ->
+  server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
+  fun ~require_method ?catch s sockaddr fd ->
+  let module Body = Httpaf.Body in
+  let module Headers = Httpaf.Headers in
+  let module Reqd = Httpaf.Reqd in
+  let module Response = Httpaf.Response in
+  let module Status = Httpaf.Status in
+  (* Lwt_unix.sleep 5. >>= fun () -> *)
+  let request_handler client_address request_descriptor =
+    set_req_time () ;
+    let request = Reqd.request request_descriptor in
+    let uri = mk_uri request in
+    let req_params = Uri.query uri in
+    debug "REQUEST: %s %S"
+      (Method.to_string request.meth)
+      request.target;
+    debugf ~v:1 (fun () ->
+        List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
+          (Headers.to_list request.headers));
+    begin match client_address with
+      | Unix.ADDR_INET (iaddr, _port) ->
+        let ip = Unix.string_of_inet_addr iaddr in
+        let ip =
+          match Headers.get (request.Request.headers) "x-forwarded-for" with
+          | None -> ip
+          | Some ip -> ip
+        in
+        register_ip ip
+      | Unix.ADDR_UNIX _ -> ()
+    end ;
+    let local_path = Uri.path uri in
+    let path = local_path |> String.split_on_char '/' |> list_trim in
 
-      let headers =
-        let headers = ref StringMap.empty in
-        Headers.iter ~f:(fun s v ->
-            headers :=
-              StringMap.add (String.lowercase_ascii s) [v] !headers)
-          (request.Httpaf.Request.headers);
-        !headers
-      in
-      let version =
-        if request.Request.version.Version.minor = 0
-        then HTTP_1_0
-        else HTTP_1_1 in
-
-      let response_content_type =
-        match Headers.get request.Request.headers "Content-Type" with
-        | Some request_content_type -> request_content_type
-        | None -> "application/octet-stream"
-      in
-      let req_body = Reqd.request_body request_descriptor in
-      let body = BodyString (Some response_content_type, read_body req_body) in
-      let ez_request =
-        EzAPI.request ~version ~headers ~body req_params in
-
-      Lwt.async (fun () ->
-          begin
-            if path = ["debug"] then
-              reply_json 200
-                (`O
-                   ["headers", `A []
-                    (* (Cohttp.Request.headers req
-                     *  |> Header.to_lines
-                     *  |> List.map (fun s -> `String s)) *);
-                    "params", `O
-                      (List.map (fun (arg,list) ->
-                           arg, `A (List.map (fun s -> `String s) list)
-                         ) req_params)
-                   ]
-                )
-            else
-              Lwt.catch (fun () ->
-                  let meth = of_httpaf_meth request.Request.meth in
-                  match s.server_kind, meth with
-                  | API dir, OPTIONS ->
-                    RestoDirectory1.lookup dir.meth_OPTIONS ez_request path >>= fun handler ->
-                    handler None >>= fun _answer -> reply_none 200
-                  | API dir, _ ->
-                    let content =
-                      match request.Request.meth, ez_request.req_body with
-                      | `GET, BodyString (_, "") -> None
-                      | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
-                        debug ~v:2 "Request params:\n  %s" content;
-                        EzAPI.add_params ez_request ( EzUrl.decode_args content );
-                        None
-                      | _, BodyString (Some mime, content) when
-                          Re.Str.(string_match (regexp "image") mime 0)
-                          || mime = "multipart/form-data" ->
-                        Some (`String content)
-                      | _, BodyString (_, content) ->
-                        if content = "" then None
-                        else (
-                          debug ~v:2 "Request content:\n  %s" content;
-                          Some (Ezjsonm.from_string content))
-                    in
-                    let meth = if require_method then Some meth else None in
-                    RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun handler ->
-                    (* Lwt.pick [ *)
-                    handler content >>= reply_answer ;
-                    (* Lwt_unix.sleep 0.1 >>= fun () -> reply_none 408 *) (* ] *)
-                  | Root (root, default), meth ->
-                    reply_file ~meth root ?default path)
-                (fun exn ->
-                   match exn with
-                   | EzReturnOPTIONS _ -> reply_none 200
-                   | EzRawReturn s -> reply_raw_json 200 s
-                   | EzRawError code -> reply_none code
-                   | EzContentError (code, json) ->
-                     reply_raw_json code json
-                   | Not_found -> reply_none 404
-                   | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
-                     reply_answer
-                       (RestoDirectory1.response_of_cannot_parse
-                          descr msg rpath)
-                   | exn ->
-                     EzDebug.printf "In %s: exception %s"
-                       local_path (Printexc.to_string exn);
-                     reply_none 500)
-          end >>= fun (code, reply) ->
-          let status = Httpaf.Status.unsafe_of_code code in
-          debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" local_path code;
-          let headers = add_headers_response ez_request.req_headers in
-          let headers = af_headers_from_string_map headers in
-          let body_str, headers = match reply with
-            | ReplyNone -> "", headers
-            | ReplyJson json ->
-              let content = Ezjsonm.to_string (json_root json) in
-              debug ~v:3 "Reply content:\n  %s" content;
-              content,
-              Headers.add headers "Content-Type" "application/json"
-            | ReplyString (content_type, content) ->
-              debug ~v:3 "Reply content:\n  %s" content;
-              content,
-              Headers.add headers "Content-Type" content_type
-          in
-          let len = String.length body_str in
-          let headers = Headers.add headers "content-length" (string_of_int len) in
-          let response = Response.create ~headers status in
-          let body = Reqd.respond_with_streaming request_descriptor response in
-          Body.write_string body body_str ;
-          begin
-            try
-              Body.flush body (fun () ->
-                  Body.close_writer body)
-            with exn -> raise exn
-          end ;
-          Lwt.return_unit)
+    let headers =
+      let headers = ref StringMap.empty in
+      Headers.iter ~f:(fun s v ->
+          headers :=
+            StringMap.add (String.lowercase_ascii s) [v] !headers)
+        (request.Httpaf.Request.headers);
+      !headers
     in
+    let version =
+      if request.Request.version.Version.minor = 0
+      then HTTP_1_0
+      else HTTP_1_1 in
 
-    let error_handler :
-      Unix.sockaddr ->
-      ?request:Httpaf.Request.t ->
-      _ ->
-      (Headers.t -> [`write] Body.t) ->
-      unit =
-      fun _client_address ?request:_ error start_response ->
-
-        let response_body = start_response Headers.empty in
-
-        begin match error with
-          | `Exn exn ->
-            Body.write_string response_body (Printexc.to_string exn);
-            Body.write_string response_body "\n";
-          | #Status.standard as error ->
-            Body.write_string response_body (Status.default_reason_phrase error)
-        end;
-        Body.flush response_body (fun () ->
-            Body.close_writer response_body
-          );
+    let response_content_type =
+      match Headers.get request.Request.headers "Content-Type" with
+      | Some request_content_type -> request_content_type
+      | None -> "application/octet-stream"
     in
+    let req_body = Reqd.request_body request_descriptor in
+    let body = BodyString (Some response_content_type, read_body req_body) in
+    let ez_request =
+      EzAPI.request ~version ~headers ~body req_params in
 
-    Httpaf_lwt_unix.Server.create_connection_handler
-      ?config:None
-      ~request_handler
-      ~error_handler
-      sockaddr
-      fd
+    Lwt.async (fun () ->
+        begin
+          if path = ["debug"] then
+            reply_json 200
+              (`O
+                 ["headers", `A []
+                 (* (Cohttp.Request.headers req
+                  *  |> Header.to_lines
+                  *  |> List.map (fun s -> `String s)) *);
+                  "params", `O
+                    (List.map (fun (arg,list) ->
+                         arg, `A (List.map (fun s -> `String s) list)
+                       ) req_params)
+                 ]
+              )
+          else
+            Lwt.catch (fun () ->
+                let meth = of_httpaf_meth request.Request.meth in
+                match s.server_kind, meth with
+                | API dir, OPTIONS ->
+                  RestoDirectory1.lookup dir.meth_OPTIONS ez_request path >>= fun handler ->
+                  handler None >>= fun _answer -> reply_none 200
+                | API dir, _ ->
+                  let content =
+                    match request.Request.meth, ez_request.req_body with
+                    | `GET, BodyString (_, "") -> None
+                    | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
+                      debug ~v:2 "Request params:\n  %s" content;
+                      EzAPI.add_params ez_request ( EzUrl.decode_args content );
+                      None
+                    | _, BodyString (Some mime, content) when
+                        Re.Str.(string_match (regexp "image") mime 0)
+                        || mime = "multipart/form-data" ->
+                      Some (`String content)
+                    | _, BodyString (_, content) ->
+                      if content = "" then None
+                      else (
+                        debug ~v:2 "Request content:\n  %s" content;
+                        Some (Ezjsonm.from_string content))
+                  in
+                  let meth = if require_method then Some meth else None in
+                  RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun handler ->
+                  (* Lwt.pick [ *)
+                  handler content >>= reply_answer ;
+                  (* Lwt_unix.sleep 0.1 >>= fun () -> reply_none 408 *) (* ] *)
+                | Root (root, default), meth ->
+                  reply_file ~meth root ?default path)
+              (fun exn ->
+                 match exn with
+                 | EzReturnOPTIONS _ -> reply_none 200
+                 | EzRawReturn s -> reply_raw_json 200 s
+                 | EzRawError code -> reply_none code
+                 | EzContentError (code, json) ->
+                   reply_raw_json code json
+                 | Not_found -> reply_none 404
+                 | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
+                   reply_answer
+                     (RestoDirectory1.response_of_cannot_parse
+                        descr msg rpath)
+                 | exn ->
+                   EzDebug.printf "In %s: exception %s" local_path @@ Printexc.to_string exn;
+                   match catch with
+                   | None -> reply_none 500
+                   | Some c -> c local_path exn)
+        end >>= fun (code, reply) ->
+        let status = Httpaf.Status.unsafe_of_code code in
+        debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" local_path code;
+        let headers = add_headers_response ez_request.req_headers in
+        let headers = af_headers_from_string_map headers in
+        let body_str, headers = match reply with
+          | ReplyNone -> "", headers
+          | ReplyJson json ->
+            let content = Ezjsonm.to_string (json_root json) in
+            debug ~v:3 "Reply content:\n  %s" content;
+            content,
+            Headers.add headers "Content-Type" "application/json"
+          | ReplyString (content_type, content) ->
+            debug ~v:3 "Reply content:\n  %s" content;
+            content,
+            Headers.add headers "Content-Type" content_type
+        in
+        let len = String.length body_str in
+        let headers = Headers.add headers "content-length" (string_of_int len) in
+        let response = Response.create ~headers status in
+        let body = Reqd.respond_with_streaming request_descriptor response in
+        Body.write_string body body_str ;
+        begin
+          try
+            Body.flush body (fun () ->
+                Body.close_writer body)
+          with exn -> raise exn
+        end ;
+        Lwt.return_unit)
+  in
+
+  let error_handler :
+    Unix.sockaddr ->
+    ?request:Httpaf.Request.t ->
+    _ ->
+    (Headers.t -> [`write] Body.t) ->
+    unit =
+    fun _client_address ?request:_ error start_response ->
+
+      let response_body = start_response Headers.empty in
+
+      begin match error with
+        | `Exn exn ->
+          Body.write_string response_body (Printexc.to_string exn);
+          Body.write_string response_body "\n";
+        | #Status.standard as error ->
+          Body.write_string response_body (Status.default_reason_phrase error)
+      end;
+      Body.flush response_body (fun () ->
+          Body.close_writer response_body
+        );
+  in
+
+  Httpaf_lwt_unix.Server.create_connection_handler
+    ?config:None
+    ~request_handler
+    ~error_handler
+    sockaddr
+    fd
 
 
 (*********************************************************************)
 (* HTTP Server                                                       *)
 (*********************************************************************)
 
-let server ?(require_method=false) servers =
+let server ?(require_method=false) ?catch servers =
   let create_server port kind =
     let s = { server_port = port;
               server_kind = kind;
@@ -430,7 +432,7 @@ let server ?(require_method=false) servers =
     establish_server_with_client_socket
       ~nb_max_connections
       listen_address (fun sockaddr fd ->
-          connection_handler ~require_method s sockaddr fd) >>= fun _server ->
+          connection_handler ~require_method ?catch s sockaddr fd) >>= fun _server ->
     Lwt.return_unit
   in
   Lwt.join (List.map (fun (port,kind) ->

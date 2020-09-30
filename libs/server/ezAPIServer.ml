@@ -20,7 +20,7 @@ let of_cohttp_meth = function
   | `Other s -> OTHER s
 
 (* Resolve handler matching request and run it *)
-let dispatch ~require_method s (io, _conn) req body =
+let dispatch ~require_method ?catch s (io, _conn) req body =
   set_req_time ();
   begin
     match io with
@@ -146,9 +146,10 @@ let dispatch ~require_method s (io, _conn) req body =
        | RestoDirectory1.Cannot_parse (descr, msg, rpath) ->
          reply_answer (RestoDirectory1.response_of_cannot_parse descr msg rpath)
        | exn ->
-         EzDebug.printf "In %s: exception %s"
-           local_path (Printexc.to_string exn);
-         reply_none 500)
+         EzDebug.printf "In %s: exception %s" local_path @@ Printexc.to_string exn;
+         match catch with
+         | None -> reply_none 500
+         | Some c -> c local_path exn)
   >>= fun (code, reply) ->
   let headers =
     Header.add_list
@@ -181,14 +182,14 @@ let dispatch ~require_method s (io, _conn) req body =
 (* HTTP Server                                                       *)
 (*********************************************************************)
 
-let server ?(require_method=false) servers =
+let server ?(require_method=false) ?catch servers =
   let create_server port kind =
     let s = { server_port = port;
               server_kind = kind;
             } in
     if not (EzAPI.all_services_registered ()) then (* exit 2 *) ();
     init_timings (EzAPI.nservices());
-    let callback conn req body = dispatch ~require_method s conn req body in
+    let callback conn req body = dispatch ~require_method ?catch s conn req body in
     let dont_crash_on_exn exn =
       try
         raise exn
