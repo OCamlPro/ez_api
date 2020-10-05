@@ -1,16 +1,13 @@
 
 open EzSession.TYPES
 
-module Make(S: SessionArg) : sig
+module type Make_S = sig
+  type auth
 
-(* If cookies are in use on server-side, `connect` might return
-  an already authenticated user. Otherwise (CSRF protection),
-  a token can be provided (saved in local storage).
-*)
   val connect :
     EzAPI.base_url ->
     ?token:string ->
-    ((S.auth option, [`Session_expired]) result -> unit) -> unit
+    ((auth option, [`Session_expired]) result -> unit) -> unit
 
   val login :
     ?format:(string -> string) ->
@@ -18,7 +15,7 @@ module Make(S: SessionArg) : sig
     ?login:string -> (* login *)
     ?password:string -> (* password *)
     ?foreign:(string * string) -> (* foreign authentication : origin * token *)
-    ((S.auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
+    ((auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
 
   val logout :
     EzAPI.base_url ->
@@ -32,10 +29,16 @@ module Make(S: SessionArg) : sig
   val disconnected : unit -> unit
 
   val auth_headers : token:string -> (string * string) list
-  val get : unit -> S.auth option
+  val get : unit -> auth option
+end
 
+module Make(S: SessionArg) : Make_S with
+  type auth = (S.user_id, S.user_info) auth = struct
 
-  end = struct
+(* If cookies are in use on server-side, `connect` might return
+  an already authenticated user. Otherwise (CSRF protection),
+  a token can be provided (saved in local storage).
+*)
 
   module M = EzSession.Make(S)
   include M
@@ -49,7 +52,7 @@ module Make(S: SessionArg) : sig
   type state =
     | Disconnected
     | Connected of EzSession.TYPES.auth_needed
-    | User of S.auth
+    | User of auth
 
   let state = ref Disconnected
 

@@ -155,7 +155,7 @@ end = struct
       >>= function cookie ->
         add_auth_header ~cookie req;
         let auth = {
-          S.auth_login = login;
+          auth_login = login;
           auth_user_id = user_id;
           auth_token = cookie;
           auth_user_info = user_info;

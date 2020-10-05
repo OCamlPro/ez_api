@@ -21,14 +21,6 @@ module TYPES = struct
     type user_id
     type user_info
 
-    type auth = {
-      auth_login : string;
-      auth_user_id : user_id;
-      auth_token : string;
-      auth_user_info : user_info;
-      auth_kind : string option;
-    }
-
     val user_id_encoding : user_id Json_encoding.encoding
     val user_info_encoding : user_info Json_encoding.encoding
 
@@ -42,6 +34,14 @@ module TYPES = struct
 
     val token_kind : [`Cookie of string | `CSRF of string ]
   end
+
+  type ('user_id, 'user_info) auth = {
+    auth_login : string;
+    auth_user_id : 'user_id;
+    auth_token : string;
+    auth_user_info : 'user_info;
+    auth_kind : string option;
+  }
 
   type auth_needed = {
     challenge_id : string;
@@ -104,6 +104,8 @@ end
 
 module Make(S : SessionArg) = struct
 
+  type nonrec auth = (S.user_id, S.user_info) auth
+
   module Encoding = struct
     open Json_encoding
 
@@ -127,7 +129,6 @@ module Make(S : SessionArg) = struct
       }
 
     let auth_ok =
-      let open S in
       conv
         (fun { auth_login; auth_user_id; auth_token; auth_user_info; auth_kind } ->
            (auth_login, auth_user_id, auth_token, auth_user_info, auth_kind))
@@ -242,7 +243,7 @@ module Make(S : SessionArg) = struct
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
-    let connect : (S.auth connect_response, connect_error, token_security) EzAPI.service0  =
+    let connect : (auth connect_response, connect_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
         ~name:"connect"
@@ -251,10 +252,7 @@ module Make(S : SessionArg) = struct
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
-    let login : (login_message,
-                 S.auth,
-                 login_error,
-                 EzAPI.no_security) EzAPI.post_service0  =
+    let login : (login_message, auth, login_error, EzAPI.no_security) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
