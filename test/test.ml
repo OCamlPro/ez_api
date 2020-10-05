@@ -62,6 +62,7 @@ module SessionArg = struct
     auth_user_id : user_id;
     auth_token : string;
     auth_user_info : user_info;
+    auth_kind : string option;
   }
   let user_id_encoding = Json_encoding.string
   let user_info_encoding = Encoding.user_info

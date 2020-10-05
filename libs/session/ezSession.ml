@@ -26,6 +26,7 @@ module TYPES = struct
       auth_user_id : user_id;
       auth_token : string;
       auth_user_info : user_info;
+      auth_kind : string option;
     }
 
     val user_id_encoding : user_id Json_encoding.encoding
@@ -49,15 +50,25 @@ module TYPES = struct
 
   type 'auth connect_response = AuthOk of 'auth | AuthNeeded of auth_needed
 
-  type login_message = {
+  type local_login_message = {
     login_user : string;
     login_challenge_id : string;
     login_challenge_reply : string;
   }
 
+  type foreign_login_message = {
+    foreign_origin : string;
+    foreign_token : string;
+  }
+
+  type login_message =
+    | Local of local_login_message
+    | Foreign of foreign_login_message
+
   type login_error =
     [ `Bad_user_or_password
-    | `Challenge_not_found_or_expired of string ]
+    | `Challenge_not_found_or_expired of string
+    | `Invalid_session ]
 
   type logout_error =
     [ `Invalid_session ]
@@ -118,15 +129,16 @@ module Make(S : SessionArg) = struct
     let auth_ok =
       let open S in
       conv
-        (fun { auth_login; auth_user_id; auth_token; auth_user_info } ->
-           (auth_login, auth_user_id, auth_token, auth_user_info))
-        (fun (auth_login, auth_user_id, auth_token, auth_user_info) ->
-           { auth_login; auth_user_id; auth_token; auth_user_info }) @@
-      obj4
+        (fun { auth_login; auth_user_id; auth_token; auth_user_info; auth_kind } ->
+           (auth_login, auth_user_id, auth_token, auth_user_info, auth_kind))
+        (fun (auth_login, auth_user_id, auth_token, auth_user_info, auth_kind) ->
+           { auth_login; auth_user_id; auth_token; auth_user_info; auth_kind }) @@
+      obj5
         (req "login" EzEncoding.encoded_string)
         (req "user_id" S.user_id_encoding)
         (req "token" string)
         (req "user_info" S.user_info_encoding)
+        (opt "kind" string)
 
     let connect_response = union [
         case auth_ok
@@ -136,7 +148,12 @@ module Make(S : SessionArg) = struct
           (function AuthNeeded x -> Some x | _ -> None)
           (fun x -> AuthNeeded x) ]
 
-    let login_message =
+    let foreign_message = conv
+        (fun {foreign_origin; foreign_token} -> (foreign_origin, foreign_token))
+        (fun (foreign_origin, foreign_token) -> {foreign_origin; foreign_token}) @@
+      obj2 (req "auth_origin" string) (req "token" string)
+
+    let local_message =
       conv
         (fun
            { login_user; login_challenge_id; login_challenge_reply }
@@ -152,6 +169,14 @@ module Make(S : SessionArg) = struct
            (req "user" EzEncoding.encoded_string)
            (req "challenge_id" string)
            (req "challenge_reply" EzEncoding.encoded_string))
+
+    let login_message = union [
+        case local_message
+          (function Local l -> Some l | _ -> None)
+          (fun l -> Local l);
+        case foreign_message
+          (function Foreign f -> Some f | _ -> None)
+          (fun f -> Foreign f) ]
 
     let bad_user_case =
       EzAPI.ErrCase {

@@ -1,0 +1,11 @@
+(library
+ (name google)
+ (optional)
+ (modules google)
+ (libraries ezRequest_lwt))
+
+(library
+ (name facebook)
+ (optional)
+ (modules facebook)
+ (libraries ezRequest_lwt))

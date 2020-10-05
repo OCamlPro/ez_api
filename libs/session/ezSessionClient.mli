@@ -13,8 +13,9 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
   val login :
     ?format:(string -> string) ->
     EzAPI.base_url ->
-    login:string -> (* login *)
-    password:string -> (* password *)
+    ?login:string -> (* login *)
+    ?password:string -> (* password *)
+    ?foreign:(string * string) -> (* foreing auth : origin, token *)
     ((S.auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
 
   val logout :
