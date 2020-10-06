@@ -4,10 +4,15 @@ open EzSession.TYPES
 module type Make_S = sig
   type auth
 
+  type nonrec login_error = [
+    | login_error
+    | `Too_many_login_attempts
+    | `Session_expired ]
+
   val connect :
     EzAPI.base_url ->
     ?token:string ->
-    ((auth option, [`Session_expired]) result -> unit) -> unit
+    ((auth option, connect_error) result -> unit) -> unit
 
   val login :
     ?format:(string -> string) ->
@@ -15,7 +20,7 @@ module type Make_S = sig
     ?login:string -> (* login *)
     ?password:string -> (* password *)
     ?foreign:(string * string) -> (* foreign authentication : origin * token *)
-    ((auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
+    ((auth, login_error) result -> unit) -> unit
 
   val logout :
     EzAPI.base_url ->
@@ -34,6 +39,11 @@ end
 
 module Make(S: SessionArg) : Make_S with
   type auth = (S.user_id, S.user_info, S.foreign_info) auth = struct
+
+  type nonrec login_error = [
+    | login_error
+    | `Too_many_login_attempts
+    | `Session_expired ]
 
 (* If cookies are in use on server-side, `connect` might return
   an already authenticated user. Otherwise (CSRF protection),
@@ -119,9 +129,6 @@ module Make(S: SessionArg) : Make_S with
         )
         ()
 
-  type login_error =
-      [ `Bad_user_or_password | `Invalid_session | `Too_many_login_attempts | `Session_expired ]
-
   let rec login_rec ?format ntries api ?login ?password ?foreign
       (f : (('a, login_error) result -> unit)) =
     if ntries = 0 then
@@ -176,12 +183,9 @@ module Make(S: SessionArg) : Make_S with
                 set_cookie u.auth_token;
                 state := User u;
                 f (Ok u)
-              | Error `Bad_user_or_password ->
-                f (Error `Bad_user_or_password)
               | Error `Challenge_not_found_or_expired _ ->
                 login_rec ?format (ntries-1) api ~login ~password f
-              | Error `Invalid_session ->
-                f (Error `Invalid_session)
+              | Error e -> f (Error (e :> login_error))
             )
         | _, _, Some (foreign_origin, foreign_token) ->
           EzRequest.ANY.post0 api Service.login "login"
@@ -191,12 +195,9 @@ module Make(S: SessionArg) : Make_S with
                 set_cookie u.auth_token;
                 state := User u;
                 f (Ok u)
-              | Error `Bad_user_or_password ->
-                f (Error `Bad_user_or_password)
               | Error `Challenge_not_found_or_expired _ ->
                 login_rec ?format (ntries-1) api ?foreign f
-              | Error `Invalid_session ->
-                f (Error `Invalid_session)
+              | Error e -> f (Error (e :> login_error))
             )
         | _ -> assert false
 

@@ -217,8 +217,8 @@ end = struct
             add_session ~cookie:foreign_token user_id >>= fun () ->
             return_auth req ~login:foreign_login ~cookie:foreign_token ~foreign user_id user_info
           | _ ->
-            debug ~v:1 "/login: could not find foreign user %S" foreign_login;
-            request_error req ~code:401 `Bad_user_or_password
+            debug ~v:1 "/login: could not find foreign user";
+            request_error req ~code:400 `User_not_registered
 
 
 

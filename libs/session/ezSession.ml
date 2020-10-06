@@ -69,6 +69,7 @@ module TYPES = struct
 
   type login_error =
     [ `Bad_user_or_password
+    | `User_not_registered
     | `Challenge_not_found_or_expired of string
     | `Invalid_session ]
 
@@ -193,6 +194,15 @@ module Make(S : SessionArg) = struct
         deselect = (fun () -> `Bad_user_or_password);
       }
 
+    let user_not_registered_case =
+      EzAPI.ErrCase {
+        code = 400;
+        name = "UserNotRegistered";
+        encoding = (obj1 (req "error" (constant "UserNotRegistered")));
+        select = (function `User_not_registered -> Some () | _ -> None);
+        deselect = (fun () -> `User_not_registered);
+      }
+
     let challenge_not_found_case =
       EzAPI.ErrCase {
         code = 401;
@@ -264,6 +274,7 @@ module Make(S : SessionArg) = struct
         ~input:Encoding.login_message
         ~output:Encoding.auth_ok
         ~error_outputs: [Encoding.bad_user_case;
+                         Encoding.user_not_registered_case;
                          Encoding.challenge_not_found_case]
         EzAPI.Path.(rpc_root // "login")
 
