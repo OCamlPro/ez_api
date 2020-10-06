@@ -99,12 +99,12 @@ open Services
 open EzRequest_lwt
 open Lwt.Infix
 
+let handle_error e = Error (handle_error (fun exn -> Some (Printexc.to_string exn)) e)
+
 let check_token ~client_id id_token =
   let params = [id_token_param, EzAPI.TYPES.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
-  | Error (KnownError {code; error}) ->
-    Error (code, Some (Printexc.to_string error))
-  | Error (UnknownError {code; msg}) -> Error (code, msg)
+  | Error e -> handle_error e
   | Ok token ->
     if token.token_info.idt_aud = client_id then Ok token.token_info.idt_aud
     else Error (400, Some "this google id_token is not valid for this app")
@@ -112,9 +112,7 @@ let check_token ~client_id id_token =
 let get_address ~client_id id_token =
   let params = [id_token_param, EzAPI.TYPES.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
-  | Error (KnownError {code; error}) ->
-    Error (code, Some (Printexc.to_string error))
-  | Error (UnknownError {code; msg}) -> Error (code, msg)
+  | Error e -> handle_error e
   | Ok token ->
     if token.token_info.idt_aud = client_id then
       match token.email_info with
