@@ -2,6 +2,7 @@ open EzSession.TYPES
 
 module type SessionStore = sig
   type user_id
+  val add_session : cookie:string -> user_id -> unit Lwt.t
   val create_session : login:string -> user_id -> user_id session Lwt.t
   val get_session : cookie:string -> user_id session option Lwt.t
   val remove_session : user_id -> cookie:string -> unit Lwt.t

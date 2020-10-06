@@ -37,6 +37,7 @@ let random_challenge () =
 
 module type SessionStore = sig
   type user_id
+  val add_session : cookie:string -> user_id -> unit Lwt.t
   val create_session : login:string -> user_id -> user_id session Lwt.t
   val get_session : cookie:string -> user_id session option Lwt.t
   val remove_session : user_id -> cookie:string -> unit Lwt.t
@@ -47,7 +48,7 @@ module type Arg = sig
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
     (string * SessionArg.user_id * SessionArg.user_info * string option) option Lwt.t
-  val check_foreign : (* check a token and create a session with this token *)
+  val check_foreign :
     origin:string -> token:string ->
     (string, int * string option) result Lwt.t
 end
@@ -213,6 +214,7 @@ end = struct
             debug ~v:1 "/login: could not find foreign user %S" foreign_login;
             request_error req ~code:401 `Bad_user_or_password
           | Some (_pwhash, user_id, user_info, kind) ->
+            add_session ~cookie:foreign_token user_id >>= fun () ->
             return_auth req ~login:foreign_login ~cookie:foreign_token ?kind user_id user_info
 
 
@@ -253,6 +255,17 @@ module SessionStoreInMemory :
 
   let (session_by_cookie : (string, user_id session) Hashtbl.t) =
     Hashtbl.create initial_hashtbl_size
+
+  let add_session ~cookie user_id =
+    let s = {
+        session_login = "";
+        session_user_id = user_id;
+        session_cookie = cookie;
+        session_variables = StringMap.empty;
+        session_last = EzAPIServerUtils.req_time ();
+      } in
+    Hashtbl.add session_by_cookie cookie s;
+    Lwt.return_unit
 
   let rec create_session ~login user_id =
     let cookie = random_challenge () in
