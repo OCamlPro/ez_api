@@ -47,7 +47,7 @@ module type Arg = sig
   module SessionArg : EzSession.TYPES.SessionArg
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
-    (string * SessionArg.user_id * SessionArg.user_info * string option) option Lwt.t
+    (SessionArg.foreign_info login_required * SessionArg.user_id * SessionArg.user_info) option Lwt.t
   val check_foreign :
     origin:string -> token:string ->
     (string, int * string option) result Lwt.t
@@ -146,7 +146,7 @@ end = struct
       add_auth_header req;
       EzAPIServerUtils.return ~code (Error msg)
 
-    let return_auth_base req ?cookie ?kind ~login user_id user_info f =
+    let return_auth_base req ?cookie ?foreign ~login user_id user_info f =
       begin match cookie with
         | Some cookie -> Lwt.return cookie
         | None ->
@@ -160,12 +160,12 @@ end = struct
           auth_user_id = user_id;
           auth_token = cookie;
           auth_user_info = user_info;
-          auth_kind = kind;
+          auth_foreign = foreign;
         } in
         EzAPIServerUtils.return (f auth)
 
-    let return_auth req ?cookie ?kind ~login user_id user_info =
-      return_auth_base req ?cookie ?kind ~login user_id user_info
+    let return_auth req ?cookie ?foreign ~login user_id user_info =
+      return_auth_base req ?cookie ?foreign ~login user_id user_info
         (fun auth -> Ok auth)
 
     let connect req security () =
@@ -176,46 +176,50 @@ end = struct
         find_user ~login >>= function
         | None ->
           request_error req ~code:440 `Session_expired
-        | Some (_pwhash, user_id, user_info, kind) ->
-          return_auth_base req ~cookie ~login ?kind user_id user_info (fun a -> Ok (AuthOk a))
+        | Some (required, user_id, user_info) ->
+          let foreign = match required with RLocal _ -> None | RForeign f -> Some f in
+          return_auth_base req ~cookie ~login ?foreign user_id user_info (fun a -> Ok (AuthOk a))
 
     let login req _  = function
       | Local { login_user; login_challenge_id; login_challenge_reply } ->
         begin
           find_user ~login:login_user >>= function
-          | None ->
+          | Some (RLocal pwhash, user_id, user_info) ->
+            begin match Hashtbl.find challenges login_challenge_id with
+              | exception Not_found ->
+                debug ~v:1 "/login: could not find challenge\n%!";
+                request_error req ~code:401
+                  (`Challenge_not_found_or_expired login_challenge_id)
+              | (challenge, _t0) ->
+                let expected_reply =
+                  EzSession.Hash.challenge
+                    ~challenge ~pwhash
+                in
+                if expected_reply <> login_challenge_reply then begin
+                  debug ~v:1 "/login: challenge failed";
+                  request_error req ~code:401 `Bad_user_or_password
+                end else begin
+                  Hashtbl.remove challenges login_challenge_id;
+                  return_auth req ~login:login_user user_id user_info
+                end
+            end
+          | _ ->
             debug ~v:1 "/login: could not find user %S" login_user;
             request_error req ~code:401 `Bad_user_or_password
-          | Some (pwhash, user_id, user_info, kind) ->
-            match Hashtbl.find challenges login_challenge_id with
-            | exception Not_found ->
-              debug ~v:1 "/login: could not find challenge\n%!";
-              request_error req ~code:401
-                (`Challenge_not_found_or_expired login_challenge_id)
-            | (challenge, _t0) ->
-              let expected_reply =
-                EzSession.Hash.challenge
-                  ~challenge ~pwhash
-              in
-              if expected_reply <> login_challenge_reply then begin
-                debug ~v:1 "/login: challenge failed";
-                request_error req ~code:401 `Bad_user_or_password
-              end else begin
-                Hashtbl.remove challenges login_challenge_id;
-                return_auth req ~login:login_user ?kind user_id user_info
-              end
+
         end
       | Foreign {foreign_origin; foreign_token} ->
         check_foreign ~origin:foreign_origin ~token:foreign_token >>= function
         | Error _ -> request_error req ~code:401 `Invalid_session
         | Ok foreign_login ->
           find_user ~login:foreign_login >>= function
-          | None ->
+          | Some (RForeign foreign, user_id, user_info) ->
+            add_session ~cookie:foreign_token user_id >>= fun () ->
+            return_auth req ~login:foreign_login ~cookie:foreign_token ~foreign user_id user_info
+          | _ ->
             debug ~v:1 "/login: could not find foreign user %S" foreign_login;
             request_error req ~code:401 `Bad_user_or_password
-          | Some (_pwhash, user_id, user_info, kind) ->
-            add_session ~cookie:foreign_token user_id >>= fun () ->
-            return_auth req ~login:foreign_login ~cookie:foreign_token ?kind user_id user_info
+
 
 
 
@@ -301,26 +305,25 @@ module SessionStoreInMemory :
 
 end
 
-module UserStoreInMemory(S : EzSession.TYPES.SessionArg
-                        with type user_id = string) : sig
+module UserStoreInMemory(
+    S : EzSession.TYPES.SessionArg
+    with type user_id = string and type foreign_info = string) : sig
 
-  type pwhash = string
   val create_user :
-    ?pwhash:pwhash -> ?password:string -> ?kind:string ->
+    ?pwhash:string -> ?password:string -> ?kind:string ->
     login:string -> S.user_info -> unit
   val remove_user : login:string -> unit
-  val find_user : login:string -> (pwhash * S.user_id * S.user_info * string option) option Lwt.t
+  val find_user : login:string -> (S.foreign_info login_required * S.user_id * S.user_info) option Lwt.t
   val check_foreign : origin:string -> token:string ->
     (string, int * string option) result Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
     with type user_info = S.user_info
      and type user_id = S.user_id
+     and type foreign_info = S.foreign_info
   module SessionStore : SessionStore with type user_id = S.user_id
 
 end = struct
-
-  type pwhash = string
 
   module SessionArg = S
   module SessionStore =
@@ -364,7 +367,8 @@ end = struct
       Lwt.return None
     | u ->
       debug ~v:1 "find_user %S ok" login;
-      Lwt.return ( Some (u.pwhash, u.user_id, u.user_info, u.kind) )
+      let required = match u.kind with None -> RLocal u.pwhash | Some k -> RForeign k in
+      Lwt.return ( Some (required, u.user_id, u.user_info) )
 
   let check_foreign ~origin ~token =
     debug ~v:1 "check_foreign %S ?" (origin ^ "-" ^ token);

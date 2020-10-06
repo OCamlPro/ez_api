@@ -20,9 +20,11 @@ module TYPES = struct
 
     type user_id
     type user_info
+    type foreign_info
 
     val user_id_encoding : user_id Json_encoding.encoding
     val user_info_encoding : user_info Json_encoding.encoding
+    val foreign_info_encoding : foreign_info Json_encoding.encoding
 
     val rpc_path : string list (* ["v1"] *)
 
@@ -35,12 +37,12 @@ module TYPES = struct
     val token_kind : [`Cookie of string | `CSRF of string ]
   end
 
-  type ('user_id, 'user_info) auth = {
+  type ('user_id, 'user_info, 'foreign_info) auth = {
     auth_login : string;
     auth_user_id : 'user_id;
     auth_token : string;
     auth_user_info : 'user_info;
-    auth_kind : string option;
+    auth_foreign : 'foreign_info option;
   }
 
   type auth_needed = {
@@ -76,6 +78,9 @@ module TYPES = struct
   type connect_error =
     [ `Session_expired ]
 
+  type 'foreign_info login_required =
+    | RLocal of string
+    | RForeign of 'foreign_info
 end
 
 open TYPES
@@ -104,7 +109,7 @@ end
 
 module Make(S : SessionArg) = struct
 
-  type nonrec auth = (S.user_id, S.user_info) auth
+  type nonrec auth = (S.user_id, S.user_info, S.foreign_info) auth
 
   module Encoding = struct
     open Json_encoding
@@ -130,16 +135,16 @@ module Make(S : SessionArg) = struct
 
     let auth_ok =
       conv
-        (fun { auth_login; auth_user_id; auth_token; auth_user_info; auth_kind } ->
-           (auth_login, auth_user_id, auth_token, auth_user_info, auth_kind))
-        (fun (auth_login, auth_user_id, auth_token, auth_user_info, auth_kind) ->
-           { auth_login; auth_user_id; auth_token; auth_user_info; auth_kind }) @@
+        (fun { auth_login; auth_user_id; auth_token; auth_user_info; auth_foreign } ->
+           (auth_login, auth_user_id, auth_token, auth_user_info, auth_foreign))
+        (fun (auth_login, auth_user_id, auth_token, auth_user_info, auth_foreign) ->
+           { auth_login; auth_user_id; auth_token; auth_user_info; auth_foreign }) @@
       obj5
         (req "login" EzEncoding.encoded_string)
         (req "user_id" S.user_id_encoding)
         (req "token" string)
         (req "user_info" S.user_info_encoding)
-        (opt "kind" string)
+        (opt "foreign" S.foreign_info_encoding)
 
     let connect_response = union [
         case auth_ok

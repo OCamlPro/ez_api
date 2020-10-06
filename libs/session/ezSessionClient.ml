@@ -33,7 +33,7 @@ module type Make_S = sig
 end
 
 module Make(S: SessionArg) : Make_S with
-  type auth = (S.user_id, S.user_info) auth = struct
+  type auth = (S.user_id, S.user_info, S.foreign_info) auth = struct
 
 (* If cookies are in use on server-side, `connect` might return
   an already authenticated user. Otherwise (CSRF protection),
