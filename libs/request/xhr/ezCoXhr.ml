@@ -28,5 +28,3 @@ let init () =
   EzRequest.log := (fun s -> Js_of_ocaml.(Firebug.console##log (Js.string s)));
   !EzRequest.log "ezCoXhr Loaded";
   ()
-
-let () = init ()

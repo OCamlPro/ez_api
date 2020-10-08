@@ -1,23 +1,28 @@
 
 open EzSession.TYPES
 
-module Make(S: SessionArg) : sig
+module type Make_S = sig
+  type auth
 
-(* If cookies are in use on server-side, `connect` might return
-  an already authenticated user. Otherwise (CSRF protection),
-  a token can be provided (saved in local storage).
-*)
+  type nonrec login_error = [
+    | login_error
+    | connect_error
+    | logout_error
+    | `Too_many_login_attempts
+    | `Session_expired ]
+
   val connect :
     EzAPI.base_url ->
     ?token:string ->
-    ((S.auth option, [`Session_expired]) result -> unit) -> unit
+    ((auth option, connect_error) result -> unit) -> unit
 
   val login :
     ?format:(string -> string) ->
     EzAPI.base_url ->
-    login:string -> (* login *)
-    password:string -> (* password *)
-    ((S.auth, [ `Bad_user_or_password | `Too_many_login_attempts | `Invalid_session | `Session_expired ]) result -> unit) -> unit
+    ?login:string -> (* login *)
+    ?password:string -> (* password *)
+    ?foreign:(string * string) -> (* foreign authentication : origin * token *)
+    ((auth, login_error) result -> unit) -> unit
 
   val logout :
     EzAPI.base_url ->
@@ -31,10 +36,23 @@ module Make(S: SessionArg) : sig
   val disconnected : unit -> unit
 
   val auth_headers : token:string -> (string * string) list
-  val get : unit -> S.auth option
+  val get : unit -> auth option
+end
 
+module Make(S: SessionArg) : Make_S with
+  type auth = (S.user_id, S.user_info) auth = struct
 
-  end = struct
+  type nonrec login_error = [
+    | login_error
+    | connect_error
+    | logout_error
+    | `Too_many_login_attempts
+    | `Session_expired ]
+
+(* If cookies are in use on server-side, `connect` might return
+  an already authenticated user. Otherwise (CSRF protection),
+  a token can be provided (saved in local storage).
+*)
 
   module M = EzSession.Make(S)
   include M
@@ -48,7 +66,7 @@ module Make(S: SessionArg) : sig
   type state =
     | Disconnected
     | Connected of EzSession.TYPES.auth_needed
-    | User of S.auth
+    | User of auth
 
   let state = ref Disconnected
 
@@ -83,9 +101,9 @@ module Make(S: SessionArg) : sig
           | Ok (AuthNeeded auth_needed) ->
              state := Connected auth_needed;
              f (Ok None)
-          | Error `Session_expired ->
+          | Error e ->
              state := Disconnected;
-             f (Error `Session_expired)
+             f (Error e)
          )
          ()
     | Connected _ ->
@@ -115,10 +133,7 @@ module Make(S: SessionArg) : sig
         )
         ()
 
-  type login_error =
-      [ `Bad_user_or_password | `Invalid_session | `Too_many_login_attempts | `Session_expired ]
-
-  let rec login_rec ?format ntries api (u_login : string) u_password
+  let rec login_rec ?format ntries api ?login ?password ?foreign
       (f : (('a, login_error) result -> unit)) =
     if ntries = 0 then
       (try f (Error `Too_many_login_attempts) with _ -> ())
@@ -128,62 +143,70 @@ module Make(S: SessionArg) : sig
         connect api
           (function
             | Error e -> f (Error (e :> login_error))
-            | Ok None -> login_rec ?format (ntries-1) api u_login u_password f
+            | Ok None -> login_rec ?format (ntries-1) api ?login ?password ?foreign f
             | Ok (Some u) ->
-              if u.auth_login <> u_login then
+              if Some u.auth_login <> login then
                 logout
                   api
                   ~token:u.auth_token
                   (function
                       Ok _ ->
-                      login_rec ?format (ntries-1) api u_login u_password f
+                      login_rec ?format (ntries-1) api ?login ?password ?foreign f
                     | Error e ->
                       f (Error (e :> login_error)) )
               else
                 f (Ok u))
       | User u ->
-
-        if u.auth_login <> u_login then
+        if Some u.auth_login <> login then
           logout api
             ~token:u.auth_token
             (function
               | Ok _ ->
-                login_rec ?format (ntries-1) api u_login u_password f
+                login_rec ?format (ntries-1) api ?login ?password f
               | Error e ->
                 f (Error (e :> login_error))
             )
         else
           f (Ok u)
       | Connected { challenge_id; challenge } ->
-        let pwhash = EzSession.Hash.password ~login:u_login ~password:u_password in
-        let pwhash = match format with
-          | None -> pwhash
-          | Some f -> f pwhash in
-        let challenge_reply =
-          EzSession.Hash.challenge ~challenge ~pwhash
-        in
-        EzRequest.ANY.post0
-          api
-          Service.login "login"
-          ~params:[]
-          ~input: {
-            login_user = u_login;
-            login_challenge_id = challenge_id;
-            login_challenge_reply = challenge_reply;
-          }
-          (function
-            | Ok u ->
-              set_cookie u.auth_token;
-              state := User u;
-              f (Ok u)
-            | Error `Bad_user_or_password ->
-              f (Error `Bad_user_or_password)
-            | Error `Challenge_not_found_or_expired _ ->
-              login_rec ?format (ntries-1) api u_login u_password f
-          )
+        match login, password, foreign with
+        | Some login, Some password, _ ->
+          let pwhash = EzSession.Hash.password ~login ~password in
+          let pwhash = match format with
+            | None -> pwhash
+            | Some f -> f pwhash in
+          let login_challenge_reply = EzSession.Hash.challenge ~challenge ~pwhash in
+          EzRequest.ANY.post0 api Service.login "login"
+            ~input:(Local {
+                login_user = login;
+                login_challenge_id = challenge_id;
+                login_challenge_reply;
+              })
+            (function
+              | Ok u ->
+                set_cookie u.auth_token;
+                state := User u;
+                f (Ok u)
+              | Error `Challenge_not_found_or_expired _ ->
+                login_rec ?format (ntries-1) api ~login ~password f
+              | Error e -> f (Error (e :> login_error))
+            )
+        | _, _, Some (foreign_origin, foreign_token) ->
+          EzRequest.ANY.post0 api Service.login "login"
+            ~input:(Foreign { foreign_origin; foreign_token })
+            (function
+              | Ok u ->
+                set_cookie u.auth_token;
+                state := User u;
+                f (Ok u)
+              | Error `Challenge_not_found_or_expired _ ->
+                login_rec ?format (ntries-1) api ?foreign f
+              | Error e -> f (Error (e :> login_error))
+            )
+        | _ -> assert false
 
-  let login ?format api ~login:u_login ~password:u_password f =
-    login_rec ?format 4 api u_login u_password f
+  let login ?format api ?login ?password ?foreign f =
+    login_rec ?format 4 api ?login ?password ?foreign f
 
   let get () =
     match !state with

@@ -36,4 +36,4 @@ let init () =
   EzDebugJS.init ();
   init ();
   EzRequest_lwt.log := (fun s -> Firebug.console##log (Js.string s));
-  !EzRequest_lwt.log "ezXhr Loaded"
+  !EzRequest_lwt.log "ezFetch Loaded"

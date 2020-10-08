@@ -60,5 +60,4 @@ let init () =
   EzDebugJS.init ();
   init ();
   EzRequest.log := (fun s -> Firebug.console##log (Js.string s));
-  !EzRequest.log "ezXhr Loaded";
-  ()
+  !EzRequest.log "ezXhr Loaded"

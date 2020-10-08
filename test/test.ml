@@ -57,12 +57,6 @@ let user1_info = "info-on-user"
 module SessionArg = struct
   type user_id = string
   type user_info = Types.user_info
-  type auth = {
-    auth_login : string;
-    auth_user_id : user_id;
-    auth_token : string;
-    auth_user_info : user_info;
-  }
   let user_id_encoding = Json_encoding.string
   let user_info_encoding = Encoding.user_info
   let rpc_path = []

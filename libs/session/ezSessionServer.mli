@@ -2,7 +2,7 @@ open EzSession.TYPES
 
 module type SessionStore = sig
   type user_id
-  val create_session : login:string -> user_id -> user_id session Lwt.t
+  val create_session : ?foreign:foreign_info -> login:string -> user_id -> user_id session Lwt.t
   val get_session : cookie:string -> user_id session option Lwt.t
   val remove_session : user_id -> cookie:string -> unit Lwt.t
 end
@@ -11,9 +11,9 @@ module type Arg = sig
   module SessionArg : EzSession.TYPES.SessionArg
   module SessionStore : SessionStore with type user_id = SessionArg.user_id
   val find_user : login:string ->
-    (string * SessionArg.user_id *
-     SessionArg.user_info) option Lwt.t
-  (* val error_wrapper : (string -> string) option *)
+    (string option * SessionArg.user_id * SessionArg.user_info) option Lwt.t
+  val check_foreign : origin:string -> token:string ->
+    (string, int * string option) result Lwt.t
 end
 
 module Make(S: Arg) : sig
@@ -32,18 +32,17 @@ module Make(S: Arg) : sig
 end
 
 
-
-
-
 exception UserAlreadyDefined
 exception NoPasswordProvided
 module UserStoreInMemory(S : SessionArg with type user_id = string) : sig
 
   val create_user :
     ?pwhash:Digest.t ->
-    ?password:string -> login:string -> S.user_info -> unit
+    ?password:string -> ?kind:string -> login:string -> S.user_info -> unit
   val remove_user : login:string -> unit
-  val find_user : login:string -> (string * S.user_id * S.user_info) option Lwt.t
+  val find_user : login:string -> (string option * S.user_id * S.user_info) option Lwt.t
+  val check_foreign : origin:string -> token:string ->
+    (string, int * string option) result Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
     with type user_info = S.user_info

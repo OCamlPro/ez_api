@@ -60,6 +60,10 @@ type 'a api_error =
   | UnknownError of { code : int ; msg : string option }
 type ('output, 'error) api_result = ('output, 'error api_error) result
 
+let handle_error kn = function
+  | KnownError {code; error} -> code, kn error
+  | UnknownError {code; msg} -> code, msg
+
 let string_of_error kn = function
   | KnownError {code; error} ->
     let content = match kn error with None -> "" | Some s -> ": " ^ s in
