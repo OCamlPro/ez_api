@@ -14,6 +14,7 @@ module Types = struct
   }
 
   type profile_info = {
+    pr_name : string;
     pr_picture : string;
     pr_given_name : string;
     pr_family_name : string;
@@ -44,31 +45,34 @@ module Encoding = struct
       (req "iat" string)
       (req "exp" string)
 
+  let bool_of_string = conv string_of_bool bool_of_string string
   let email_info = conv
       (fun {em_addr; em_verified} -> (em_addr, em_verified))
       (fun (em_addr, em_verified) -> {em_addr; em_verified}) @@
     obj2
       (req "email" string)
-      (req "email_verfied" bool)
+      (req "email_verified" bool_of_string)
 
   let profile_info = conv
-      (fun {pr_picture; pr_given_name; pr_family_name; pr_locale}
-        -> (pr_picture, pr_given_name, pr_family_name, pr_locale))
-      (fun (pr_picture, pr_given_name, pr_family_name, pr_locale)
-        -> {pr_picture; pr_given_name; pr_family_name; pr_locale}) @@
-    obj4
+      (fun {pr_picture; pr_name; pr_given_name; pr_family_name; pr_locale}
+        -> (pr_picture, pr_name, pr_given_name, pr_family_name, pr_locale))
+      (fun (pr_picture, pr_name, pr_given_name, pr_family_name, pr_locale)
+        -> {pr_picture; pr_name; pr_given_name; pr_family_name; pr_locale}) @@
+    obj5
       (req "picture" string)
+      (req "name" string)
       (req "given_name" string)
       (req "family_name" string)
       (req "locale" string)
 
   let merge_objs_opt e1 e2 = union [
+      case (merge_objs e1 e2)
+        (function (x, Some y) -> Some (x, y) | _ -> None)
+        (fun (x, y) -> (x, Some y));
       case e1
         (function (x, None) -> Some x | _ -> None)
         (fun x -> (x, None));
-      case (merge_objs e1 e2)
-        (function (x, Some y) -> Some (x, y) | _ -> None)
-        (fun (x, y) -> (x, Some y)) ]
+    ]
 
   let encoding = EzEncoding.ignore_enc @@ conv
       (fun {token_info; email_info; profile_info}
@@ -99,23 +103,21 @@ open Services
 open EzRequest_lwt
 open Lwt.Infix
 
-let handle_error e = Error (handle_error (fun exn -> Some (Printexc.to_string exn)) e)
+let handle_error e =
+  Error (handle_error (fun exn -> Some (Printexc.to_string exn)) e)
 
 let check_token ~client_id id_token =
   let params = [id_token_param, EzAPI.TYPES.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok token ->
-    if token.token_info.idt_aud = client_id then Ok token.token_info.idt_aud
+    if token.token_info.idt_aud = client_id then Ok token.token_info.idt_sub
     else Error (400, Some "this google id_token is not valid for this app")
 
-let get_address ~client_id id_token =
+let get_info ~client_id id_token =
   let params = [id_token_param, EzAPI.TYPES.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok token ->
-    if token.token_info.idt_aud = client_id then
-      match token.email_info with
-      | None -> Error (400, Some "google permission doesn't include email address")
-      | Some em -> Ok em.em_addr
+    if token.token_info.idt_aud = client_id then Ok (token.email_info, token.profile_info)
     else Error (400, Some "this google id_token is not valid for this app")

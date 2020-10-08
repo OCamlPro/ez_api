@@ -6,6 +6,8 @@ module type Make_S = sig
 
   type nonrec login_error = [
     | login_error
+    | connect_error
+    | logout_error
     | `Too_many_login_attempts
     | `Session_expired ]
 
@@ -38,10 +40,12 @@ module type Make_S = sig
 end
 
 module Make(S: SessionArg) : Make_S with
-  type auth = (S.user_id, S.user_info, S.foreign_info) auth = struct
+  type auth = (S.user_id, S.user_info) auth = struct
 
   type nonrec login_error = [
     | login_error
+    | connect_error
+    | logout_error
     | `Too_many_login_attempts
     | `Session_expired ]
 
@@ -97,9 +101,9 @@ module Make(S: SessionArg) : Make_S with
           | Ok (AuthNeeded auth_needed) ->
              state := Connected auth_needed;
              f (Ok None)
-          | Error `Session_expired ->
+          | Error e ->
              state := Disconnected;
-             f (Error `Session_expired)
+             f (Error e)
          )
          ()
     | Connected _ ->

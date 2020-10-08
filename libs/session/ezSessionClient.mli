@@ -5,17 +5,19 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
   an already authenticated user. Otherwise (CSRF protection),
   a token can be provided (saved in local storage).
 *)
-  type nonrec auth = (S.user_id, S.user_info, S.foreign_info) EzSession.TYPES.auth
+  type nonrec auth = (S.user_id, S.user_info) EzSession.TYPES.auth
 
   type login_error = [
     | EzSession.TYPES.login_error
+    | EzSession.TYPES.connect_error
+    | EzSession.TYPES.logout_error
     | `Too_many_login_attempts
     | `Session_expired ]
 
   val connect :
     EzAPI.base_url ->
     ?token:string ->
-    (((S.user_id, S.user_info, S.foreign_info) EzSession.TYPES.auth option, EzSession.TYPES.connect_error) result -> unit) -> unit
+    (((S.user_id, S.user_info) EzSession.TYPES.auth option, EzSession.TYPES.connect_error) result -> unit) -> unit
 
   val login :
     ?format:(string -> string) ->
@@ -23,7 +25,7 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
     ?login:string -> (* login *)
     ?password:string -> (* password *)
     ?foreign:(string * string) -> (* foreing auth : origin, token *)
-    (((S.user_id, S.user_info, S.foreign_info) EzSession.TYPES.auth, login_error) result -> unit) -> unit
+    (((S.user_id, S.user_info) EzSession.TYPES.auth, login_error) result -> unit) -> unit
 
   val logout :
     EzAPI.base_url ->
@@ -40,6 +42,6 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
     need authentication *)
   val auth_headers : token:string -> (string * string) list
 
-  val get : unit -> (S.user_id, S.user_info, S.foreign_info) EzSession.TYPES.auth option
+  val get : unit -> (S.user_id, S.user_info) EzSession.TYPES.auth option
 
   end

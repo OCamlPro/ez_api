@@ -1,4 +1,3 @@
-open StringCompat
 
 (* TODO:
   * Use a better hash fuction than md5 !!!
@@ -8,23 +7,26 @@ let debug = false
 
 module TYPES = struct
 
+  type foreign_info = {
+    foreign_origin : string;
+    foreign_token : string;
+  }
+
   type 'user_id session = {
     session_cookie : string;
     session_login : string;
     session_user_id : 'user_id;
-    mutable session_variables : string StringMap.t;
-    mutable session_last : float;
+    session_last : float;
+    session_foreign : foreign_info option;
   }
 
   module type SessionArg = sig
 
     type user_id
     type user_info
-    type foreign_info
 
     val user_id_encoding : user_id Json_encoding.encoding
     val user_info_encoding : user_info Json_encoding.encoding
-    val foreign_info_encoding : foreign_info Json_encoding.encoding
 
     val rpc_path : string list (* ["v1"] *)
 
@@ -37,12 +39,11 @@ module TYPES = struct
     val token_kind : [`Cookie of string | `CSRF of string ]
   end
 
-  type ('user_id, 'user_info, 'foreign_info) auth = {
+  type ('user_id, 'user_info) auth = {
     auth_login : string;
     auth_user_id : 'user_id;
     auth_token : string;
     auth_user_info : 'user_info;
-    auth_foreign : 'foreign_info option;
   }
 
   type auth_needed = {
@@ -58,30 +59,22 @@ module TYPES = struct
     login_challenge_reply : string;
   }
 
-  type foreign_login_message = {
-    foreign_origin : string;
-    foreign_token : string;
-  }
-
   type login_message =
     | Local of local_login_message
-    | Foreign of foreign_login_message
+    | Foreign of foreign_info
 
   type login_error =
     [ `Bad_user_or_password
     | `User_not_registered
     | `Challenge_not_found_or_expired of string
-    | `Invalid_session ]
+    | `Invalid_session_login of string ]
 
   type logout_error =
-    [ `Invalid_session ]
+    [ `Invalid_session_logout of string]
 
   type connect_error =
-    [ `Session_expired ]
+    [ `Session_expired | `Invalid_session_connect of string ]
 
-  type 'foreign_info login_required =
-    | RLocal of string
-    | RForeign of 'foreign_info
 end
 
 open TYPES
@@ -95,22 +88,21 @@ module Hash = struct
     let s = hash (login ^ password) in
     if debug then
       EzDebug.printf "EzSession.Hash.password:\n  %S %S => %S"
-                     login password s;
+        login password s;
     s
 
   let challenge ~challenge ~pwhash =
     let s = hash (challenge ^ pwhash) in
     if debug then
       EzDebug.printf "EzSession.Hash.challenge:\n  %S %S => %S"
-                     challenge pwhash s;
+        challenge pwhash s;
     s
-
 
 end
 
 module Make(S : SessionArg) = struct
 
-  type nonrec auth = (S.user_id, S.user_info, S.foreign_info) auth
+  type nonrec auth = (S.user_id, S.user_info) auth
 
   module Encoding = struct
     open Json_encoding
@@ -125,27 +117,17 @@ module Make(S : SessionArg) = struct
         (req "challenge_id" string)
         (req "challenge" string)
 
-    let session_expired_case =
-      EzAPI.ErrCase {
-        code = 440;
-        name = "SessionExpired";
-        encoding = (obj1 (req "error" (constant "SessionExpired")));
-        select = (function `Session_expired -> Some () (* | _ -> None *));
-        deselect = (fun () -> `Session_expired);
-      }
-
     let auth_ok =
       conv
-        (fun { auth_login; auth_user_id; auth_token; auth_user_info; auth_foreign } ->
-           (auth_login, auth_user_id, auth_token, auth_user_info, auth_foreign))
-        (fun (auth_login, auth_user_id, auth_token, auth_user_info, auth_foreign) ->
-           { auth_login; auth_user_id; auth_token; auth_user_info; auth_foreign }) @@
-      obj5
+        (fun { auth_login; auth_user_id; auth_token; auth_user_info } ->
+           (auth_login, auth_user_id, auth_token, auth_user_info))
+        (fun (auth_login, auth_user_id, auth_token, auth_user_info) ->
+           { auth_login; auth_user_id; auth_token; auth_user_info }) @@
+      obj4
         (req "login" EzEncoding.encoded_string)
         (req "user_id" S.user_id_encoding)
         (req "token" string)
         (req "user_info" S.user_info_encoding)
-        (opt "foreign" S.foreign_info_encoding)
 
     let connect_response = union [
         case auth_ok
@@ -185,6 +167,15 @@ module Make(S : SessionArg) = struct
           (function Foreign f -> Some f | _ -> None)
           (fun f -> Foreign f) ]
 
+    let session_expired_case =
+      EzAPI.ErrCase {
+        code = 440;
+        name = "SessionExpired";
+        encoding = (obj1 (req "error" (constant "SessionExpired")));
+        select = (function `Session_expired -> Some () | _ -> None);
+        deselect = (fun () -> `Session_expired);
+      }
+
     let bad_user_case =
       EzAPI.ErrCase {
         code = 401;
@@ -214,13 +205,37 @@ module Make(S : SessionArg) = struct
         deselect = (fun ((), s) -> `Challenge_not_found_or_expired s);
       }
 
-    let invalid_session_case =
+    let invalid_session_login_case =
       EzAPI.ErrCase {
-        code = 401;
+        code = 400;
         name = "InvalidSession";
-        encoding = (obj1 (req "error" (constant "InvalidSession")));
-        select = (function `Invalid_session -> Some () (* | _ -> None *));
-        deselect = (fun () -> `Invalid_session);
+        encoding = (obj2
+                      (req "error" (constant "InvalidSession"))
+                      (req "reason" string));
+        select = (function `Invalid_session_login s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Invalid_session_login s);
+      }
+
+    let invalid_session_logout_case =
+      EzAPI.ErrCase {
+        code = 400;
+        name = "InvalidSession";
+        encoding = (obj2
+                      (req "error" (constant "InvalidSession"))
+                      (req "reason" string));
+        select = (function `Invalid_session_logout s -> Some ((), s));
+        deselect = (fun ((), s) -> `Invalid_session_logout s);
+      }
+
+    let invalid_session_connect_case =
+      EzAPI.ErrCase {
+        code = 400;
+        name = "InvalidSession";
+        encoding = (obj2
+                      (req "error" (constant "InvalidSession"))
+                      (req "reason" string));
+        select = (function `Invalid_session_connect s -> Some ((), s) | _ -> None);
+        deselect = (fun ((), s) -> `Invalid_session_connect s);
       }
 
   end
@@ -263,7 +278,7 @@ module Make(S : SessionArg) = struct
         ~section:section_session
         ~name:"connect"
         ~output:Encoding.connect_response
-        ~error_outputs: [Encoding.session_expired_case]
+        ~error_outputs:[Encoding.session_expired_case; Encoding.invalid_session_connect_case]
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
@@ -273,9 +288,10 @@ module Make(S : SessionArg) = struct
         ~name:"login"
         ~input:Encoding.login_message
         ~output:Encoding.auth_ok
-        ~error_outputs: [Encoding.bad_user_case;
-                         Encoding.user_not_registered_case;
-                         Encoding.challenge_not_found_case]
+        ~error_outputs:[Encoding.bad_user_case;
+                        Encoding.user_not_registered_case;
+                        Encoding.challenge_not_found_case;
+                        Encoding.invalid_session_login_case]
         EzAPI.Path.(rpc_root // "login")
 
     let logout : (auth_needed, logout_error, token_security) EzAPI.service0  =
@@ -284,7 +300,7 @@ module Make(S : SessionArg) = struct
         ~name:"logout"
         ~meth:Resto1.PUT
         ~output:Encoding.auth_needed
-        ~error_outputs: [Encoding.invalid_session_case]
+        ~error_outputs:[Encoding.invalid_session_logout_case]
         ~security
         EzAPI.Path.(rpc_root // "logout")
   end

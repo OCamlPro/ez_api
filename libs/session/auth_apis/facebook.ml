@@ -10,6 +10,19 @@ module Types = struct
     token_scopes : string list;
     user_id : string;
   }
+
+  type profile = {
+    fb_name : string;
+    fb_email : string;
+    fb_lastname : string option;
+    fb_firstname : string option;
+    fb_birthday : string option;
+    fb_phone : string option;
+    fb_address : string option;
+    fb_picture : string option;
+    fb_website : string option;
+    fb_organization : string option;
+  }
 end
 
 module Encoding = struct
@@ -36,6 +49,28 @@ module Encoding = struct
       (req "metadata" any_value)
       (req "scopes" (list string))
       (req "user_id" string)
+
+  let profile = conv
+      (fun {fb_name; fb_email; fb_lastname; fb_firstname; fb_birthday; fb_phone;
+            fb_address; fb_picture; fb_website; fb_organization}
+        -> (fb_name, fb_email, fb_lastname, fb_firstname, fb_birthday, fb_phone,
+            fb_address, fb_picture, fb_website, fb_organization))
+      (fun (fb_name, fb_email, fb_lastname, fb_firstname, fb_birthday, fb_phone,
+            fb_address, fb_picture, fb_website, fb_organization)
+        -> {fb_name; fb_email; fb_lastname; fb_firstname; fb_birthday; fb_phone;
+            fb_address; fb_picture; fb_website; fb_organization}) @@
+    obj10
+      (req "username" string)
+      (req "email" string)
+      (opt "last_name" string)
+      (opt "first_name" string)
+      (opt "birthday" string)
+      (opt "primary_phone" string)
+      (opt "profile_pic" string)
+      (opt "address" string)
+      (opt "website" string)
+      (opt "organization" string)
+
 end
 
 module Services = struct
@@ -90,12 +125,15 @@ let check_token ~app_token ~app_id input_token =
     if token.app_id = app_id && token.token_valid then Ok token.user_id
     else Error (400, Some "Invalid facebook token")
 
-let get_address ~user_id user_access_token =
+let fields =
+  "username,email,last_name,first_name,birthday,primary_phone,\
+   profile_pic,address,website,organization"
+
+let get_info ~user_id user_access_token : (profile, int * string option) result Lwt.t =
   let params = [
     access_token_param, EzAPI.TYPES.S user_access_token;
-    fields_param, EzAPI.TYPES.S "email"
+    fields_param, EzAPI.TYPES.S fields
   ] in
-  let output = Json_encoding.(obj1 (req "email" string)) in
-  ANY.get1 ~params facebook_auth (nodes ~name:"email" output) user_id >|= function
+  ANY.get1 ~params facebook_auth (nodes ~name:"email" Encoding.profile) user_id >|= function
   | Error e -> handle_error e
-  | Ok email -> Ok email
+  | Ok pr -> Ok pr
