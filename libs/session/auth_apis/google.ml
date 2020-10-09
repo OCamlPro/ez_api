@@ -1,5 +1,5 @@
 module Types = struct
-  type token_info = {
+  type info = {
     idt_iss : string;
     idt_sub : string;
     idt_azp : string;
@@ -8,23 +8,19 @@ module Types = struct
     idt_exp : string;
   }
 
-  type email_info = {
-    em_addr : string;
-    em_verified : bool;
+  type profile = {
+    go_addr : string;
+    go_name : string;
+    go_verified : bool option;
+    go_picture : string option;
+    go_given_name : string option;
+    go_family_name : string option;
+    go_locale : string option;
   }
 
-  type profile_info = {
-    pr_name : string;
-    pr_picture : string;
-    pr_given_name : string;
-    pr_family_name : string;
-    pr_locale : string;
-  }
-
-  type info = {
-    token_info : token_info;
-    email_info : email_info option;
-    profile_info : profile_info option;
+  type all = {
+    token_info : info;
+    profile_info : profile option;
   }
 end
 
@@ -32,7 +28,7 @@ module Encoding = struct
   open Types
   open Json_encoding
 
-  let token_info = conv
+  let info = conv
       (fun {idt_iss; idt_sub; idt_azp; idt_aud; idt_iat; idt_exp}
         -> (idt_iss, idt_sub, idt_azp, idt_aud, idt_iat, idt_exp))
       (fun (idt_iss, idt_sub, idt_azp, idt_aud, idt_iat, idt_exp)
@@ -46,24 +42,23 @@ module Encoding = struct
       (req "exp" string)
 
   let bool_of_string = conv string_of_bool bool_of_string string
-  let email_info = conv
-      (fun {em_addr; em_verified} -> (em_addr, em_verified))
-      (fun (em_addr, em_verified) -> {em_addr; em_verified}) @@
-    obj2
+  let profile = conv
+      (fun {go_addr; go_name; go_verified; go_picture; go_given_name;
+            go_family_name; go_locale}
+        -> (go_addr, go_name, go_verified, go_picture, go_given_name,
+            go_family_name, go_locale))
+      (fun (go_addr, go_name, go_verified, go_picture, go_given_name,
+            go_family_name, go_locale)
+        -> {go_addr; go_name; go_verified; go_picture; go_given_name;
+            go_family_name; go_locale}) @@
+    obj7
       (req "email" string)
-      (req "email_verified" bool_of_string)
-
-  let profile_info = conv
-      (fun {pr_picture; pr_name; pr_given_name; pr_family_name; pr_locale}
-        -> (pr_picture, pr_name, pr_given_name, pr_family_name, pr_locale))
-      (fun (pr_picture, pr_name, pr_given_name, pr_family_name, pr_locale)
-        -> {pr_picture; pr_name; pr_given_name; pr_family_name; pr_locale}) @@
-    obj5
-      (req "picture" string)
       (req "name" string)
-      (req "given_name" string)
-      (req "family_name" string)
-      (req "locale" string)
+      (opt "email_verified" bool_of_string)
+      (opt "picture" string)
+      (opt "given_name" string)
+      (opt "family_name" string)
+      (opt "locale" string)
 
   let merge_objs_opt e1 e2 = union [
       case (merge_objs e1 e2)
@@ -75,13 +70,9 @@ module Encoding = struct
     ]
 
   let encoding = EzEncoding.ignore_enc @@ conv
-      (fun {token_info; email_info; profile_info}
-        -> ((token_info, email_info), profile_info))
-      (fun ((token_info, email_info), profile_info)
-        -> {token_info; email_info; profile_info}) @@
-    merge_objs_opt
-      (merge_objs_opt token_info email_info)
-      profile_info
+      (fun {token_info; profile_info} -> (token_info, profile_info))
+      (fun (token_info, profile_info) -> {token_info; profile_info}) @@
+    merge_objs_opt info profile
 end
 
 module Services = struct
@@ -89,7 +80,7 @@ module Services = struct
 
   let google_auth = EzAPI.TYPES.BASE "https://www.googleapis.com/"
 
-  let token_info : (Types.info, exn, EzAPI.no_security) EzAPI.service0 =
+  let token_info : (Types.all, exn, EzAPI.no_security) EzAPI.service0 =
     EzAPI.service
       ~register:false
       ~name:"token_info"
@@ -118,6 +109,9 @@ let get_info ~client_id id_token =
   let params = [id_token_param, EzAPI.TYPES.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
-  | Ok token ->
-    if token.token_info.idt_aud = client_id then Ok (token.email_info, token.profile_info)
+  | Ok r ->
+    if r.token_info.idt_aud = client_id then
+      match r.profile_info with
+      | None -> Error (400, Some "email or profile not included in google permission")
+      | Some p -> Ok p
     else Error (400, Some "this google id_token is not valid for this app")
