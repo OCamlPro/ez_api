@@ -70,8 +70,8 @@ type 'a apikey_security = {
   ref_name : string;
   name : 'a
 }
-type bearer_security_desc = { ref_name : string ; format : string option }
-type basic_security_desc = { ref_name : string }
+type bearer_security_desc = { bearer_name : string ; format : string option }
+type basic_security_desc = { basic_name : string }
 type bearer_security = [ `Bearer of bearer_security_desc ]
 type basic_security = [ `Basic of basic_security_desc ]
 type header_security = [ `Header of string apikey_security ]

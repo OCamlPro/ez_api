@@ -51,7 +51,9 @@ module TYPES = struct
     challenge : string;
   }
 
-  type 'auth connect_response = AuthOk of 'auth | AuthNeeded of auth_needed
+  type 'auth connect_response =
+    | AuthOk of 'auth
+    | AuthNeeded of auth_needed
 
   type local_login_message = {
     login_user : string;
@@ -63,9 +65,14 @@ module TYPES = struct
     | Local of local_login_message
     | Foreign of foreign_info
 
+  type ('user_id, 'user_info) login_response =
+    | LoginOk of ('user_id, 'user_info) auth
+    | LoginWait of 'user_id
+
   type login_error =
     [ `Bad_user_or_password
     | `User_not_registered
+    | `Unverified_user
     | `Challenge_not_found_or_expired of string
     | `Invalid_session_login of string ]
 
@@ -167,6 +174,14 @@ module Make(S : SessionArg) = struct
           (function Foreign f -> Some f | _ -> None)
           (fun f -> Foreign f) ]
 
+    let login_response = union [
+        case auth_ok
+          (function LoginOk x -> Some x | _ -> None)
+          (fun x -> LoginOk x);
+        case (obj1 (req "user_id" S.user_id_encoding))
+          (function LoginWait x -> Some x | _ -> None)
+          (fun x -> LoginWait x) ]
+
     let session_expired_case =
       EzAPI.ErrCase {
         code = 440;
@@ -192,6 +207,15 @@ module Make(S : SessionArg) = struct
         encoding = (obj1 (req "error" (constant "UserNotRegistered")));
         select = (function `User_not_registered -> Some () | _ -> None);
         deselect = (fun () -> `User_not_registered);
+      }
+
+    let unverified_user_case =
+      EzAPI.ErrCase {
+        code = 400;
+        name = "UnverifiedUser";
+        encoding = (obj1 (req "error" (constant "unverified")));
+        select = (function `Unverified_user -> Some () | _ -> None);
+        deselect = (fun () -> `Unverified_user);
       }
 
     let challenge_not_found_case =
@@ -282,14 +306,15 @@ module Make(S : SessionArg) = struct
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
-    let login : (login_message, auth, login_error, EzAPI.no_security) EzAPI.post_service0  =
+    let login : (login_message, (S.user_id, S.user_info) login_response, login_error, EzAPI.no_security) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
         ~input:Encoding.login_message
-        ~output:Encoding.auth_ok
+        ~output:Encoding.login_response
         ~error_outputs:[Encoding.bad_user_case;
                         Encoding.user_not_registered_case;
+                        Encoding.unverified_user_case;
                         Encoding.challenge_not_found_case;
                         Encoding.invalid_session_login_case]
         EzAPI.Path.(rpc_root // "login")

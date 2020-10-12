@@ -2,6 +2,7 @@ open StringCompat
 open Lwt
 open EzAPI.TYPES
 open EzAPIServerUtils
+open Resto1
 
 module Header = Cohttp.Header
 module Request = Cohttp.Request
