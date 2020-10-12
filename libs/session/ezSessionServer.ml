@@ -51,7 +51,18 @@ module type Arg = sig
   val check_foreign :
     origin:string -> token:string ->
     (string, int * string option) result Lwt.t
+  val register_foreign :
+    origin:string -> token:string ->
+    (SessionArg.user_id * SessionArg.user_info option, int * string option) result Lwt.t
 end
+
+let default_check_foreign ~origin ~token =
+  ignore (origin, token);
+  Lwt.return (Error (400, Some "Foreign authentication not implemented"))
+
+let default_register_foreign ~origin ~token =
+  ignore (origin, token);
+  Lwt.return (Error (400, Some "Foreign registration not implemented"))
 
 module Make(S: Arg) : sig
 
@@ -66,6 +77,7 @@ end = struct
 
   let find_user = S.find_user
   let check_foreign = S.check_foreign
+  let register_foreign = S.register_foreign
   open S.SessionStore
   module S = S.SessionArg
 
@@ -159,13 +171,16 @@ end = struct
           auth_login = login;
           auth_user_id = user_id;
           auth_token = cookie;
-          auth_user_info = user_info;
-        } in
+          auth_user_info = user_info } in
         EzAPIServerUtils.return (f auth)
 
     let return_auth req ?cookie ?foreign ~login user_id user_info =
-      return_auth_base req ?cookie ?foreign ~login user_id user_info
-        (fun auth -> Ok auth)
+      match user_info with
+      | Some user_info ->
+        return_auth_base req ?cookie ?foreign ~login user_id user_info
+          (fun auth -> Ok (LoginOk auth))
+      | None ->
+        EzAPIServerUtils.return (Ok (LoginWait user_id))
 
     let connect req security () =
       get_request_session security req >>= function
@@ -205,7 +220,7 @@ end = struct
                   request_error req ~code:401 `Bad_user_or_password
                 end else begin
                   Hashtbl.remove challenges login_challenge_id;
-                  return_auth req ~login:login_user user_id user_info
+                  return_auth req ~login:login_user user_id (Some user_info)
                 end
             end
           | _ ->
@@ -220,10 +235,15 @@ end = struct
           find_user ~login:foreign_login >>= function
           | Some (_, user_id, user_info) ->
             return_auth req ~login:foreign_login ~foreign:{foreign_origin; foreign_token}
-              user_id user_info
-          | _ ->
-            debug ~v:1 "/login: could not find foreign user";
-            request_error req ~code:400 `User_not_registered
+              user_id (Some user_info)
+          | None ->
+            register_foreign ~origin:foreign_origin ~token:foreign_token >>= function
+            | Ok (user_id, user_info) ->
+              return_auth req ~login:foreign_login ~foreign:{foreign_origin; foreign_token}
+                user_id user_info
+            | Error _ ->
+              debug ~v:1 "/login: could not register foreign user";
+              request_error req ~code:400 `User_not_registered
 
     let logout req security () =
        get_request_session security req >>= function
@@ -306,6 +326,8 @@ module UserStoreInMemory(
   val find_user : login:string -> (string option * S.user_id * S.user_info) option Lwt.t
   val check_foreign : origin:string -> token:string ->
     (string, int * string option) result Lwt.t
+  val register_foreign : origin:string -> token:string ->
+    (S.user_id * S.user_info option, int * string option) result Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
     with type user_info = S.user_info
@@ -367,6 +389,7 @@ end = struct
       debug ~v:1 "check_foreign %S ok" (origin ^ "-" ^ token);
       Lwt.return (Ok u.login)
 
+  let register_foreign = default_register_foreign
 
   let remove_user ~login =
     Hashtbl.remove users login

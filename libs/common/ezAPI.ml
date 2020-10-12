@@ -1,5 +1,5 @@
-
 module Resto = Resto1
+open Resto
 
 open StringCompat
 module IntMap = Map.Make(struct type t = int let compare = compare end)
@@ -69,8 +69,8 @@ type 'a apikey_security = {
   ref_name : string;
   name : 'a
 }
-type bearer_security_desc = { ref_name : string ; format : string option }
-type basic_security_desc = { ref_name : string }
+type bearer_security_desc = { bearer_name : string ; format : string option }
+type basic_security_desc = { basic_name : string }
 type bearer_security = [ `Bearer of bearer_security_desc ]
 type basic_security = [ `Basic of basic_security_desc ]
 type header_security = [ `Header of string apikey_security ]
@@ -88,12 +88,12 @@ type security_scheme =
 type path =
   | ROOT
   | CONCAT of path * string
-  | ENDARG of path * Resto.Arg.descr
+  | ENDARG of path * Arg.descr
 
 type ('a, 'b) p =
   path *
-  (request, 'a) Resto.Path.path *
-  (unit, 'b) Resto.Path.path *
+  (request, 'a) Path.path *
+  (unit, 'b) Path.path *
   'b
 
 type service_doc = {
@@ -127,18 +127,18 @@ type _ err_case =
     } -> 'b err_case
 
 (* All our services use 'params' as 'prefix of the service *)
-type ('params, 'params2, 'input, 'output, 'error, 'security) service
+type nonrec ('params, 'params2, 'input, 'output, 'error, 'security) service
   = {
-    s : (request, 'params, 'input, ('output, 'error) result) Resto.service;
-    s_OPTIONS : (request, 'params, unit, ('output, 'error) result) Resto.service;
-    s_internal : (unit, 'params2, unit, ('output, 'error) result) Resto.service;
+    s : (request, 'params, 'input, ('output, 'error) result) service;
+    s_OPTIONS : (request, 'params, unit, ('output, 'error) result) service;
+    s_internal : (unit, 'params2, unit, ('output, 'error) result) service;
     params : param list;
     doc : service_doc;
     enc_input : 'input Json_encoding.encoding;
     enc_output : 'output Json_encoding.encoding;
     enc_error : 'error err_case list;
     s_security : ([< security_scheme ] as 'security) list;
-    s_meth : Resto1.method_type;
+    s_meth : method_type;
   }
 
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
@@ -150,8 +150,8 @@ type ('input, 'output, 'error, 'security) post_service0 =
 type ('arg,'input,'output, 'error, 'security) post_service1 =
   (request * 'arg, unit * 'arg, 'input, 'output, 'error, 'security) service
 
-let arg_string ?descr name example: string Resto.Arg.arg * string =
-  Resto.Arg.make
+let arg_string ?descr name example: string Arg.arg * string =
+  Arg.make
     ~name
     ~destruct:( fun a -> Ok a : string -> (string, string) Result.result )
     ~construct:( fun s -> s : string -> string )
@@ -160,8 +160,8 @@ let arg_string ?descr name example: string Resto.Arg.arg * string =
     (),
   example
 
-let arg_int ?descr name example: int Resto.Arg.arg * int =
-  Resto.Arg.make
+let arg_int ?descr name example: int Arg.arg * int =
+  Arg.make
     ~name
     ~destruct:( fun a -> Ok (int_of_string a))
     ~construct:( fun s -> string_of_int s )
@@ -231,7 +231,7 @@ let encode_args s (URL parts) args =
   EzUrl.encode_args args
 
 let forge url s params args =
-  let parts, _json = Resto.forge_request s.s_internal params () in
+  let parts, _json = forge_request s.s_internal params () in
   let parts = String.concat "/" parts in
   let args =
     match args with
@@ -265,16 +265,16 @@ let find_param p req =
 
 module Path = struct
 
-  let root = (ROOT, Resto.Path.root, Resto.Path.root,())
+  let root = (ROOT, Path.root, Path.root,())
   let (//) (s1,p1,p2,arg) s =
     (CONCAT (s1,s)),
-    (Resto.Path.(/) p1 s),
-    (Resto.Path.(/) p2 s),
+    (Path.(/) p1 s),
+    (Path.(/) p2 s),
     arg
   let (/:) (s1,p1,p2,sample1) (arg, sample2) =
-    (ENDARG (s1, Resto.Arg.descr arg)),
-    (Resto.Path.(/:) p1 arg),
-    (Resto.Path.(/:) p2 arg),
+    (ENDARG (s1, Arg.descr arg)),
+    (Path.(/:) p1 arg),
+    (Path.(/:) p2 arg),
     (sample1, sample2)
 end
 
@@ -284,7 +284,7 @@ let rec string_of_path p =
   | CONCAT (p, s) ->
      Printf.sprintf "%s/%s" (string_of_path p) s
   | ENDARG (p, arg) ->
-     Printf.sprintf "%s/<%s>" (string_of_path p) arg.Resto.Arg.name
+     Printf.sprintf "%s/<%s>" (string_of_path p) arg.Arg.name
 
 let rec update_service_list services doc = match services with
   | [] -> [ doc ]
@@ -355,7 +355,7 @@ let params_of_query_security (l : [< security_scheme ] list) =
     ) [] l
 
 let str_of_method = function
-  | Resto.GET -> "get"
+  | GET -> "get"
   | HEAD -> "head"
   | POST -> "post"
   | PUT -> "put"
@@ -369,7 +369,7 @@ let str_of_method = function
 let post_service ?(section=default_section)
     ?name
     ?descr
-    ?(meth=Resto.POST)
+    ?(meth=POST)
     ~input
     ~output
     ?(error_outputs=[])
@@ -412,9 +412,9 @@ let post_service ?(section=default_section)
           (fun e -> Error e)
       ]) in
   let service = {
-      s = Resto.service ~meth ~input ~output:resto_output path1;
-      s_OPTIONS = Resto.service ~meth:Resto.OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
-      s_internal = Resto.service ~input:Json_encoding.empty ~output:resto_output path2;
+      s = service ~meth ~input ~output:resto_output path1;
+      s_OPTIONS = service ~meth:OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
+      s_internal = service ~input:Json_encoding.empty ~output:resto_output path2;
       params;
       doc;
       enc_input = input;
@@ -427,7 +427,7 @@ let post_service ?(section=default_section)
   doc.doc_sample <- make_sample;
   service
 
-let service ?section ?name ?descr ?(meth=Resto.GET) ~output ?error_outputs ?params ?security ?register arg =
+let service ?section ?name ?descr ?(meth=GET) ~output ?error_outputs ?params ?security ?register arg =
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
     ~output ?error_outputs ~meth ?params ?security ?register arg
@@ -450,7 +450,7 @@ let rec buf_path b p =
   | ENDARG (p, arg) ->
      buf_path b p;
      Buffer.add_char b '/';
-     Printf.bprintf b "<%s>" arg.Resto.Arg.name
+     Printf.bprintf b "<%s>" arg.Arg.name
 
 let buf_service ~map ?base_url b doc =
   let has_arguments = doc.doc_params <> [] in
@@ -612,7 +612,7 @@ let get_path sd =
     | ENDARG (p, arg) ->
        buf_path b p;
        Buffer.add_char b '/';
-       Printf.bprintf b "{%s}" arg.Resto.Arg.name
+       Printf.bprintf b "{%s}" arg.Arg.name
   in
   let b = Buffer.create 100 in
   buf_path b sd.doc_path;
@@ -622,13 +622,13 @@ module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
 
 let schema_security_scheme = function
   | `Nosecurity u -> unreachable u
-  | `Basic { ref_name } ->
-    ref_name, `O [
+  | `Basic { basic_name } ->
+    basic_name, `O [
       "type", `String "http";
       "scheme", `String "basic";
     ]
-  | `Bearer { ref_name; format } ->
-    ref_name, `O ([
+  | `Bearer { bearer_name; format } ->
+    bearer_name, `O ([
         "type", `String "http";
         "scheme", `String "bearer"
       ] @ match format with
@@ -656,8 +656,8 @@ let schema_security_scheme = function
 
 let security_ref_name = function
   | `Nosecurity u -> unreachable u
-  | `Basic { ref_name }
-  | `Bearer { ref_name; format=_  }
+  | `Basic { basic_name = ref_name }
+  | `Bearer { bearer_name = ref_name; format=_  }
   | `Cookie { ref_name; name=_ }
   | `Header { ref_name; name=_ }
   | `Query { ref_name; name=_ } ->
@@ -714,14 +714,14 @@ let paths_of_sections ?(docs=[]) sections =
                    Json_schema.element @@
                    Json_schema.Object {
                      Json_schema.object_specs with
-                     properties = [
+                     Json_schema.properties = [
                        "input", input_schema, true, None;
                        "output", output_schema, true, None;
                        "errors",
                        Json_schema.element @@
                        Json_schema.Object {
                          Json_schema.object_specs with
-                         properties =  List.map (fun (code, err_sch) ->
+                         Json_schema.properties =  List.map (fun (code, err_sch) ->
                              string_of_int code, err_sch, false, None
                            ) error_codes_schemas
                        }, false, None;
@@ -802,15 +802,15 @@ let paths_of_sections ?(docs=[]) sections =
           | ROOT -> parameters
           | CONCAT (p,_s) -> iter p parameters
           | ENDARG (p,arg) ->
-            let param_descr = match arg.Resto.Arg.descr with
+            let param_descr = match arg.Arg.descr with
               | None -> ""
               | Some descr -> descr in
-            let example = match arg.Resto.Arg.example with
+            let example = match arg.Arg.example with
               | None -> []
               | Some example -> [ "example", `String example ] in
             let param =
               `O ([
-                "name", `String arg.Resto.Arg.name;
+                "name", `String arg.Arg.name;
                 "in", `String "path";
                 "description", `String param_descr;
                 "required", `Bool true;

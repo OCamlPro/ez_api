@@ -1,5 +1,7 @@
 open EzSession.TYPES
 
+val random_challenge : unit -> string
+
 module type SessionStore = sig
   type user_id
   val create_session : ?foreign:foreign_info -> login:string -> user_id -> user_id session Lwt.t
@@ -14,7 +16,14 @@ module type Arg = sig
     (string option * SessionArg.user_id * SessionArg.user_info) option Lwt.t
   val check_foreign : origin:string -> token:string ->
     (string, int * string option) result Lwt.t
+  val register_foreign : origin:string -> token:string ->
+    (SessionArg.user_id * SessionArg.user_info option, int * string option) result Lwt.t
 end
+
+val default_check_foreign : origin:string -> token:string ->
+  (_, int * string option) result Lwt.t
+val default_register_foreign : origin:string -> token:string ->
+  (_, int * string option) result Lwt.t
 
 module Make(S: Arg) : sig
 
@@ -43,6 +52,8 @@ module UserStoreInMemory(S : SessionArg with type user_id = string) : sig
   val find_user : login:string -> (string option * S.user_id * S.user_info) option Lwt.t
   val check_foreign : origin:string -> token:string ->
     (string, int * string option) result Lwt.t
+  val register_foreign : origin:string -> token:string ->
+    (S.user_id * S.user_info option, int * string option) result Lwt.t
 
   module SessionArg : EzSession.TYPES.SessionArg
     with type user_info = S.user_info

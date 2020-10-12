@@ -183,10 +183,12 @@ module Make(S: SessionArg) : Make_S with
                 login_challenge_reply;
               })
             (function
-              | Ok u ->
+              | Ok (LoginOk u) ->
                 set_cookie u.auth_token;
                 state := User u;
                 f (Ok u)
+              | Ok _ ->
+                f (Error `Unverified_user)
               | Error `Challenge_not_found_or_expired _ ->
                 login_rec ?format (ntries-1) api ~login ~password f
               | Error e -> f (Error (e :> login_error))
@@ -195,10 +197,12 @@ module Make(S: SessionArg) : Make_S with
           EzRequest.ANY.post0 api Service.login "login"
             ~input:(Foreign { foreign_origin; foreign_token })
             (function
-              | Ok u ->
+              | Ok (LoginOk u) ->
                 set_cookie u.auth_token;
                 state := User u;
                 f (Ok u)
+              | Ok _ ->
+                f (Error `Unverified_user)
               | Error `Challenge_not_found_or_expired _ ->
                 login_rec ?format (ntries-1) api ?foreign f
               | Error e -> f (Error (e :> login_error))

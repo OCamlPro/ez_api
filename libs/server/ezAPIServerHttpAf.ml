@@ -3,13 +3,14 @@ open Lwt
 open StringCompat
 open Httpaf
 open EzAPIServerUtils
+open Resto1
 
 type lwt_server = {
   shutdown : unit Lwt.t Lazy.t;
 }
 
 let of_httpaf_meth = function
-  | `GET -> Resto1.GET
+  | `GET -> GET
   | `HEAD -> HEAD
   | `POST -> POST
   | `PUT -> PUT
@@ -243,11 +244,11 @@ let connection_handler :
     let uri = mk_uri request in
     let req_params = Uri.query uri in
     debug "REQUEST: %s %S"
-      (Method.to_string request.meth)
-      request.target;
+      (Method.to_string request.Request.meth)
+      request.Request.target;
     debugf ~v:1 (fun () ->
         List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
-          (Headers.to_list request.headers));
+          (Headers.to_list request.Request.headers));
     begin match client_address with
       | Unix.ADDR_INET (iaddr, _port) ->
         let ip = Unix.string_of_inet_addr iaddr in
