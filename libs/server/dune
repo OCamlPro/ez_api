@@ -4,7 +4,7 @@
  (wrapped false)
  (optional)
  (modules restoDirectory1 gMTime timings ezAPIServerUtils ezSwagger)
- (libraries ezSession geoip lwt_log))
+ (libraries ezSession geoip lwt_log re.str))
 
 (library
  (name ezAPIServer)

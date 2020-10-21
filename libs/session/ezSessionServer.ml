@@ -230,7 +230,7 @@ end = struct
         end
       | Foreign {foreign_origin; foreign_token} ->
         check_foreign ~origin:foreign_origin ~token:foreign_token >>= function
-        | Error _ -> request_error req ~code:400 (`Invalid_session_login "foreign authenticatino fail")
+        | Error _ -> request_error req ~code:400 (`Invalid_session_login "foreign authentication fail")
         | Ok foreign_login ->
           find_user ~login:foreign_login >>= function
           | Some (_, user_id, user_info) ->
