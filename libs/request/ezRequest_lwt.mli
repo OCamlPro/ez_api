@@ -123,7 +123,7 @@ val log : (string -> unit) ref
    you must initialize an engine independantly.*)
 module ANY : S
 
-module Make(S : sig
+module Make(_ : sig
 
     val get :
       ?meth:string ->
