@@ -3,7 +3,7 @@
  (public_name ez-api.server-utils)
  (wrapped false)
  (optional)
- (modules restoDirectory1 gMTime timings ezAPIServerUtils ezSwagger)
+ (modules restoDirectory1 gMTime timings ezAPIServerUtils ezOpenAPI)
  (libraries ezSession geoip lwt_log re.str))
 
 (library

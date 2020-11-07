@@ -110,6 +110,8 @@ type service_doc = {
     doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
     doc_meth : string;
     doc_security : security_scheme list;
+    doc_input_example : Json_repr.any option;
+    doc_output_example : Json_repr.any option;
   }
 
 and section = {
@@ -253,13 +255,9 @@ module Param = struct
   let bool = param PARAM_BOOL
 end
 
-let find_params p req =
-  try
-    Some (StringMap.find p.param_value req.req_params)
-  with Not_found -> None
+let find_params p req = StringMap.find_opt p.param_value req.req_params
 
-let find_param p req =
-  match find_params p req with
+let find_param p req = match find_params p req with
   | None -> None
   | Some values -> Some (String.concat "," values)
 
@@ -278,13 +276,10 @@ module Path = struct
     (sample1, sample2)
 end
 
-let rec string_of_path p =
-  match p with
+let rec string_of_path = function
   | ROOT -> ""
-  | CONCAT (p, s) ->
-     Printf.sprintf "%s/%s" (string_of_path p) s
-  | ENDARG (p, arg) ->
-     Printf.sprintf "%s/<%s>" (string_of_path p) arg.Arg.name
+  | CONCAT (p, s) -> Printf.sprintf "%s/%s" (string_of_path p) s
+  | ENDARG (p, arg) -> Printf.sprintf "%s/{%s}" (string_of_path p) arg.Arg.name
 
 let rec update_service_list services doc = match services with
   | [] -> [ doc ]
@@ -292,8 +287,6 @@ let rec update_service_list services doc = match services with
   | h :: t -> h :: (update_service_list t doc)
 
 let definitions_path = "/components/schemas/"
-let responses_path = "/components/responses/"
-(* let security_path = "/components/securitySchemes/" *)
 
 let merge_errs_same_code errors =
   let code_map =
@@ -318,7 +311,7 @@ let merge_errs_same_code errors =
                 Json_encoding.case encoding select deselect
               ) l in
           Json_encoding.union err_cases in
-      lazy (Json_encoding.schema ~definitions_path:responses_path encoding)
+      lazy (Json_encoding.schema ~definitions_path encoding)
     ) code_map
   |> IntMap.bindings
 
@@ -376,10 +369,18 @@ let post_service ?(section=default_section)
     ?(params = [])
     ?(security=[])
     ?(register=true)
+    ?input_example
+    ?output_example
     (doc_path,path1,path2,sample) =
   let doc_id = !nservices in
   if register then incr nservices;
   let params = List.rev_append (params_of_query_security security) params in
+  let doc_input_example = match input_example with
+    | None -> None
+    | Some ex -> Some (Json_repr.to_any @@ Json_encoding.construct input ex) in
+  let doc_output_example = match output_example with
+    | None -> None
+    | Some ex -> Some (Json_repr.to_any @@ Json_encoding.construct output ex) in
   let doc = {
       doc_path;
       doc_params = params;
@@ -394,6 +395,7 @@ let post_service ?(section=default_section)
       doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = str_of_method meth;
       doc_security = (security :> security_scheme list);
+      doc_input_example; doc_output_example
     } in
   if register then (
     section.section_docs <- update_service_list section.section_docs doc;
@@ -427,128 +429,31 @@ let post_service ?(section=default_section)
   doc.doc_sample <- make_sample;
   service
 
-let service ?section ?name ?descr ?(meth=GET) ~output ?error_outputs ?params ?security ?register arg =
+let service ?section ?name ?descr ?(meth=GET) ~output ?error_outputs ?params
+    ?security ?register ?output_example arg =
   post_service ?section ?name ?descr
     ~input:Json_encoding.empty
-    ~output ?error_outputs ~meth ?params ?security ?register arg
+    ~output ?error_outputs ~meth ?params ?security ?register ?output_example arg
 
 let section section_name =
   let s = { section_name; section_docs = [] } in
   sections := s :: !sections;
   s
 
-let printf url fmt =
-  Printf.kprintf (add_end url) fmt
-
-let rec buf_path b p =
-  match p with
-  | ROOT -> ()
-  | CONCAT (p, s) ->
-     buf_path b p;
-     Buffer.add_char b '/';
-     Buffer.add_string b s
-  | ENDARG (p, arg) ->
-     buf_path b p;
-     Buffer.add_char b '/';
-     Printf.bprintf b "<%s>" arg.Arg.name
-
-let buf_service ~map ?base_url b doc =
-  let has_arguments = doc.doc_params <> [] in
-  Buffer.add_string b "## `";
-  buf_path b doc.doc_path;
-  if has_arguments then
-    Printf.bprintf b "?<arguments>";
-  Buffer.add_string b "`\n";
-  Buffer.add_string b "\n";
-
-  if has_arguments then begin
-      Printf.bprintf b "### Arguments\n";
-      List.iter (fun p ->
-          Printf.bprintf b "* `%s` = `%s` %s :" p.param_value
-                         (match p.param_type with
-                          | PARAM_INT -> "<int>"
-                          | PARAM_STRING -> "<string>"
-                          | PARAM_BOOL -> "<bool>"
-                         )
-                         (match p.param_name with
-                          | None -> p.param_value
-                          | Some name -> name);
-          begin
-            match p.param_descr with
-            | None -> ()
-            | Some descr -> Buffer.add_string b descr
-          end;
-          Printf.bprintf b "\n";
-        ) doc.doc_params;
-    end;
-
-  begin
-    let content = try
-      match doc.doc_name with
-        None -> raise Not_found
-      | Some info -> StringMap.find info map
-    with Not_found ->
-      "This service is undocumented\n"
-    in
-    Buffer.add_string b "\n";
-    Buffer.add_string b content;
-    Buffer.add_string b "\n";
-  end;
-
-  begin
-    match base_url with
-    | None -> ()
-    | Some base_url ->
-       let URL url = doc.doc_sample base_url in
-       Printf.bprintf b
-                      "\n### Sample request:\n\
-                       ```bash\n\
-                       curl %s\n\
-                       ```\n"
-                      url
-  end;
-  begin match doc.doc_name with
-    None -> ()
-  | Some name ->
-     try
-       let content = StringMap.find (Printf.sprintf "info-%s.md" name) map in
-       Buffer.add_string b "\n";
-       Buffer.add_string b content;
-       Buffer.add_string b "\n";
-     with Not_found -> ()
-  end;
-  Printf.bprintf b "\n\n<hr/>\n\n";
-  ()
-
-let md_of_services ?section ?base_url list =
-  let title, services = match section with
-    | None -> "All", !services
-    | Some s -> s.section_name, List.rev s.section_docs
-  in
-  let map = List.fold_left (fun map (s1, s2) ->
-                StringMap.add s1 s2 map) StringMap.empty list in
-  let b = Buffer.create 10000 in
-  Printf.bprintf b "# %s\n" title;
-  List.iter (buf_service ~map ?base_url b) (List.rev services);
-  Buffer.contents b
-
 let register service =
   service.doc.doc_registered <- true;
   service.s, service.s_OPTIONS
 
 let all_services_registered () =
-  let b = Buffer.create 1000 in
-  List.iter (fun doc ->
-      if not doc.doc_registered then begin
-          buf_path b doc.doc_path;
-          Printf.bprintf b " is not registered\n";
-        end
-    ) !services;
-  let s = Buffer.contents b in
+  let s = List.fold_left (fun acc doc ->
+      if not doc.doc_registered then
+        Printf.sprintf "%s%s is not registered\n" acc (string_of_path doc.doc_path)
+      else acc
+    ) "" !services in
   if s <> "" then begin
-      Printf.eprintf "Warning: unregistered services:\n%s\n%!" s;
-      false
-    end else true
+    Printf.eprintf "Warning: unregistered services:\n%s\n%!" s;
+    false
+  end else true
 
 let section_name s = s.section_name
 
@@ -558,7 +463,7 @@ let id s = s.doc.doc_id
 let services_doc_map f = List.rev_map f !services
 
 let string_of_param_type = function
-  | PARAM_INT -> "int"
+  | PARAM_INT -> "integer"
   | PARAM_STRING -> "string"
   | PARAM_BOOL -> "bool"
 
@@ -572,7 +477,6 @@ let service_to_readable s =
          string_of_param_type p.param_type))
       s.doc_params)
 
-(* let path s = string_of_path s.doc.doc_path *)
 let services () =
   Array.map (fun doc -> string_of_path doc.doc_path)
             (Array.of_list (List.rev !services))
@@ -601,310 +505,13 @@ let service_errors s ~code =
 let service_security s = s.s_security
 let service_meth s = s.s_meth
 
-let get_path sd =
-  let rec buf_path b p =
-    match p with
-    | ROOT -> ()
-    | CONCAT (p, s) ->
-       buf_path b p;
-       Buffer.add_char b '/';
-       Buffer.add_string b s
-    | ENDARG (p, arg) ->
-       buf_path b p;
-       Buffer.add_char b '/';
-       Printf.bprintf b "{%s}" arg.Arg.name
-  in
-  let b = Buffer.create 100 in
-  buf_path b sd.doc_path;
-  Buffer.contents b
-
-module JsonSchema = Json_schema.Make(Json_repr.Ezjsonm)
-
-let schema_security_scheme = function
-  | `Nosecurity u -> unreachable u
-  | `Basic { basic_name } ->
-    basic_name, `O [
-      "type", `String "http";
-      "scheme", `String "basic";
-    ]
-  | `Bearer { bearer_name; format } ->
-    bearer_name, `O ([
-        "type", `String "http";
-        "scheme", `String "bearer"
-      ] @ match format with
-      | None -> []
-      | Some format -> ["bearerFormat", `String format]
-      )
-  | `Header { ref_name; name } ->
-    ref_name , `O [
-      "type", `String "apiKey";
-      "in", `String "header";
-      "name", `String name;
-    ]
-  | `Cookie { ref_name; name } ->
-    ref_name , `O [
-      "type", `String "apiKey";
-      "in", `String "cookie";
-      "name", `String name;
-    ]
-  | `Query { ref_name; name } ->
-    ref_name , `O [
-      "type", `String "apiKey";
-      "in", `String "query";
-      "name", `String name.param_value;
-    ]
-
 let security_ref_name = function
   | `Nosecurity u -> unreachable u
   | `Basic { basic_name = ref_name }
   | `Bearer { bearer_name = ref_name; format=_  }
   | `Cookie { ref_name; name=_ }
   | `Header { ref_name; name=_ }
-  | `Query { ref_name; name=_ } ->
-    ref_name
-
-let paths_of_sections ?(docs=[]) sections =
-  let docs = List.map (fun (name, summary, descr) -> name, (summary, descr)) docs in
-  let list = ref [] in
-  let map = ref StringMap.empty in
-  List.iter (fun s ->
-      List.iter (fun sv ->
-          let id = string_of_int sv.doc_id in
-          if not (StringMap.mem id !map) then begin
-              list := sv :: !list;
-              map := StringMap.add id sv !map
-            end
-        ) (List.rev s.section_docs)
-    ) sections;
-  let services = !list in
-
-  let definitions_schema =
-    ref (Json_schema.create (Json_schema.element Json_schema.Any))
-  in
-  let io_schemas =
-    List.map (fun sd ->
-        let output_schema = Lazy.force sd.doc_output in
-        let input_schema = Lazy.force sd.doc_input in
-        let output_schema, updated =
-          Json_schema.merge_definitions
-            (output_schema, !definitions_schema) in
-        let input_schema, updated =
-          Json_schema.merge_definitions
-            (input_schema, updated) in
-        let error_codes_schemas, updated =
-          List.fold_left (fun (acc, updated) (code, error_schema) ->
-              let error_schema, updated =
-                Json_schema.merge_definitions
-                  (Lazy.force error_schema, updated) in
-              (code, Json_schema.root error_schema) :: acc, updated
-            ) ([], updated) sd.doc_error_outputs in
-        definitions_schema := updated;
-        Json_schema.root input_schema,
-        Json_schema.root output_schema,
-        List.rev error_codes_schemas
-      ) services
-  in
-  (* let input_schemas, output_schemas = List.split input_output_schemas in *)
-  let io_schemas, definitions =
-    let sch = Json_schema.update
-        (Json_schema.element
-           (Json_schema.Combine
-              (Json_schema.All_of,
-               List.map (fun (input_schema, output_schema, error_codes_schemas) ->
-                   Json_schema.element @@
-                   Json_schema.Object {
-                     Json_schema.object_specs with
-                     Json_schema.properties = [
-                       "input", input_schema, true, None;
-                       "output", output_schema, true, None;
-                       "errors",
-                       Json_schema.element @@
-                       Json_schema.Object {
-                         Json_schema.object_specs with
-                         Json_schema.properties =  List.map (fun (code, err_sch) ->
-                             string_of_int code, err_sch, false, None
-                           ) error_codes_schemas
-                       }, false, None;
-                     ]
-                   }
-                 ) io_schemas
-              )))
-        !definitions_schema
-    in
-    match JsonSchema.to_json sch with
-    | `O (
-        ("$schema", _) ::
-        ("allOf", `A services_sch) ::
-        defs
-      ) ->
-      let definitions = match defs with
-        | [] -> []
-        | ("components", `O definitions) :: _ -> definitions
-        | _ -> assert false in
-      let io_json_schemas = List.map (function
-          | `O ( ("type", `String "object") ::
-                 ("properties", `O [ "input", input;
-                                     "output", output;
-                                     "errors", `O ( ("type", `String "object") ::
-                                                    ("properties", `O errs) :: _)
-                                   ]) ::
-                 _ ) ->
-            input, output, errs
-          | j ->
-            Printf.eprintf "%s\n%!" (Ezjsonm.value_to_string ~minify:false j);
-            assert false
-        ) services_sch in
-      io_json_schemas, definitions
-    | j ->
-      Printf.eprintf "%s\n%!" (Ezjsonm.value_to_string ~minify:false j);
-      assert false
-  in
-
-  let paths = List.mapi (fun i sd ->
-      let doc_infos =
-        match sd.doc_name with
-        | None -> None
-        | Some name -> List.assoc_opt name docs in
-      let summary, description = match doc_infos with
-        | None ->
-          let path = get_path sd in
-          Format.eprintf
-            "Warning: no description provided for service %s@." path;
-          path, ""
-        | Some (summary, description) -> summary, description in
-      let parameters =
-        List.map (fun p ->
-            let param_descr = match p.param_descr with
-              | None -> ""
-              | Some descr -> descr in
-            let param_type = match p.param_type with
-              | PARAM_STRING -> "string"
-              | PARAM_INT -> "integer"
-              | PARAM_BOOL -> "boolean"
-            in
-            `O ([
-                "name", `String p.param_value;
-                "in", `String "query";
-                "description", `String param_descr;
-                "required", `Bool p.param_required;
-                "schema", `O [
-                  "type", `String param_type
-                ]
-              ] @ match p.param_examples with
-              | [] -> []
-              | e :: _ -> ["example", `String e]
-              )
-          ) sd.doc_params
-      in
-      let parameters =
-        let rec iter path parameters =
-          match path with
-          | ROOT -> parameters
-          | CONCAT (p,_s) -> iter p parameters
-          | ENDARG (p,arg) ->
-            let param_descr = match arg.Arg.descr with
-              | None -> ""
-              | Some descr -> descr in
-            let example = match arg.Arg.example with
-              | None -> []
-              | Some example -> [ "example", `String example ] in
-            let param =
-              `O ([
-                "name", `String arg.Arg.name;
-                "in", `String "path";
-                "description", `String param_descr;
-                "required", `Bool true;
-                "schema", `O [
-                  "type", `String "string"];
-              ] @ example)
-            in
-            iter p (param :: parameters)
-        in
-        iter sd.doc_path parameters
-      in
-      let in_schema, out_schema, err_schemas = List.nth io_schemas i in
-      let request_schema = match in_schema with
-        | `O ["type", `String "object";
-              "properties", `O [];
-              "additionalProperties", `Bool false ] -> []
-        | _ -> [
-            "requestBody", `O [
-              "content", `O [
-                "application/json", `O [
-                  "schema", in_schema
-                ]
-              ]
-            ]]
-      in
-      let success_response =
-        "200",
-        `O [
-          "description", `String "Success";
-          "content", `O [
-            "application/json", `O [
-              "schema", out_schema
-            ]
-          ]
-        ] in
-      let error_responses =
-        err_schemas
-        |> List.filter (fun (code, _) -> int_of_string code < 500)
-        |> List.map (fun (code, (err_schema : Ezjsonm.value)) ->
-            let descr = (* Hackish *)
-              try match err_schema with
-                | `O ["$ref", `String refname] ->
-                  (match String.split_on_char '/' refname with
-                   | [_; _; _; s] -> s
-                   | _ -> raise Not_found
-                  )
-                | `O (("type", `String "object") :: ("properties", `O l) :: _) -> (
-                    List.find (function
-                        | ("kind" | "error" | "description"),
-                          `O ( ("type", `String "string") :: ("enum", `A [_]) :: _) -> true
-                        | _ -> false
-                      ) l
-                    |> function
-                    | (_, `O (_ :: (_, `A [`String s]) :: _)) -> s
-                    | _ -> assert false
-                  )
-                | _ -> raise Not_found
-              with Not_found -> "Error " ^ code in
-            code,
-            `O [
-              "description", `String descr;
-              "content", `O [
-                "application/json", `O [
-                  "schema", err_schema
-                ]
-              ]
-            ]
-          ) in
-      let security = `A (List.map (fun secscheme ->
-          `O [security_ref_name secscheme, `A []]
-        ) sd.doc_security)
-      in
-      get_path sd,
-      `O [
-        sd.doc_meth, `O ([
-          "tags", `A [ `String sd.doc_section.section_name ];
-          "summary", `String summary;
-          "description", `String description;
-          "operationId", `String (string_of_int sd.doc_id);
-          "parameters", `A parameters;
-          "responses", `O (success_response :: error_responses);
-          "security", security;
-        ] @ request_schema)
-      ]
-    ) services
-  in
-  let security_schemes = List.fold_left (fun acc sd ->
-      let security = List.map schema_security_scheme sd.doc_security in
-      List.rev_append security acc
-    ) [] (List.rev services)
-  in
-  let definitions = definitions @ [ "securitySchemes", `O security_schemes ] in
-  paths, definitions
-
+  | `Query { ref_name; name=_ } -> ref_name
 
 module Legacy = struct
 

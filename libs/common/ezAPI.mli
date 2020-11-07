@@ -100,6 +100,8 @@ type service_doc = {
   doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
   doc_meth : string;
   doc_security : security_scheme list;
+  doc_input_example : Json_repr.any option;
+  doc_output_example : Json_repr.any option;
 }
 
 and section = {
@@ -148,6 +150,8 @@ module Path : sig
   val (/:) : ('a,'b) p -> 'c Resto.Arg.arg * 'c -> ('a * 'c,'b * 'c) p
 end
 
+val string_of_path : path -> string
+
 module Param : sig
   val string : ?name:string -> ?descr:string -> ?required:bool
     -> ?examples:string list -> string -> param
@@ -171,6 +175,7 @@ val service :
   ?params:param list ->
   ?security:([< security_scheme ] as 'security) list ->
   ?register:bool ->
+  ?output_example:'output ->
   ('b, 'c) p ->
   ('b, 'c, unit, 'output, 'error, 'security) service
 
@@ -185,6 +190,8 @@ val post_service :
   ?params:param list ->
   ?security:([< security_scheme ] as 'security) list ->
   ?register:bool ->
+  ?input_example:'input ->
+  ?output_example:'output ->
   ('b, 'c) p ->
   ('b, 'c, 'input, 'output, 'error, 'security) service
 
@@ -202,15 +209,6 @@ val forge0 :
 val forge1 :
   base_url -> (_, unit * 'a, _, _, _, _) service ->
   'a -> (param * arg_value) list -> url
-val printf : base_url -> ('a, unit, string, url) format4 -> 'a
-
-(* [md_of_services map] creates a documentation from all the declared
-  services. We should probably use a specific type [doc] to gather
-  services in different groups. *)
-val md_of_services :
-  ?section:section ->
-  ?base_url:base_url ->
-  (string * string) list -> string
 
 (* return a comma-concatenation of the occurrences of the argument *)
 val find_param :
@@ -251,11 +249,7 @@ val service_meth : _ service -> Resto1.method_type
 
 val str_of_method : Resto1.method_type -> string
 
-(* swagger *)
-val paths_of_sections : ?docs:((string * string * string) list) ->
-  section list ->
-  (string * Ezjsonm.value) list * (string * Ezjsonm.value) list
-
+val security_ref_name : security_scheme -> string
 
 module Legacy : sig
 
