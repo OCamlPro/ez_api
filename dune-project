@@ -24,11 +24,14 @@
   (js_of_ocaml-lwt (>= 3.4.0))
   (calendar (>= 2.03))
   (geoip (>= 0.0.3))
-  (cohttp-lwt-unix (>= 2.0.0))
-  (cohttp-lwt-jsoo (>= 2.0.0))
+  cohttp-lwt-unix
+  cohttp-lwt-jsoo
   tls
   lwt_log
-  re.str
+  re
   (httpaf-lwt-unix (>= 0.6.0))
   (extunix (>= 0.2.0))
-  (ocurl (>= 0.8.0))))
+  (ocurl (>= 0.8.0)))
+ (conflicts
+  (cohttp-lwt-unix (> 2.5.4))
+  (cohttp-lwt-jsoo (> 2.5.4))))
