@@ -115,6 +115,7 @@ module Make(S : SessionArg) = struct
     open Json_encoding
 
     let auth_needed =
+      def ~title:"needed" "needed_authentication" @@
       conv
         (fun { challenge_id; challenge } ->
            (challenge_id, challenge))
@@ -125,6 +126,7 @@ module Make(S : SessionArg) = struct
         (req "challenge" string)
 
     let auth_ok =
+      def ~title:"success" "success_authentication" @@
       conv
         (fun { auth_login; auth_user_id; auth_token; auth_user_info } ->
            (auth_login, auth_user_id, auth_token, auth_user_info))
@@ -144,12 +146,14 @@ module Make(S : SessionArg) = struct
           (function AuthNeeded x -> Some x | _ -> None)
           (fun x -> AuthNeeded x) ]
 
-    let foreign_message = conv
+    let foreign_message =
+      def ~title:"foreign login" "foreign_login_message" @@ conv
         (fun {foreign_origin; foreign_token} -> (foreign_origin, foreign_token))
         (fun (foreign_origin, foreign_token) -> {foreign_origin; foreign_token}) @@
       obj2 (req "auth_origin" string) (req "token" string)
 
     let local_message =
+      def ~title:"local login" "local_login_message" @@
       conv
         (fun
            { login_user; login_challenge_id; login_challenge_reply }
@@ -178,7 +182,7 @@ module Make(S : SessionArg) = struct
         case auth_ok
           (function LoginOk x -> Some x | _ -> None)
           (fun x -> LoginOk x);
-        case (obj1 (req "user_id" S.user_id_encoding))
+        case (def ~title:"pending" "login_validation_pending" @@ obj1 (req "user_id" S.user_id_encoding))
           (function LoginWait x -> Some x | _ -> None)
           (fun x -> LoginWait x) ]
 

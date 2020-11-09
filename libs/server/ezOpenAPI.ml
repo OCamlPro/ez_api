@@ -556,7 +556,9 @@ let make_path ?(docs=[]) ?definitions sd =
     | Some name -> match List.assoc_opt name docs with
       | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
       | Some (summary, descr, input, output) ->
-        Some summary, Some descr, input, output in
+        Some summary, Some descr,
+        (match input with None -> sd.doc_input_example | Some x -> x),
+        (match output with None -> sd.doc_output_example | Some x -> x) in
   let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
   (path,
    Makers.mk_path ?summary ?descr ~meth:sd.doc_meth (
@@ -565,10 +567,11 @@ let make_path ?(docs=[]) ?definitions sd =
        ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_path)
        ~security:sd.doc_security
        ?request:(make_request ?example:input_ex input_schema) @@
-     List.mapi (fun i (code, schema) ->
-         let example = if i = 0 then output_ex else None in
+     List.map (fun (code, schema) ->
+         let example = if code = 200 then output_ex else None in
          let code_str = string_of_int code in
-         let content = empty_schema ~none:[] schema (fun schema ->
+         let content =
+           empty_schema ~none:[ "application/json", Makers.mk_media ?example ()] schema (fun schema ->
              [ "application/json", Makers.mk_media ?example ~schema () ]) in
          code_str, Makers.mk_response ~content
            (Option.value ~default:code_str @@ EzErrorCodes.error code)) output_schemas)),
