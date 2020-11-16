@@ -540,7 +540,7 @@ module Make(Repr : Json_repr.Repr) = struct
       | MappedPath (p, map, _) -> register p (fun p i -> handler (map p) i)
 
   let register_dynamic_directory
-    : type pr a pr.
+    : type pr a.
       ?descr:string ->
       pr directory -> (pr, a) Path.path ->
       (a -> a directory Lwt.t) -> pr directory =
@@ -565,7 +565,7 @@ module Make(Repr : Json_repr.Repr) = struct
             (fun args -> builder (map args) >|= map_directory map)
 
   let register_custom_lookup
-    : type pr a pr.
+    : type pr a.
       ?descr:string ->
       pr directory -> (pr, a) Path.path -> (a -> string list -> custom_lookup Lwt.t) ->
       pr directory =
