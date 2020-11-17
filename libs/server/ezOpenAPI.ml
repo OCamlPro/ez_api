@@ -585,6 +585,43 @@ let definitions_schemas definitions =
       | _ -> None end
   | _ -> None
 
+let json_map f (j : Ezjsonm.value) : Ezjsonm.value =
+  let rec map j =
+    let j' = match j with
+      | `Null | `Bool _ | `Float _ | `String _ -> j
+      | `A l ->
+        let l' = List.rev_map map l |> List.rev in
+        if List.for_all2 (==) l l' then j
+        else `A l'
+      | `O l ->
+        let l' = List.rev_map (fun (s, x) ->
+            s, map x
+          ) l |> List.rev in
+        if List.for_all2 (fun (_, x) (_, x') -> x == x') l l' then j
+        else `O l'
+    in
+    let j' = f j' in
+    if j == j' then j else j'
+  in
+  map j
+
+(* ReDoc ignores item description if it is for a ref (and uses the
+   description of the ref instead which makes the feature
+   useless). This hack wraps the ref in an allOf combinator to
+   workaround the latent ReDoc bug while retaining the same
+   semantic. *)
+let fix_descr_ref json =
+  json_map (fun j ->
+      try
+        let _description = Ezjsonm.find j ["description"] in
+        let ref_ = Ezjsonm.find j ["$ref"] in
+        let j = Ezjsonm.update j ["$ref"] None in
+        Ezjsonm.update j ["allOf"] @@ Some (
+          `A [ `O ["$ref", ref_] ]
+        )
+      with Not_found -> j
+    ) json
+
 let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~sections title =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
   let sds = List.concat @@ List.map (fun s -> s.section_docs) sections in
@@ -596,7 +633,12 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~s
   let oa = Makers.mk_openapi ?servers ~info
       ~components:(Makers.mk_components ~security ?schemas ())
       (List.rev paths) in
-  EzEncoding.construct Encoding.openapi_object oa
+  let openapi_json =
+    Json_encoding.construct Encoding.openapi_object oa
+    |> fix_descr_ref
+  in
+  EzEncoding.Ezjsonm.to_string ~minify:true openapi_json
+
 
 let write ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections ~title filename =
   let s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections title in
