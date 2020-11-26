@@ -8,4 +8,5 @@ will be called in case of error. If ~error is specified, an exception
 is raised in case of error.
  *)
 
+module Interface : EzRequest_lwt.Interface
 include EzRequest_lwt.S

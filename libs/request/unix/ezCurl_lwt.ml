@@ -38,18 +38,20 @@ let make ?msg ~headers prepare url =
     else Error (rc, Some data) in
   Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
-include Make(struct
-    let get ?(meth="GET") ?(headers=[]) ?msg url =
-      log ~meth url msg;
-      make ?msg ~headers (fun c -> Curl.set_post c false) url
+module Interface = struct
+  let get ?(meth="GET") ?(headers=[]) ?msg url =
+    log ~meth url msg;
+    make ?msg ~headers (fun c -> Curl.set_post c false) url
 
-    let post ?(meth="POST") ?(content_type = "application/json") ?(content="{}") ?(headers=[])
-        ?msg url =
-      log ~meth url msg;
-      let headers = ("Content-Type", content_type) :: headers in
-      make ?msg ~headers (fun c ->
-          if meth = "PUT" then Curl.set_put c true else Curl.set_post c true;
-          Curl.set_postfields c content;
-          Curl.set_postfieldsize c (String.length content);
-        ) url
-end)
+  let post ?(meth="POST") ?(content_type = "application/json") ?(content="{}") ?(headers=[])
+      ?msg url =
+    log ~meth url msg;
+    let headers = ("Content-Type", content_type) :: headers in
+    make ?msg ~headers (fun c ->
+        if meth = "PUT" then Curl.set_put c true else Curl.set_post c true;
+        Curl.set_postfields c content;
+        Curl.set_postfieldsize c (String.length content);
+      ) url
+end
+
+include Make(Interface)

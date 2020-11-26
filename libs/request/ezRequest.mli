@@ -99,7 +99,7 @@ module type S = sig
 
   val init : unit -> unit
 
-  (* hook executed before every xhr *)
+  (* hook executed before every request *)
   val add_hook : (unit -> unit) -> unit
 
   val get :
@@ -126,12 +126,6 @@ end
 
 val request_reply_hook : (unit -> unit) ref
 
-
-type rep =
-  | CodeOk of string
-  | CodeError of int * string option
-
-
 val log : (string -> unit) ref
 
 
@@ -139,20 +133,20 @@ val log : (string -> unit) ref
 you must initialize an engine independantly.*)
 module ANY : S
 
-module Make(_ : sig
+module type Interface = sig
+  val get :
+    ?meth:string ->
+    string -> string ->
+    ?headers:(string * string) list ->
+    ((string, int * string option) result -> unit) -> unit
 
-    val xhr_get :
-      ?meth:string ->
-      string -> string ->
-      ?headers:(string * string) list ->
-      (rep -> unit) -> unit
+  val post :
+    ?meth:string ->
+    ?content_type:string ->
+    ?content:string ->
+    string -> string ->
+    ?headers:(string * string) list ->
+    ((string, int * string option) result -> unit) -> unit
+end
 
-    val xhr_post :
-      ?meth:string ->
-      ?content_type:string ->
-      ?content:string ->
-      string -> string ->
-      ?headers:(string * string) list ->
-      (rep -> unit) -> unit
-
-  end) : S
+module Make(_ : Interface) : S

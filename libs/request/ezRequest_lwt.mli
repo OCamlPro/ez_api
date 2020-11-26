@@ -123,20 +123,22 @@ val log : (string -> unit) ref
    you must initialize an engine independantly.*)
 module ANY : S
 
-module Make(_ : sig
+module type Interface = sig
 
-    val get :
-      ?meth:string ->
-      ?headers:(string * string) list ->
-      ?msg:string -> string ->
-      (string, int * string option) result Lwt.t
+  val get :
+    ?meth:string ->
+    ?headers:(string * string) list ->
+    ?msg:string -> string ->
+    (string, int * string option) result Lwt.t
 
-    val post :
-      ?meth:string ->
-      ?content_type:string ->
-      ?content:string ->
-      ?headers:(string * string) list ->
-      ?msg:string -> string ->
-      (string, int * string option) result Lwt.t
+  val post :
+    ?meth:string ->
+    ?content_type:string ->
+    ?content:string ->
+    ?headers:(string * string) list ->
+    ?msg:string -> string ->
+    (string, int * string option) result Lwt.t
 
-  end) : S
+end
+
+module Make(_ : Interface) : S

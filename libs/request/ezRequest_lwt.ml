@@ -332,4 +332,22 @@ module Default = Make(struct
       return (Error (-2, Some "No http client loaded"))
   end)
 
+module type Interface = sig
+
+  val get :
+    ?meth:string ->
+    ?headers:(string * string) list ->
+    ?msg:string -> string ->
+    (string, int * string option) result Lwt.t
+
+  val post :
+    ?meth:string ->
+    ?content_type:string ->
+    ?content:string ->
+    ?headers:(string * string) list ->
+    ?msg:string -> string ->
+    (string, int * string option) result Lwt.t
+
+end
+
 let () = Default.init ()

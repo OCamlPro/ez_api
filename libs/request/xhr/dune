@@ -5,7 +5,8 @@
  (wrapped false)
  (modules ezDebugJS)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPI ezEncodingJS))
+ (libraries ezAPI ezEncodingJS)
+ (modes byte))
 
 (library
  (name ezAPIJS)
@@ -14,7 +15,8 @@
  (wrapped false)
  (modules ezXhr)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest ezAPIJSCommon))
+ (libraries ezRequest ezAPIJSCommon)
+ (modes byte))
 
 (library
  (name ezAPIJS_lwt)
@@ -23,7 +25,8 @@
  (wrapped false)
  (modules ezXhr_lwt)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest_lwt js_of_ocaml-lwt))
+ (libraries ezAPIJSCommon ezRequest_lwt js_of_ocaml-lwt)
+ (modes byte))
 
 (library
  (name ezAPICohttp_xhr_lwt)
@@ -32,7 +35,8 @@
  (wrapped false)
  (modules ezCoXhr_lwt)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo))
+ (libraries ezAPIJSCommon ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo)
+ (modes byte))
 
 (library
  (name ezAPICohttp_xhr)
@@ -41,7 +45,8 @@
  (wrapped false)
  (modules ezCoXhr)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo))
+ (libraries ezAPIJSCommon ezRequest ezCohttp_base cohttp-lwt-jsoo)
+ (modes byte))
 
 (library
  (name ezFetch)
@@ -49,7 +54,8 @@
  (optional)
  (modules ezFetch)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest ezjs-fetch))
+ (libraries ezAPIJSCommon ezRequest ezjs_fetch)
+ (modes byte))
 
 (library
  (name ezFetch_lwt)
@@ -57,4 +63,5 @@
  (optional)
  (modules ezFetch_lwt)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezAPIJSCommon ezRequest_lwt ezjs-fetch))
+ (libraries ezAPIJSCommon ezRequest_lwt ezjs_fetch.lwt)
+ (modes byte))

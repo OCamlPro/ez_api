@@ -93,7 +93,7 @@ module type S = sig
 
   val init : unit -> unit
 
-  (* hook executed before every xhr *)
+  (* hook executed before every request *)
   val add_hook : (unit -> unit) -> unit
 
   val get :
@@ -118,15 +118,11 @@ module type S = sig
 
 end
 
-type rep =
-  CodeOk of string
-| CodeError of int * string option
-
 let log = ref prerr_endline
 
 let request_reply_hook = ref (fun () -> ())
 
-let before_xhr_hook = ref (fun () -> ())
+let before_hook = ref (fun () -> ())
 
 let decode_result ?error encoding f res =
   let res = match res with "" -> "{}" | res -> res in
@@ -141,32 +137,32 @@ let decode_result ?error encoding f res =
         error (-3) (Some msg)
 
 
-let any_xhr_get = ref (fun ?meth:_m _msg _url ?headers:_ f ->
-    f (CodeError (-2,Some "No http client loaded")))
-let any_xhr_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
-                  f (CodeError (-2,Some "No http client loaded")))
+let any_get = ref (fun ?meth:_m _msg _url ?headers:_ f ->
+    f (Error (-2,Some "No http client loaded")))
+let any_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f ->
+    f (Error (-2,Some "No http client loaded")))
 
 module Make(S : sig
 
-    val xhr_get :
+    val get :
       ?meth:string ->
       string -> string ->
       ?headers:(string * string) list ->
-      (rep -> unit) -> unit
+      ((string, int * string option) result -> unit) -> unit
 
-    val xhr_post :
+    val post :
       ?meth:string ->
       ?content_type:string ->
        ?content:string ->
       string -> string ->
       ?headers:(string * string) list ->
-      (rep -> unit) -> unit
+      ((string, int * string option) result -> unit) -> unit
 
     end) = struct
 
   let init () =
-    any_xhr_get := S.xhr_get;
-    any_xhr_post := S.xhr_post;
+    any_get := S.get;
+    any_post := S.post;
     ()
 
   let () = init ()
@@ -177,12 +173,12 @@ module Make(S : sig
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m ->
       Some (String.uppercase_ascii @@ EzAPI.str_of_method m) in
-    S.xhr_get ?meth msg url ?headers
+    S.get ?meth msg url ?headers
       (fun code ->
          !request_reply_hook ();
          match code with
-         | CodeOk res -> f res
-         | CodeError (n, body) ->
+         | Ok res -> f res
+         | Error (n, body) ->
            match error with
            | None -> ()
            | Some f -> f n body)
@@ -192,19 +188,19 @@ module Make(S : sig
     EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ EzAPI.str_of_method m) in
-    S.xhr_post ?meth ?content_type ?content ?headers msg url
+    S.post ?meth ?content_type ?content ?headers msg url
       (fun code ->
          !request_reply_hook ();
          match code with
-         | CodeOk res -> f res
-         | CodeError (n, body) ->
+         | Ok res -> f res
+         | Error (n, body) ->
            match error with
            | None -> ()
            | Some f -> f n body)
 
   let add_hook f =
-    let old_hook = !before_xhr_hook in
-    before_xhr_hook := (fun () -> old_hook (); f ())
+    let old_hook = !before_hook in
+    before_hook := (fun () -> old_hook (); f ())
 
   let handlers ?error service f =
     let error code msg =
@@ -232,7 +228,7 @@ module Make(S : sig
         ?error
         ?(params=[])
         f () =
-      !before_xhr_hook ();
+      !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       if post then
@@ -254,7 +250,7 @@ module Make(S : sig
         ?(params=[])
         f
         (arg : 'arg) =
-      !before_xhr_hook ();
+      !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       if post then
@@ -276,7 +272,7 @@ module Make(S : sig
         ~(input : 'input)
         f
       =
-      !before_xhr_hook ();
+      !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
@@ -295,7 +291,7 @@ module Make(S : sig
         (arg : 'arg)
         f
       =
-      !before_xhr_hook ();
+      !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
@@ -350,19 +346,35 @@ module Make(S : sig
 end
 
 module ANY : S = Make(struct
-    let xhr_get ?meth msg url ?headers f =
-      !any_xhr_get ?meth msg url ?headers f
-    let xhr_post ?meth ?content_type ?content msg url ?headers f =
-      !any_xhr_post ?meth ?content_type ?content msg url ?headers f
-    end)
+    let get ?meth msg url ?headers f =
+      !any_get ?meth msg url ?headers f
+    let post ?meth ?content_type ?content msg url ?headers f =
+      !any_post ?meth ?content_type ?content msg url ?headers f
+  end)
 
 module Default = Make(struct
 
-    let xhr_get ?meth:_meth _msg _url ?headers:_ f = f (CodeError (-2,Some "No http client loaded"))
-    let xhr_post ?meth:_meth ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f
-      =
-      f (CodeError (-2,Some "No http client loaded"))
+    let get ?meth:_meth _msg _url ?headers:_ f = f (Error (-2,Some "No http client loaded"))
+    let post ?meth:_meth ?content_type:(_x="") ?content:(_y="") _msg _url ?headers:_ f =
+      f (Error (-2,Some "No http client loaded"))
 
-    end)
+  end)
+
+module type Interface = sig
+  val get :
+    ?meth:string ->
+    string -> string ->
+    ?headers:(string * string) list ->
+    ((string, int * string option) result -> unit) -> unit
+
+  val post :
+    ?meth:string ->
+    ?content_type:string ->
+    ?content:string ->
+    string -> string ->
+    ?headers:(string * string) list ->
+    ((string, int * string option) result -> unit) -> unit
+end
+
 
 let () = Default.init ()
