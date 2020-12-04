@@ -64,20 +64,41 @@ let decode s =
   iter 0;
   Buffer.contents r
 
-let encode_args l =
+let encode_args ?(url=false) l =
   String.concat "&" (List.map (fun (name, arg) ->
-                         Printf.sprintf "%s=%s" name
-                                        (String.concat ","
-                                                       (List.map encode arg))) l)
+      Printf.sprintf "%s=%s" name
+        (String.concat ","
+           (if url then List.map encode arg else arg))) l)
 
-let decode_args s =
+let decode_args ?(url=false) s =
   let args = String.split_on_char '&' s in
   List.map (fun s ->
       let s, v = cut_at s '=' in
       let v = String.split_on_char ',' v in
       let s = decode s in
-      let v = List.map decode v in
+      let v = if url then List.map decode v else v in
       s, v
     ) args
 
 let content_type = "application/x-www-form-urlencoded"
+
+let encode_obj ?(url=false) enc x =
+  let rec aux ?prefix = function
+    | `Null -> None
+    | `String s -> let s = if url then encode s else s in
+      Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
+    | `Float f -> let s = string_of_float f in
+      Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
+    | `Bool b -> let s = string_of_bool b in
+      Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
+    | `A l ->
+      if l = [] then None else
+        Some (String.concat "&" @@ List.filter_map (aux ?prefix) l)
+    | `O l ->
+      if l = [] then None else
+        Some (String.concat "&" @@ List.filter_map (fun (k, v) ->
+            let prefix = match prefix with None -> k | Some p -> p ^ "[" ^ k ^ "]" in
+            aux ~prefix v) l) in
+  match aux (Json_encoding.construct enc x) with
+  | None -> ""
+  | Some s -> s

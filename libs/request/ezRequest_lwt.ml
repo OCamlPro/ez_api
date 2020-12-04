@@ -9,9 +9,13 @@ module type RAWGEN = sig
     constraint 'security = [< EzAPI.security_scheme ]
   type ('arg, 'output, 'error, 'security) service1
     constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg1, 'arg2, 'output, 'error, 'security) service2
+    constraint 'security = [< EzAPI.security_scheme ]
   type ('input, 'output, 'error, 'security) post_service0
     constraint 'security = [< EzAPI.security_scheme ]
   type ('arg, 'input, 'output, 'error, 'security) post_service1
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2
     constraint 'security = [< EzAPI.security_scheme ]
   type ('output, 'error) api_result
 
@@ -34,10 +38,21 @@ module type RAWGEN = sig
     'arg ->
     ('output, 'error) api_result Lwt.t
 
+  val get2 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg: string ->
+    EzAPI.base_url ->
+    ('arg1, 'arg2, 'output, 'error, 'security) service2 ->
+    'arg1 -> 'arg2 ->
+    ('output, 'error) api_result Lwt.t
+
   val post0 :
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg:string ->
+    ?url_encode:bool ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('input,'output, 'error, 'security) post_service0 -> (* POST service *)
@@ -47,10 +62,22 @@ module type RAWGEN = sig
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg:string ->
+    ?url_encode:bool ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('arg, 'input,'output, 'error, 'security) post_service1 -> (* POST service *)
     'arg ->
+    ('output, 'error) api_result Lwt.t
+
+  val post2 :
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
+    ?url_encode:bool ->
+    input:'input ->                           (* input *)
+    EzAPI.base_url ->                 (* API url *)
+    ('arg1, 'arg2, 'input,'output, 'error, 'security) post_service2 -> (* POST service *)
+    'arg1 -> 'arg2 ->
     ('output, 'error) api_result Lwt.t
 
 end
@@ -77,10 +104,14 @@ module type RAW = RAWGEN
     ('output, 'error, 'security) EzAPI.service0
    and type ('arg, 'output, 'error, 'security) service1 :=
      ('arg, 'output, 'error, 'security) EzAPI.service1
+   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 :=
+     ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2
    and type ('input, 'output, 'error, 'security) post_service0 :=
      ('input, 'output, 'error, 'security) EzAPI.post_service0
    and type ('arg, 'input, 'output, 'error, 'security) post_service1 :=
      ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1
+   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 :=
+     ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2
    and type ('output, 'error) api_result := ('output, 'error) api_result
 
 module type LEGACY = RAWGEN
@@ -88,10 +119,14 @@ module type LEGACY = RAWGEN
     ('output) EzAPI.Legacy.service0
    and type ('arg, 'output, 'error, 'security) service1 =
      ('arg, 'output) EzAPI.Legacy.service1
+   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
+     ('arg1, 'arg2, 'output) EzAPI.Legacy.service2
    and type ('input, 'output, 'error, 'security) post_service0 =
      ('input, 'output) EzAPI.Legacy.post_service0
    and type ('arg, 'input, 'output, 'error, 'security) post_service1 =
      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
+     ('arg1, 'arg2, 'input, 'output) EzAPI.Legacy.post_service2
    and type ('output, 'error) api_result :=
      ('output, (int * string option)) result
 
@@ -157,7 +192,7 @@ let handle_result service res =
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url ->
     return (Error (-2, Some "No http client loaded"))
   )
-let any_post = ref (fun ?meth:_m ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url ->
+let any_post = ref (fun ?meth:_m ?content_type:_ ?content:_ ?headers:_ ?msg:_ _url ->
     return (Error (-2, Some "No http client loaded"))
   )
 
@@ -243,28 +278,64 @@ module Make(S : sig
         let url = EzAPI.forge1 api service arg params in
         internal_get ~meth ?headers ?msg url >|= handle_result service
 
-    let post0 ?headers ?(params=[]) ?msg ~(input : 'input)
+    let get2 ?(post=false) ?headers ?(params=[]) ?msg
+        api (service : ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2)
+        (arg1 : 'arg1) (arg2 : 'arg2) =
+      !before_hook ();
+      let meth = EzAPI.service_meth service in
+      if post then
+        let url = EzAPI.forge2 api service arg1 arg2 []  in
+        let content = EzAPI.encode_args service url params in
+        let content_type = EzUrl.content_type in
+        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
+        handle_result service
+      else
+        let url = EzAPI.forge2 api service arg1 arg2 params in
+        internal_get ~meth ?headers ?msg url >|= handle_result service
+
+    let post0 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
         api (service : ('input,'output, 'error, 'security) EzAPI.post_service0) =
       !before_hook ();
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge0 api service params in
-      let content = EzEncoding.construct input_encoding input in
-      let content_type = "application/json" in
+      let content, content_type =
+        if not url_encode then
+          EzEncoding.construct input_encoding input, "application/json"
+        else
+          EzUrl.encode_obj input_encoding input, EzUrl.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
-    let post1 ?headers ?(params=[]) ?msg ~(input : 'input)
+    let post1 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
         api (service : ('arg, 'input,'output, 'error, 'security) EzAPI.post_service1) (arg : 'arg) =
       !before_hook ();
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge1 api service arg params in
-      let content = EzEncoding.construct input_encoding input in
-      let content_type = "application/json" in
+      let content, content_type =
+        if not url_encode then
+          EzEncoding.construct input_encoding input, "application/json"
+        else
+          EzUrl.encode_obj input_encoding input, "application/x-www-form-urlencoded" in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
-  end
+
+    let post2 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
+        api (service : ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2)
+        (arg1 : 'arg1) (arg2 : 'arg2) =
+      !before_hook ();
+      let meth = EzAPI.service_meth service in
+      let input_encoding = EzAPI.service_input service in
+      let url = EzAPI.forge2 api service arg1 arg2 params in
+      let content, content_type =
+        if not url_encode then
+          EzEncoding.construct input_encoding input, "application/json"
+        else
+          EzUrl.encode_obj input_encoding input, "application/x-www-form-urlencoded" in
+      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
+      handle_result service
+end
 
   include Raw
 
@@ -279,12 +350,20 @@ module Make(S : sig
       ('arg, 'output) EzAPI.Legacy.service1
       constraint 'security = [< EzAPI.security_scheme ]
 
+    type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
+      ('arg1, 'arg2, 'output) EzAPI.Legacy.service2
+      constraint 'security = [< EzAPI.security_scheme ]
+
     type ('input, 'output, 'error, 'security) post_service0 =
       ('input, 'output) EzAPI.Legacy.post_service0
       constraint 'security = [< EzAPI.security_scheme ]
 
     type ('arg, 'input, 'output, 'error, 'security) post_service1 =
       ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+      constraint 'security = [< EzAPI.security_scheme ]
+
+    type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
+      ('arg1, 'arg2, 'input, 'output) EzAPI.Legacy.post_service2
       constraint 'security = [< EzAPI.security_scheme ]
 
     open EzAPI.Legacy
@@ -305,14 +384,25 @@ module Make(S : sig
       get1 ?post ?headers ?params ?msg api service arg
       >|= unresultize
 
-    let post0 ?headers ?params ?msg ~(input : 'input)
-        api (service : ('input,'output) post_service0) =
-      post0 ?headers ?params ?msg ~input api service
+    let get2 ?post ?headers ?params ?msg
+        api (service : ('arg1, 'arg2, 'output) service2) (arg1 : 'arg1) (arg2 : 'arg2) =
+      get2 ?post ?headers ?params ?msg api service arg1 arg2
       >|= unresultize
 
-    let post1 ?headers ?params ?msg ~(input : 'input)
+    let post0 ?headers ?params ?msg ?url_encode ~(input : 'input)
+        api (service : ('input,'output) post_service0) =
+      post0 ?headers ?params ?msg ?url_encode ~input api service
+      >|= unresultize
+
+    let post1 ?headers ?params ?msg ?url_encode ~(input : 'input)
         api (service : ('arg, 'input,'output) post_service1) (arg : 'arg) =
-      post1 ?headers ?params ?msg ~input api service arg
+      post1 ?headers ?params ?msg ?url_encode ~input api service arg
+      >|= unresultize
+
+    let post2 ?headers ?params ?msg ?url_encode ~(input : 'input)
+        api (service : ('arg1, 'arg2, 'input, 'output) post_service2)
+        (arg1 : 'arg1) (arg2 : 'arg2) =
+      post2 ?headers ?params ?msg ?url_encode ~input api service arg1 arg2
       >|= unresultize
 
   end

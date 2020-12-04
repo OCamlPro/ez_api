@@ -146,11 +146,15 @@ type nonrec ('params, 'params2, 'input, 'output, 'error, 'security) service
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
 type ('arg, 'output, 'error, 'security) service1 =
   (request * 'arg, unit * 'arg, unit, 'output, 'error, 'security) service
+type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
+  ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, unit, 'output, 'error, 'security) service
 
 type ('input, 'output, 'error, 'security) post_service0 =
   (request, unit, 'input, 'output, 'error, 'security) service
 type ('arg,'input,'output, 'error, 'security) post_service1 =
   (request * 'arg, unit * 'arg, 'input, 'output, 'error, 'security) service
+type ('arg1, 'arg2,'input,'output, 'error, 'security) post_service2 =
+  ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output, 'error, 'security) service
 
 let arg_string ?descr name example: string Arg.arg * string =
   Arg.make
@@ -243,8 +247,9 @@ let forge url s params args =
   in
   add_end url (parts ^ args)
 
-let forge1 url s params args =  forge url s ((), params) args
 let forge0 url s args = forge url s () args
+let forge1 url s params args =  forge url s ((), params) args
+let forge2 url s params1 params2 args =  forge url s (((), params1), params2) args
 
 module Param = struct
   let param param_type ?name ?descr ?(required=false) ?(examples=[]) param_value =
@@ -522,11 +527,15 @@ module Legacy = struct
     (request, unit, unit, 'output) service
   type ('arg, 'output) service1 =
     (request * 'arg, unit * 'arg, unit, 'output) service
+  type ('arg1, 'arg2, 'output) service2 =
+    ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, unit, 'output) service
 
   type ('input, 'output) post_service0 =
     (request, unit, 'input, 'output) service
-  type ('arg,'input,'output) post_service1 =
+  type ('arg, 'input,'output) post_service1 =
     (request * 'arg, unit * 'arg, 'input, 'output) service
+  type ('arg1, 'arg2, 'input, 'output) post_service2 =
+    ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output) service
 
   let post_service ?section ?name ?descr ?meth ~input ~output ?params arg =
     post_service ?section ?name ?descr ?meth ~input ~output ?params arg

@@ -7,9 +7,13 @@ module type RAWGEN = sig
     constraint 'security = [< EzAPI.security_scheme ]
   type ('arg, 'output, 'error, 'security) service1
     constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg1, 'arg2, 'output, 'error, 'security) service2
+    constraint 'security = [< EzAPI.security_scheme ]
   type ('input, 'output, 'error, 'security) post_service0
     constraint 'security = [< EzAPI.security_scheme ]
   type ('arg, 'input, 'output, 'error, 'security) post_service1
+    constraint 'security = [< EzAPI.security_scheme ]
+  type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2
     constraint 'security = [< EzAPI.security_scheme ]
   type ('output, 'error) api_result
 
@@ -32,10 +36,21 @@ module type RAWGEN = sig
     'arg ->
     ('output, 'error) api_result Lwt.t
 
+  val get2 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg: string ->
+    EzAPI.base_url ->
+    ('arg1, 'arg2, 'output, 'error, 'security) service2 ->
+    'arg1 -> 'arg2 ->
+    ('output, 'error) api_result Lwt.t
+
   val post0 :
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg:string ->
+    ?url_encode:bool ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('input,'output, 'error, 'security) post_service0 -> (* POST service *)
@@ -45,10 +60,22 @@ module type RAWGEN = sig
     ?headers:(string * string) list ->
     ?params:(EzAPI.param * EzAPI.arg_value) list ->
     ?msg:string ->
+    ?url_encode:bool ->
     input:'input ->                           (* input *)
     EzAPI.base_url ->                 (* API url *)
     ('arg, 'input,'output, 'error, 'security) post_service1 -> (* POST service *)
     'arg ->
+    ('output, 'error) api_result Lwt.t
+
+  val post2 :
+    ?headers:(string * string) list ->
+    ?params:(EzAPI.param * EzAPI.arg_value) list ->
+    ?msg:string ->
+    ?url_encode:bool ->
+    input:'input ->                           (* input *)
+    EzAPI.base_url ->                 (* API url *)
+    ('arg1, 'arg2, 'input,'output, 'error, 'security) post_service2 -> (* POST service *)
+    'arg1 -> 'arg2 ->
     ('output, 'error) api_result Lwt.t
 
 end
@@ -66,10 +93,14 @@ module type RAW = RAWGEN
     ('output, 'error, 'security) EzAPI.service0
    and type ('arg, 'output, 'error, 'security) service1 :=
      ('arg, 'output, 'error, 'security) EzAPI.service1
+   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 :=
+     ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2
    and type ('input, 'output, 'error, 'security) post_service0 :=
      ('input, 'output, 'error, 'security) EzAPI.post_service0
    and type ('arg, 'input, 'output, 'error, 'security) post_service1 :=
      ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1
+   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 :=
+     ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2
    and type ('output, 'error) api_result := ('output, 'error) api_result
 
 module type LEGACY = RAWGEN
@@ -77,10 +108,14 @@ module type LEGACY = RAWGEN
     ('output) EzAPI.Legacy.service0
    and type ('arg, 'output, 'error, 'security) service1 =
      ('arg, 'output) EzAPI.Legacy.service1
+   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
+     ('arg1, 'arg2, 'output) EzAPI.Legacy.service2
    and type ('input, 'output, 'error, 'security) post_service0 =
      ('input, 'output) EzAPI.Legacy.post_service0
    and type ('arg, 'input, 'output, 'error, 'security) post_service1 =
      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
+   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
+     ('arg1, 'arg2, 'input, 'output) EzAPI.Legacy.post_service2
    and type ('output, 'error) api_result :=
      ('output, (int * string option)) result
 

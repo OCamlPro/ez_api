@@ -117,11 +117,16 @@ type ('params, 'params2, 'input, 'output, 'error, 'security) service
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
 type ('arg, 'output, 'error, 'security) service1 =
   (request * 'arg, unit * 'arg, unit, 'output, 'error, 'security) service
+type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
+  ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, unit, 'output, 'error, 'security) service
 
 type ('input, 'output, 'error, 'security) post_service0 =
   (request, unit, 'input, 'output, 'error, 'security) service
 type ('arg,'input,'output, 'error, 'security) post_service1 =
   (request * 'arg, unit * 'arg, 'input, 'output, 'error, 'security) service
+type ('arg1, 'arg2,'input,'output, 'error, 'security) post_service2 =
+  ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output, 'error, 'security) service
+
 
 type ('a, 'b) p
 
@@ -209,6 +214,10 @@ val forge0 :
 val forge1 :
   base_url -> (_, unit * 'a, _, _, _, _) service ->
   'a -> (param * arg_value) list -> url
+val forge2 :
+  base_url -> (_, (unit * 'a) * 'b, _, _, _, _) service ->
+  'a -> 'b -> (param * arg_value) list -> url
+
 
 (* return a comma-concatenation of the occurrences of the argument *)
 val find_param :
@@ -260,11 +269,15 @@ module Legacy : sig
     (request, unit, unit, 'output) service
   type ('arg, 'output) service1 =
     (request * 'arg, unit * 'arg, unit, 'output) service
+  type ('arg1, 'arg2, 'output) service2 =
+    ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, unit, 'output) service
 
   type ('input, 'output) post_service0 =
     (request, unit, 'input, 'output) service
-  type ('arg,'input,'output) post_service1 =
+  type ('arg, 'input,'output) post_service1 =
     (request * 'arg, unit * 'arg, 'input, 'output) service
+  type ('arg1, 'arg2, 'input,'output) post_service2 =
+    ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output) service
 
   val service :
     ?section: section ->

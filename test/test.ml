@@ -64,7 +64,7 @@ module SessionArg = struct
 end
 
 
-module MakeService(S : sig end) = struct
+module MakeService(_ : sig end) = struct
 
   let arg_test =
     EzAPI.arg_string "arg-in-path" "example-of-value"
@@ -290,6 +290,7 @@ module MakeClient(S : sig end) = struct
       )
 
   let test4 arg api =
+    let open EzSession.TYPES in
     begin_request ();
     Session.connect
       api
