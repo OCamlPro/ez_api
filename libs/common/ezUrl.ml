@@ -87,13 +87,22 @@ let encode_obj ?(url=false) enc x =
     | `Null -> None
     | `String s -> let s = if url then encode s else s in
       Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
-    | `Float f -> let s = string_of_float f in
+    | `Float f ->
+      let s = if floor f = f then string_of_int (int_of_float f) else string_of_float f in
       Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
     | `Bool b -> let s = string_of_bool b in
       Some (match prefix with None -> s | Some p -> p ^ "=" ^ s)
     | `A l ->
       if l = [] then None else
-        Some (String.concat "&" @@ List.filter_map (aux ?prefix) l)
+        Some (String.concat "&" @@
+              List.rev @@ snd @@
+              List.fold_left (fun (i, acc) x ->
+                  let prefix = match prefix with
+                    | None -> None
+                    | Some p -> Some (p ^ "[" ^ (string_of_int i) ^ "]") in
+                  match aux ?prefix x with
+                  | None -> i, acc
+                  | Some s -> i+1, s :: acc) (0, []) l)
     | `O l ->
       if l = [] then None else
         Some (String.concat "&" @@ List.filter_map (fun (k, v) ->
