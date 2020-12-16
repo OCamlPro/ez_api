@@ -18,4 +18,5 @@
  (public_name ez-api.server-httpaf)
  (optional)
  (modules ezAPIServerHttpAf)
- (libraries ezAPIServerUtils httpaf-lwt-unix extunix))
+ (libraries ezAPIServerUtils httpaf-lwt-unix)
+ (foreign_stubs (language c) (names rlimit_no_file)))
