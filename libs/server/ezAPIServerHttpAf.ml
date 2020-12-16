@@ -5,6 +5,8 @@ open Httpaf
 open EzAPIServerUtils
 open Resto1
 
+external limit_open_file : unit -> int = "rlimit_no_file_c"
+
 type lwt_server = {
   shutdown : unit Lwt.t Lazy.t;
 }
@@ -423,13 +425,8 @@ let server ?(require_method=false) ?catch servers =
     if not (EzAPI.all_services_registered ()) then (* exit 2 *) ();
     init_timings (EzAPI.nservices());
     let listen_address = Unix.(ADDR_INET (inet_addr_any, port)) in
-    let nb_max_connections = match ExtUnixAll.(getrlimit RLIMIT_NOFILE) with
-      | Some soft64 , _ ->
-        let soft = Int64.to_int soft64 in
-        let nb = soft - 100 in
-        EzDebug.printf "Setting max_connection to %d" nb  ;
-        nb
-      | _ -> assert false in
+    let nb_max_connections = limit_open_file () - 100 in
+    EzDebug.printf "Setting max_connection to %d" nb_max_connections;
     establish_server_with_client_socket
       ~nb_max_connections
       listen_address (fun sockaddr fd ->
