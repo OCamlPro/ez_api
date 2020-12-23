@@ -2,4 +2,4 @@
  (name ezEncoding)
  (public_name ez-api.encoding)
  (modules ezEncoding)
- (libraries ocplib-json-typed ezjsonm))
+ (libraries json-data-encoding ezjsonm))

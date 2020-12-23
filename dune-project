@@ -17,7 +17,7 @@
  (synopsis "Easy API library over ocplib-resto/ocplib-directory")
  (documentation "https://ocamlpro.github.io/ez-api/doc")
  (depends
-  (ocplib-json-typed (>= 0.7.0))
+  (json-data-encoding (>= 0.7.0))
   (lwt (>= 4.0.0))
   (ezjsonm (>= 1.0.0)))
  (depopts
