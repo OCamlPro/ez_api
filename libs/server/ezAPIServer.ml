@@ -81,7 +81,8 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
       ~body
       req_params
   in
-  debug "REQUEST: %s %S"
+  debug "[%t] REQUEST: %s %S"
+    pp_time
     (req |> Cohttp.Request.meth |> Cohttp.Code.string_of_method)
     (req |> Cohttp.Request.uri |> Uri.path_and_query);
   debugf ~v:1 (fun () ->
