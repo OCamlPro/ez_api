@@ -27,6 +27,9 @@ let verbose = match Sys.getenv_opt "EZAPISERVER" with
 
 let set_verbose i = verbose := i
 
+let pp_time () =
+  GMTime.(date_of_tm @@ Unix.gmtime @@ time ())
+
 let debug ?(v=0) fmt =
   if !verbose > v then EzDebug.printf fmt
   else Printf.ifprintf () fmt
