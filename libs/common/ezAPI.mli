@@ -95,8 +95,9 @@ type service_doc = {
   mutable doc_registered : bool;
   mutable doc_sample : (base_url -> url);
   doc_section : section;
-  doc_input : Json_schema.schema Lazy.t;
+  doc_input : Json_schema.schema Lazy.t option;
   doc_output : Json_schema.schema Lazy.t;
+  doc_mime : string list;
   doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
   doc_meth : string;
   doc_security : security_scheme list;
@@ -108,6 +109,11 @@ and section = {
   section_name : string;
   mutable section_docs : service_doc list;
 }
+
+type _ input_type =
+  | Empty : unit input_type
+  | Json : 'a Json_encoding.encoding -> 'a input_type
+  | Binary : string list -> string input_type
 
 (* All our services use 'params' as 'prefix of the service, and
    'unit' as 'input of the service (i.e. no input) *)
@@ -189,7 +195,8 @@ val post_service :
   ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
   ?descr: string ->
   ?meth:Resto.method_type (* meth type: get, post *) ->
-  input:'input Json_encoding.encoding ->
+  ?input:'input Json_encoding.encoding ->
+  ?input_type:'input input_type ->
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->
@@ -246,7 +253,7 @@ val encode_args :
   ('a, 'b, 'c, 'd, 'e, 'f) service ->
   url -> (param * arg_value) list -> string
 
-val service_input : (_, _, 'input, _, _, _) service -> 'input Json_encoding.encoding
+val service_input : (_, _, 'input, _, _, _) service -> 'input input_type
 val service_output : (_, _, _, 'output, _, _) service -> 'output Json_encoding.encoding
 val service_errors :
   (_, _, _, _, 'error, _) service ->

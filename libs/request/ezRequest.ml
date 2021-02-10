@@ -324,72 +324,94 @@ module Make(S : sig
         let url = EzAPI.forge2 api service arg1 arg2 params in
         internal_get ~meth msg url ?headers ~error ok
 
-    let post0 api
-        ( service : ('input, 'output, 'error, 'security) EzAPI.post_service0 )
-        msg
-        ?headers
-        ?error
-        ?(params=[])
-        ?(url_encode=false)
-        ~(input : 'input)
-        f
-      =
+    let post0 :
+      type i.
+      EzAPI.base_url ->
+      (i, 'output, 'error, 'security) EzAPI.post_service0 ->
+      string ->
+      ?headers:(string * string) list ->
+      ?error: error_handler ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?url_encode:bool ->
+      input:i ->
+      (('output, 'error) Result.result -> unit) ->
+      unit =
+      fun api service msg ?headers ?error ?(params=[]) ?(url_encode=false)
+        ~input f ->
       !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge0 api service params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, EzUrl.content_type in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post ~meth msg url ~content ~content_type ?headers ~error ok
 
-    let post1 api
-        (service : ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1 )
-        msg
-        ?headers
-        ?error
-        ?(params=[])
-        ?(url_encode=false)
-        ~(input : 'input)
-        (arg : 'arg)
-        f
-      =
+    let post1 :
+      type i.
+      EzAPI.base_url ->
+      ('arg, i, 'output, 'error, 'security) EzAPI.post_service1 ->
+      string ->
+      ?headers:(string * string) list ->
+      ?error: error_handler ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?url_encode:bool ->
+      input:i ->
+      'arg ->
+      (('output, 'error) Result.result -> unit) -> unit =
+      fun api service msg ?headers ?error ?(params=[]) ?(url_encode=false)
+        ~input arg f ->
       !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge1 api service arg params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, EzUrl.content_type in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post msg ~meth url ~content ~content_type ?headers ~error ok
 
-    let post2 api
-        (service : ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2 )
-        msg
-        ?headers
-        ?error
-        ?(params=[])
-        ?(url_encode=false)
-        ~(input : 'input)
-        (arg1 : 'arg1) (arg2 : 'arg2)
-        f
-      =
+    let post2 :
+      type i.
+      EzAPI.base_url ->
+      ('arg1, 'arg2, i, 'output, 'error, 'security) EzAPI.post_service2 ->
+      string ->
+      ?headers:(string * string) list ->
+      ?error: error_handler ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?url_encode:bool ->
+      input:i ->
+      'arg1 -> 'arg2 ->
+      (('output, 'error) Result.result -> unit) -> unit =
+      fun api service msg ?headers ?error ?(params=[]) ?(url_encode=false)
+        ~input arg1 arg2 f ->
       !before_hook ();
       let ok, error = handlers ?error service f in
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge2 api service arg1 arg2 params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, EzUrl.content_type in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post msg ~meth url ~content ~content_type ?headers ~error ok
   end
 

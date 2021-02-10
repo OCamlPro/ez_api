@@ -89,7 +89,7 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
       StringMap.iter (fun s v ->
           List.iter (fun v -> EzDebug.printf "  %s: %s" s v) v)
         headers);
-  let meth = of_cohttp_meth @@ Cohttp.Request.meth req in
+  let req_meth = of_cohttp_meth @@ Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
        if path = ["debug"] then
@@ -106,34 +106,32 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
               ]
            )
        else
-         match s.server_kind, meth with
-         | API dir, OPTIONS ->
+         let meth = if require_method then Some req_meth else None in
+         match s.server_kind, req_meth, request.req_body with
+         | API dir, OPTIONS, _ ->
            RestoDirectory1.lookup dir.meth_OPTIONS request path
-           >>= fun handler -> handler None >>= fun _answer ->
+           >>= fun (handler, _) -> handler None >>= fun _answer ->
            (* Note: this path always fails with EzReturnOPTIONS *)
            reply_none 200
-         | API dir, _ ->
-           let content =
-             match meth, request.req_body with
-             | GET, BodyString (_, "") -> None
-             | _, BodyString (Some "application/x-www-form-urlencoded", content) ->
-               debug ~v:2 "Request params:\n  %s" content;
-               EzAPI.add_params request ( EzUrl.decode_args content );
-               None
-             | _, BodyString (Some mime, content)
-               when Re.Str.(string_match (regexp "image") mime 0) || mime = "multipart/form-data"->
-               Some (`String content)
-             | _, BodyString (_, content) ->
-               if content = "" then None
-               else (
-                 debug ~v:2 "Request content:\n  %s" content;
-                 Some (Ezjsonm.from_string content))
-           in
-           let meth = if require_method then Some meth else None in
-           RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun handler ->
-           handler content
-           >>= reply_answer
-         | Root (root, default), meth ->
+         | API dir, _, BodyString (_, "") ->
+           RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun (handler, _) ->
+           handler None >>= reply_answer
+         | API dir, _, BodyString (Some mime, content) when mime = EzUrl.content_type ->
+           debug ~v:2 "Request params:\n  %s" content;
+           EzAPI.add_params request ( EzUrl.decode_args content );
+           RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun (handler, _) ->
+           handler None >>= reply_answer
+         | API dir, _, BodyString (Some mime, content) ->
+           RestoDirectory1.lookup ?meth dir.meth_GET request path >>= fun (handler, allowed_mimes) ->
+           if mime = "application/json" && EzAPIServerUtils.is_mime_allowed allowed_mimes mime then (
+             debug ~v:2 "Request content:\n  %s" content;
+             handler (Some (Ezjsonm.from_string content)) >>= reply_answer)
+           else if EzAPIServerUtils.is_mime_allowed allowed_mimes mime then
+             handler (Some (`String content)) >>= reply_answer
+           else reply_none 415
+         | API _, _, _ ->
+           reply_none 415
+         | Root (root, default), meth, _ ->
            reply_file ~meth root ?default path
     )
     (fun exn ->

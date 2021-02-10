@@ -139,11 +139,13 @@ module Make(Repr : Json_repr.Repr) = struct
     | Arg: 'a Resto1.Internal.arg * ('key * 'a) directory -> 'key static_subdirectories
 
   and _ registred_service =
-    | RegistredService:
-        string option * Resto1.method_type *
-        'i Json_encoding.encoding * 'o Json_encoding.encoding *
-        ('key -> 'i -> 'o answer Lwt.t) ->
-      'key registred_service
+    | RegistredService: {
+        description : string option;
+        method_type : Resto1.method_type;
+        input : 'i Json_encoding.encoding;
+        output : 'o Json_encoding.encoding;
+        mime_types : Resto1.mime list;
+        handler : ('key -> 'i -> 'o answer Lwt.t) } -> 'key registred_service
 
   and custom_lookup =
     | CustomService of Description.service_descr *
@@ -189,8 +191,9 @@ module Make(Repr : Json_repr.Repr) = struct
       (a -> b) -> b registred_service -> a registred_service
     = fun f t ->
       match t with
-      | RegistredService (d,m,i,o,h) ->
-          RegistredService (d, m, i, o, (fun p i -> h (f p) i))
+      | RegistredService {description; method_type; input; output; mime_types; handler} ->
+        RegistredService {description; method_type; input; output; mime_types;
+                          handler = (fun p i -> handler (f p) i)}
 
   let map = map_directory
 
@@ -332,7 +335,7 @@ module Make(Repr : Json_repr.Repr) = struct
       a registred_service -> Description.service_descr
     = fun service ->
       match service with
-      | RegistredService (description,_meth,input,output,_) ->
+      | RegistredService {description; input; output; _} ->
           { Description.description ;
             input = Json_encoding.schema input ;
             output = Json_encoding.schema output }
@@ -377,14 +380,14 @@ module Make(Repr : Json_repr.Repr) = struct
     : type a _p.
       ?meth : 'method_type ->
       a directory -> a -> string list ->
-      (Repr.value option -> Repr.value answer Lwt.t) Lwt.t
+      ((Repr.value option -> Repr.value answer Lwt.t) * Resto1.mime list) Lwt.t
     = fun ?meth dir args path ->
       resolve [] dir args path >>= fun (Dir (dir, args)) ->
       match dir with
       | StaticD dir -> begin
           match dir.service with
           | None -> raise Not_found
-          | Some (RegistredService (_, method_type, input, output, handler)) ->
+          | Some (RegistredService {method_type; input; output; handler; mime_types; _}) ->
               let call (json: Repr.value option) : Repr.value answer Lwt.t =
                 match json, meth with
                 | _, Some meth when meth <> method_type ->
@@ -417,12 +420,12 @@ module Make(Repr : Json_repr.Repr) = struct
                           (Answer.map (fun x -> construct output x))
                           (handler args input)
                   end in
-              Lwt.return call
+              Lwt.return (call, mime_types)
         end
       | Map _ | Dynamic (_,_) -> assert false
       | Custom (_,lookup) -> begin
           lookup args [] >>= function
-          | CustomService (_, handler) -> Lwt.return handler
+          | CustomService (_, handler) -> Lwt.return (handler, [])
           | CustomDirectory _ -> Lwt.fail Not_found
         end
 
@@ -521,23 +524,25 @@ module Make(Repr : Json_repr.Repr) = struct
       pr directory -> (pr, p, i, o) service ->
       (p -> i -> o answer Lwt.t) -> pr directory =
     fun root s handler ->
-      let s = Resto1.Internal.to_service s in
-      let register
-        : type k. (pr, k) rpath -> (k -> i -> o answer Lwt.t) -> pr directory =
-        fun path handler ->
-          let dir, insert = insert path root in
-          let service =
-            Some (RegistredService (s.description, s.meth, s.input, s.output, handler)) in
-          match dir with
-          | Map _ -> failwith "Not implemented"
-          | StaticD ({ service = None ; subdirs = _ } as dir) ->
-              insert (StaticD { dir with service })
-          | StaticD _ -> conflict path CService
-          | Custom _ -> conflict path CCustom
-          | Dynamic _ -> conflict path CBuilder in
-      match s.path with
-      | Path p -> register p handler
-      | MappedPath (p, map, _) -> register p (fun p i -> handler (map p) i)
+    let {description; method_type; input; output; mime_types; path} =
+      Resto1.Internal.to_service s in
+    let register
+      : type k. (pr, k) rpath -> (k -> i -> o answer Lwt.t) -> pr directory =
+      fun path handler ->
+        let dir, insert = insert path root in
+        let service =
+          Some (RegistredService {
+              description; method_type; input; output; mime_types; handler }) in
+        match dir with
+        | Map _ -> failwith "Not implemented"
+        | StaticD ({ service = None ; subdirs = _ } as dir) ->
+          insert (StaticD { dir with service })
+        | StaticD _ -> conflict path CService
+        | Custom _ -> conflict path CCustom
+        | Dynamic _ -> conflict path CBuilder in
+    match path with
+    | Path p -> register p handler
+    | MappedPath (p, map, _) -> register p (fun p i -> handler (map p) i)
 
   let register_dynamic_directory
     : type pr a.

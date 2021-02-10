@@ -61,6 +61,17 @@ module Path : sig
 
 end
 
+(** mime *)
+
+type str_or_star = [ `star | `str of string ]
+
+type mime = {
+  typ : str_or_star;
+  subtyp : str_or_star;
+  param : (string * string) option
+}
+
+val parse_mime : string -> mime option
 
 (** Services. *)
 type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | OTHER of string
@@ -70,6 +81,7 @@ type ('prefix, 'params, 'input, 'output) service
 val service:
   ?description: string ->
   ?meth: method_type ->
+  ?mime_types: string list ->
   input: 'input Json_encoding.encoding ->
   output: 'output Json_encoding.encoding ->
   ('prefix, 'params) Path.path ->
@@ -79,7 +91,6 @@ val prefix:
   ('prefix, 'inner_prefix) Path.path ->
   ('inner_prefix, 'params, 'input, 'output) service ->
   ('prefix, 'params, 'input, 'output) service
-
 
 type json = Json_repr.Ezjsonm.value
 
@@ -179,7 +190,8 @@ module Internal : sig
     path : ('prefix, 'params) path ;
     input : 'input Json_encoding.encoding ;
     output : 'output Json_encoding.encoding ;
-    meth : 'method_type ;
+    method_type : 'method_type ;
+    mime_types : mime list;
   }
 
   val from_service:

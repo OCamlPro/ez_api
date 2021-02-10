@@ -535,19 +535,31 @@ let empty_schema ~none schema f = match Json_schema.root schema with
     -> none
   | _ -> f schema
 
-let make_request ?example schema = empty_schema ~none:None schema (fun schema ->
-    Some Makers.(mk_request ["application/json", mk_media ?example ~schema () ]))
+let make_request ?example mime schema = match schema, mime with
+  | None, [] -> None
+  | None, l ->
+    (* binary requests *)
+    let schema = Json_schema.(
+        create @@ element @@ String {string_specs with str_format = Some "binary"} ) in
+    Some Makers.(mk_request @@ List.map (fun m -> m, mk_media ~schema ()) l)
+  | Some schema, _ ->
+    empty_schema ~none:None schema (fun schema ->
+        Some Makers.(mk_request ["application/json", mk_media ?example ~schema () ]))
 
 let merge_definitions ?(definitions=Json_schema.any) sd =
-  let input_schema, definitions =
-    Json_schema.merge_definitions (Lazy.force sd.doc_input, definitions) in
+  let input_schema, definitions = match sd.doc_input with
+    | None -> None, definitions
+    | Some sc ->
+      let sc, def =
+        Json_schema.merge_definitions (Lazy.force sc, definitions) in
+      Some (Json_schema.simplify sc), def in
   let output_schema, definitions =
     Json_schema.merge_definitions (Lazy.force sd.doc_output, definitions) in
   let output_schemas, definitions = List.fold_left (fun (acc, definitions) (code, sch) ->
       let sch, definitions = Json_schema.merge_definitions (Lazy.force sch, definitions) in
       (code, Json_schema.simplify sch) :: acc, definitions)
       ([200, Json_schema.simplify output_schema], definitions) sd.doc_error_outputs in
-  Json_schema.simplify input_schema, output_schemas, definitions
+  input_schema, output_schemas, definitions
 
 let make_path ?(docs=[]) ?definitions sd =
   let path = string_of_path sd.doc_path in
@@ -566,7 +578,7 @@ let make_path ?(docs=[]) ?definitions sd =
        ~tags:[sd.doc_section.section_name] ~id:(string_of_int sd.doc_id)
        ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_path)
        ~security:sd.doc_security
-       ?request:(make_request ?example:input_ex input_schema) @@
+       ?request:(make_request ?example:input_ex sd.doc_mime input_schema) @@
      List.map (fun (code, schema) ->
          let example = if code = 200 then output_ex else None in
          let code_str = string_of_int code in
