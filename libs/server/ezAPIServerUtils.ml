@@ -298,6 +298,18 @@ let return_error ?content code =
   | None -> raise (EzRawError code)
   | Some content -> raise (EzContentError (code, content))
 
+let is_mime_allowed l m =
+  match Resto1.parse_mime m with
+  | None -> false
+  | Some {Resto1.typ; subtyp; _} ->
+    if typ = `star || subtyp = `star then false
+    else
+      let rec aux = function
+        | [] -> false
+        | h :: t ->
+          ((h.typ = `star || h.typ = typ) && (h.subtyp = `star || h.typ = typ)) ||
+          aux t in
+      aux l
 
 module Legacy = struct
 

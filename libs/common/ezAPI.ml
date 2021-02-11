@@ -96,6 +96,16 @@ type ('a, 'b) p =
   (unit, 'b) Path.path *
   'b
 
+type _ input_type =
+  | Empty : unit input_type
+  | Json : 'a Json_encoding.encoding -> 'a input_type
+  | Binary : string list -> string input_type
+
+let input_type_encoding : type i. i input_type -> i Json_encoding.encoding = function
+  | Json enc -> enc
+  | Empty -> Json_encoding.empty
+  | Binary _ -> Json_encoding.string
+
 type service_doc = {
     doc_id : int; (* uniq service identifier *)
     doc_name : string option;
@@ -105,8 +115,9 @@ type service_doc = {
     mutable doc_registered : bool;
     mutable doc_sample : (base_url -> url);
     doc_section : section;
-    doc_input : Json_schema.schema Lazy.t;
+    doc_input : Json_schema.schema Lazy.t option;
     doc_output : Json_schema.schema Lazy.t;
+    doc_mime : string list;
     doc_error_outputs : (int * Json_schema.schema Lazy.t) list;
     doc_meth : string;
     doc_security : security_scheme list;
@@ -128,20 +139,20 @@ type _ err_case =
       deselect: 'a -> 'b;
     } -> 'b err_case
 
+
 (* All our services use 'params' as 'prefix of the service *)
-type nonrec ('params, 'params2, 'input, 'output, 'error, 'security) service
-  = {
-    s : (request, 'params, 'input, ('output, 'error) result) service;
-    s_OPTIONS : (request, 'params, unit, ('output, 'error) result) service;
-    s_internal : (unit, 'params2, unit, ('output, 'error) result) service;
-    params : param list;
-    doc : service_doc;
-    enc_input : 'input Json_encoding.encoding;
-    enc_output : 'output Json_encoding.encoding;
-    enc_error : 'error err_case list;
-    s_security : ([< security_scheme ] as 'security) list;
-    s_meth : method_type;
-  }
+type nonrec ('params, 'params2, 'input, 'output, 'error, 'security) service = {
+  s : (request, 'params, 'input, ('output, 'error) result) service;
+  s_OPTIONS : (request, 'params, unit, ('output, 'error) result) service;
+  s_internal : (unit, 'params2, unit, ('output, 'error) result) service;
+  params : param list;
+  doc : service_doc;
+  input : 'input input_type;
+  enc_output : 'output Json_encoding.encoding;
+  enc_error : 'error err_case list;
+  s_security : ([< security_scheme ] as 'security) list;
+  s_meth : method_type;
+}
 
 type ('output, 'error, 'security) service0 = (request, unit, unit, 'output, 'error, 'security) service
 type ('arg, 'output, 'error, 'security) service1 =
@@ -224,8 +235,7 @@ let add_end (BASE url) args =
 let encode_args s (URL parts) args =
   let args =
     List.map (fun (arg, v) ->
-        if not (List.exists (fun p ->
-                    p.param_value = arg.param_value) s.params)
+        if not (List.exists (fun p -> p.param_value = arg.param_value) s.params)
         then
           Printf.kprintf warning "%s: unknown argument %S"
                          parts arg.param_value;
@@ -364,28 +374,51 @@ let str_of_method = function
   | PATCH -> "patch"
   | OTHER s -> s
 
-let post_service ?(section=default_section)
-    ?name
-    ?descr
-    ?(meth=POST)
-    ~input
-    ~output
-    ?(error_outputs=[])
-    ?(params = [])
-    ?(security=[])
-    ?(register=true)
-    ?input_example
-    ?output_example
-    (doc_path,path1,path2,sample) =
+let post_service :
+  type i.
+  ?section: section ->
+  ?name: string -> (* name of additionnal doc. in [md_of_services] map *)
+  ?descr: string ->
+  ?meth:Resto.method_type (* meth type: get, post *) ->
+  ?input:i Json_encoding.encoding ->
+  ?input_type:i input_type ->
+  output: 'output Json_encoding.encoding ->
+  ?error_outputs: 'error err_case list ->
+  ?params:param list ->
+  ?security:([< security_scheme ] as 'security) list ->
+  ?register:bool ->
+  ?input_example:i ->
+  ?output_example:'output ->
+  ('b, 'c) p ->
+  ('b, 'c, i, 'output, 'error, 'security) service =
+  fun ?(section=default_section) ?name ?descr ?(meth=POST)
+    ?input ?input_type ~output ?(error_outputs=[]) ?(params = [])
+    ?(security=[]) ?(register=true) ?input_example ?output_example
+    (doc_path,path1,path2,sample) ->
+  let input_type = match input, input_type with
+    | Some enc, _ -> Json enc
+    | None, Some i -> i
+    | _ -> failwith (
+        Printf.sprintf
+          "service %s doesn't have a \
+           valid combination of input/input_type" (string_of_path doc_path)) in
+  let input = input_type_encoding input_type in
   let doc_id = !nservices in
   if register then incr nservices;
   let params = List.rev_append (params_of_query_security security) params in
-  let doc_input_example = match input_example with
-    | None -> None
-    | Some ex -> Some (Json_repr.to_any @@ Json_encoding.construct input ex) in
+  let doc_input_example = match input_example, input_type with
+    | Some ex, Json enc -> Some (Json_repr.to_any @@ Json_encoding.construct enc ex)
+    | _ -> None in
   let doc_output_example = match output_example with
     | None -> None
     | Some ex -> Some (Json_repr.to_any @@ Json_encoding.construct output ex) in
+  let doc_input = match input_type with
+    | Json enc -> Some (lazy (Json_encoding.schema ~definitions_path enc ))
+    | _ -> None in
+  let doc_mime = match input_type with
+    | Binary l -> l
+    | Empty -> []
+    | Json _ -> [ "application/json" ] in
   let doc = {
       doc_path;
       doc_params = params;
@@ -395,7 +428,7 @@ let post_service ?(section=default_section)
       doc_sample = (fun _ -> assert false);
       doc_id;
       doc_section = section;
-      doc_input = lazy (Json_encoding.schema ~definitions_path input);
+      doc_input; doc_mime;
       doc_output = lazy (Json_encoding.schema ~definitions_path output);
       doc_error_outputs = merge_errs_same_code error_outputs;
       doc_meth = str_of_method meth;
@@ -419,17 +452,17 @@ let post_service ?(section=default_section)
           (fun e -> Error e)
       ]) in
   let service = {
-      s = service ~meth ~input ~output:resto_output path1;
-      s_OPTIONS = service ~meth:OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
-      s_internal = service ~input:Json_encoding.empty ~output:resto_output path2;
-      params;
-      doc;
-      enc_input = input;
-      enc_output = output;
-      enc_error = error_outputs;
-      s_security = security;
-      s_meth = meth;
-    } in
+    s = service ~meth ~input ~output:resto_output ~mime_types:doc_mime path1;
+    s_OPTIONS = service ~meth:OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
+    s_internal = service ~input:Json_encoding.empty ~output:resto_output path2;
+    params;
+    doc;
+    input = input_type;
+    enc_output = output;
+    enc_error = error_outputs;
+    s_security = security;
+    s_meth = meth;
+  } in
   let make_sample url = forge url service sample [] in
   doc.doc_sample <- make_sample;
   service
@@ -437,7 +470,7 @@ let post_service ?(section=default_section)
 let service ?section ?name ?descr ?(meth=GET) ~output ?error_outputs ?params
     ?security ?register ?output_example arg =
   post_service ?section ?name ?descr
-    ~input:Json_encoding.empty
+    ~input_type:Empty
     ~output ?error_outputs ~meth ?params ?security ?register ?output_example arg
 
 let section section_name =
@@ -486,7 +519,7 @@ let services () =
   Array.map (fun doc -> string_of_path doc.doc_path)
             (Array.of_list (List.rev !services))
 
-let service_input s = s.enc_input
+let service_input s = s.input
 let service_output s = s.enc_output
 let service_errors s ~code =
   match

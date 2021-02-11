@@ -293,46 +293,84 @@ module Make(S : sig
         let url = EzAPI.forge2 api service arg1 arg2 params in
         internal_get ~meth ?headers ?msg url >|= handle_result service
 
-    let post0 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
-        api (service : ('input,'output, 'error, 'security) EzAPI.post_service0) =
+    let post0 :
+      type i.
+      ?headers:(string * string) list ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?msg:string ->
+      ?url_encode:bool ->
+      input:i ->
+      EzAPI.base_url ->
+      (i, 'output, 'error, 'security) EzAPI.post_service0 ->
+      ('output, 'error) api_result Lwt.t =
+      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service ->
       !before_hook ();
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge0 api service params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, EzUrl.content_type in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
-    let post1 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
-        api (service : ('arg, 'input,'output, 'error, 'security) EzAPI.post_service1) (arg : 'arg) =
+    let post1 :
+      type i.
+      ?headers:(string * string) list ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?msg:string ->
+      ?url_encode:bool ->
+      input:i ->
+      EzAPI.base_url ->
+      ('arg, i, 'output, 'error, 'security) EzAPI.post_service1 -> 'arg ->
+      ('output, 'error) api_result Lwt.t =
+      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg ->
       !before_hook ();
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge1 api service arg params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, "application/x-www-form-urlencoded" in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
-    let post2 ?headers ?(params=[]) ?msg ?(url_encode=false) ~(input : 'input)
-        api (service : ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2)
-        (arg1 : 'arg1) (arg2 : 'arg2) =
+    let post2 :
+      type i.
+      ?headers:(string * string) list ->
+      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?msg:string ->
+      ?url_encode:bool ->
+      input:i ->
+      EzAPI.base_url ->
+      ('arg1, 'arg2, i, 'output, 'error, 'security) EzAPI.post_service2 -> 'arg1 -> 'arg2 ->
+      ('output, 'error) api_result Lwt.t =
+      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg1 arg2 ->
       !before_hook ();
       let meth = EzAPI.service_meth service in
       let input_encoding = EzAPI.service_input service in
       let url = EzAPI.forge2 api service arg1 arg2 params in
-      let content, content_type =
-        if not url_encode then
-          EzEncoding.construct input_encoding input, "application/json"
-        else
-          EzUrl.encode_obj input_encoding input, "application/x-www-form-urlencoded" in
+      let content, content_type = match input_encoding with
+        | EzAPI.Empty -> "", "application/json"
+        | EzAPI.Binary [] -> input, "multipart/form-data"
+        | EzAPI.Binary (h :: _) -> input, h
+        | EzAPI.Json enc ->
+          if not url_encode then
+            EzEncoding.construct enc input, "application/json"
+          else
+            EzUrl.encode_obj enc input, EzUrl.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 end

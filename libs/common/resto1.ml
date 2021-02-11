@@ -11,6 +11,35 @@
 
 module StringMap = Map.Make(String)
 
+type str_or_star = [ `star | `str of string ]
+
+type mime = {
+  typ : str_or_star;
+  subtyp : str_or_star;
+  param : (string * string) option
+}
+
+let parse_mime m =
+  match String.index_opt m '/' with
+  | None -> None
+  | Some i ->
+    let typ = String.sub m 0 i in
+    let typ = if typ = "*" then `star else `str typ in
+    match String.index_from_opt m (i+1) ';' with
+    | None ->
+      let subtyp = String.sub m (i+1) (String.length m - i - 1) in
+      let subtyp = if subtyp = "*" then `star else `str subtyp in
+      Some {typ; subtyp; param = None}
+    | Some j ->
+      let subtyp = String.sub m (i+1) (j - i - 1) in
+      let subtyp = if subtyp = "*" then `star else `str subtyp in
+      match String.index_from_opt m (j+1) '=' with
+        | None -> Some {typ; subtyp; param = None}
+        | Some k ->
+          let key = String.sub m (j+1) (k - j - 1) in
+          let v = String.sub m (k+1) (String.length m - k - 1) in
+          Some {typ; subtyp; param = Some (key, v)}
+
 module Internal = struct
 
   module Ty = struct
@@ -72,7 +101,8 @@ module Internal = struct
     path : ('prefix, 'params) path ;
     input : 'input Json_encoding.encoding ;
     output : 'output Json_encoding.encoding ;
-    meth : 'method_type ;
+    method_type : 'method_type ;
+    mime_types : mime list ;
   }
 
   let from_service x = x
@@ -210,8 +240,9 @@ type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE 
 type ('prefix, 'params, 'input, 'output) service =
   ('prefix, 'params, 'input, 'output, method_type) Internal.iservice
 
-let service ?description ?(meth=GET) ~input ~output path =
-  { description ; path ; input ; output; meth }
+let service ?description ?(meth=GET) ?(mime_types=[]) ~input ~output path =
+  let mime_types = List.filter_map parse_mime mime_types in
+  { description ; path ; input ; output; method_type = meth; mime_types }
 
 let prefix path s = { s with path = Path.prefix path s.path }
 
