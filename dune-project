@@ -26,9 +26,8 @@
   (geoip (>= 0.0.3))
   cohttp-lwt-unix
   cohttp-lwt-jsoo
+  unix
   tls
-  lwt_log
-  re
   (httpaf-lwt-unix (>= 0.6.0))
   (ocurl (>= 0.8.0))
   (ezjs_fetch (> 0.2.0)))
