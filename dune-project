@@ -26,6 +26,7 @@
   (geoip (>= 0.0.3))
   cohttp-lwt-unix
   cohttp-lwt-jsoo
+  lwt_log
   tls
   (httpaf-lwt-unix (>= 0.6.0))
   (ocurl (>= 0.8.0))
