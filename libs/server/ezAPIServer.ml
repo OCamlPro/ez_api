@@ -8,6 +8,8 @@ module Header = Cohttp.Header
 module Request = Cohttp.Request
 module Server = Cohttp_lwt_unix.Server
 
+let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
+
 let of_cohttp_meth = function
   | `GET -> Resto1.GET
   | `HEAD -> HEAD

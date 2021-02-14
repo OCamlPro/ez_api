@@ -432,5 +432,6 @@ let server ?(require_method=false) ?catch servers =
           connection_handler ~require_method ?catch s sockaddr fd) >>= fun _server ->
     Lwt.return_unit
   in
-  Lwt.join (List.map (fun (port,kind) ->
-      create_server port kind) servers)
+  let waiter, _ = Lwt.wait () in
+  Lwt.join (List.map (fun (port,kind) -> create_server port kind) servers) >>= fun () ->
+  waiter (* keep the server running *)
