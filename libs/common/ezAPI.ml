@@ -223,13 +223,12 @@ let warnings f =
   List.iter f (List.rev !warnings);
   warnings := []
 
-let add_end (BASE url) args =
+
+let assemble_url (BASE url) parts args =
   let urllen = String.length url in
-  let url =
-    Printf.sprintf "%s%s%s" url
-                   (if urllen = 0 || url.[urllen - 1] = '/' then "" else "/")
-                   args
-  in
+  let sep =
+    if urllen = 0 || url.[urllen - 1] = '/' || parts = "" then "" else "/" in
+  let url = Printf.sprintf "%s%s%s%s" url sep parts args in
   URL url
 
 let encode_args s (URL parts) args =
@@ -255,7 +254,7 @@ let forge url s params args =
     | args ->
        Printf.sprintf "?%s" (encode_args s (URL parts) args)
   in
-  add_end url (parts ^ args)
+  assemble_url url parts args
 
 let forge0 url s args = forge url s () args
 let forge1 url s params args =  forge url s ((), params) args
