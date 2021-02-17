@@ -210,13 +210,17 @@ let add_headers_response headers =
   StringMap.add "access-control-allow-methods" [ "POST, GET, OPTIONS, PATCH, PUT, DELETE" ] h
 
 let read_body body =
+  let w, n = Lwt.wait () in
   let body_str = ref "" in
+  let on_eof () = Lwt.wakeup n !body_str in
+  let rec on_read bs ~off ~len =
+    body_str := !body_str ^ Bigstringaf.substring bs ~off ~len;
+    Body.schedule_read body ~on_read ~on_eof in
   Body.schedule_read
     body
-    ~on_eof:(fun () -> ())
-    ~on_read:(fun request_data ~off ~len ->
-        body_str := !body_str ^ Bigstringaf.substring request_data ~off ~len) ;
-  !body_str
+    ~on_eof
+    ~on_read;
+  w
 
 let connection_handler :
   require_method:bool -> ?catch:(string -> exn -> (int * reply) Lwt.t) ->
@@ -267,10 +271,6 @@ let connection_handler :
       | None -> "application/octet-stream"
     in
     let req_body = Reqd.request_body request_descriptor in
-    let body = BodyString (Some response_content_type, read_body req_body) in
-    let ez_request =
-      EzAPI.request ~version ~headers ~body req_params in
-
     Lwt.async (fun () ->
         begin
           if path = ["debug"] then
@@ -285,13 +285,16 @@ let connection_handler :
               )
           else
             Lwt.catch (fun () ->
+                read_body req_body >>= fun body ->
+                let body = BodyString (Some response_content_type, body) in
+                let ez_request =
+                  EzAPI.request ~version ~headers ~body req_params in
                 let req_meth = of_httpaf_meth request.Request.meth in
                 let meth = if require_method then Some req_meth else None in
                 match s.server_kind, req_meth, ez_request.req_body with
                 | API dir, OPTIONS, _ ->
                   RestoDirectory1.lookup dir.meth_OPTIONS ez_request path
                   >>= fun (handler, _) -> handler None >>= fun _answer ->
-                  (* Note: this path always fails with EzReturnOPTIONS *)
                   reply_none 200
                 | API dir, _, BodyString (_, "") ->
                   RestoDirectory1.lookup ?meth dir.meth_GET ez_request path >>= fun (handler, _) ->
@@ -309,8 +312,7 @@ let connection_handler :
                   else if EzAPIServerUtils.is_mime_allowed allowed_mimes mime then
                     handler (Some (`String content)) >>= reply_answer
                   else reply_none 415
-                | API _, _, _ ->
-                  reply_none 415
+                | API _, _, _ -> reply_none 415
                 | Root (root, default), meth, _ ->
                   reply_file ~meth root ?default path)
               (fun exn ->
@@ -333,7 +335,7 @@ let connection_handler :
         end >>= fun (code, reply) ->
         let status = Httpaf.Status.unsafe_of_code code in
         debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" local_path code;
-        let headers = add_headers_response ez_request.req_headers in
+        let headers = add_headers_response headers in
         let headers = af_headers_from_string_map headers in
         let body_str, headers = match reply with
           | ReplyNone -> "", headers
