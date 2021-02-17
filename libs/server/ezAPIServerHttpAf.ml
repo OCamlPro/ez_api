@@ -103,17 +103,13 @@ let establish_server_generic
         accept_loop ()
       else accept_loop ()
     | `Should_stop ->
-      Lwt_unix.close listening_socket >>= fun () ->
-
+      Lwt_unix.close listening_socket >|= fun () ->
       begin match listening_address with
         | Unix.ADDR_UNIX path when path <> "" && path.[0] <> '\x00' ->
           Unix.unlink path
-        | _ ->
-          ()
+        | _ -> ()
       end [@ocaml.warning "-4"];
-
-      Lwt.wakeup_later notify_listening_socket_closed ();
-      Lwt.return_unit
+      Lwt.wakeup_later notify_listening_socket_closed ()
   in
 
   let server =
@@ -139,36 +135,30 @@ let establish_server_generic
 let establish_server_with_client_socket
     ?server_fd ?backlog ?(no_close = false) ~nb_max_connections sockaddr f =
   let handler client_address client_socket =
-    Lwt.async begin fun () ->
-      (* Not using Lwt.finalize here, to make sure that exceptions from [f]
-         reach !Lwt.async_exception_hook before exceptions from closing the
-         channels. *)
+    Lwt.async @@ fun () ->
+    Lwt.catch
+      (fun () -> f client_address client_socket)
+      (fun exn ->
+         !Lwt.async_exception_hook exn;
+         Lwt.return_unit)
+    >>= fun () ->
+    decr_connections nb_max_connections ;
+    if no_close then
+      Lwt.return_unit
+    else if Lwt_unix.state client_socket = Lwt_unix.Closed then
+      Lwt.return_unit
+    else
       Lwt.catch
-        (fun () -> f client_address client_socket)
+        (fun () -> close_socket client_socket)
         (fun exn ->
            !Lwt.async_exception_hook exn;
-           Lwt.return_unit)
-      >>= fun () ->
-      decr_connections nb_max_connections ;
-      if no_close then Lwt.return_unit
-      else
-      if Lwt_unix.state client_socket = Lwt_unix.Closed then
-        Lwt.return_unit
-      else
-        Lwt.catch
-          (fun () -> close_socket client_socket)
-          (fun exn ->
-             !Lwt.async_exception_hook exn;
-             Lwt.return_unit)
-    end
-  in
+           Lwt.return_unit) in
 
   let server, server_started =
     establish_server_generic
-      Lwt_unix.bind ?fd:server_fd ?backlog sockaddr handler nb_max_connections
-  in
-  server_started >>= fun () ->
-  Lwt.return server
+      Lwt_unix.bind ?fd:server_fd ?backlog sockaddr handler nb_max_connections in
+  server_started >|= fun () ->
+  server
 
 let mk_uri  { Request.meth ; Request.target ; Request.headers ; _ } =
   match target with
@@ -210,8 +200,7 @@ let mk_uri  { Request.meth ; Request.target ; Request.headers ; _ } =
     end
 
 let af_headers_from_string_map m =
-  StringMap.fold (fun k v acc ->
-      Headers.add acc k @@ List.hd v)
+  StringMap.fold (fun k v acc -> Headers.add acc k @@ List.hd v)
     m Headers.empty
 
 let add_headers_response headers =
@@ -222,24 +211,17 @@ let add_headers_response headers =
 
 let read_body body =
   let body_str = ref "" in
-  Httpaf.Body.schedule_read
+  Body.schedule_read
     body
     ~on_eof:(fun () -> ())
     ~on_read:(fun request_data ~off ~len ->
         body_str := !body_str ^ Bigstringaf.substring request_data ~off ~len) ;
   !body_str
 
-
 let connection_handler :
   require_method:bool -> ?catch:(string -> exn -> (int * reply) Lwt.t) ->
   server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
   fun ~require_method ?catch s sockaddr fd ->
-  let module Body = Httpaf.Body in
-  let module Headers = Httpaf.Headers in
-  let module Reqd = Httpaf.Reqd in
-  let module Response = Httpaf.Response in
-  let module Status = Httpaf.Status in
-  (* Lwt_unix.sleep 5. >>= fun () -> *)
   let request_handler client_address request_descriptor =
     set_req_time () ;
     let request = Reqd.request request_descriptor in
@@ -294,10 +276,7 @@ let connection_handler :
           if path = ["debug"] then
             reply_json 200
               (`O
-                 ["headers", `A []
-                 (* (Cohttp.Request.headers req
-                  *  |> Header.to_lines
-                  *  |> List.map (fun s -> `String s)) *);
+                 ["headers", `A [];
                   "params", `O
                     (List.map (fun (arg,list) ->
                          arg, `A (List.map (fun s -> `String s) list)
@@ -371,14 +350,7 @@ let connection_handler :
         let len = String.length body_str in
         let headers = Headers.add headers "content-length" (string_of_int len) in
         let response = Response.create ~headers status in
-        let body = Reqd.respond_with_streaming request_descriptor response in
-        Body.write_string body body_str ;
-        begin
-          try
-            Body.flush body (fun () ->
-                Body.close_writer body)
-          with exn -> raise exn
-        end ;
+        Reqd.respond_with_string request_descriptor response body_str;
         Lwt.return_unit)
   in
 
@@ -391,7 +363,6 @@ let connection_handler :
     fun _client_address ?request:_ error start_response ->
 
       let response_body = start_response Headers.empty in
-
       begin match error with
         | `Exn exn ->
           Body.write_string response_body (Printexc.to_string exn);
@@ -399,9 +370,7 @@ let connection_handler :
         | #Status.standard as error ->
           Body.write_string response_body (Status.default_reason_phrase error)
       end;
-      Body.flush response_body (fun () ->
-          Body.close_writer response_body
-        );
+      Body.flush response_body (fun () -> Body.close_writer response_body)
   in
 
   Httpaf_lwt_unix.Server.create_connection_handler
