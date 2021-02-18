@@ -1,4 +1,4 @@
-(lang dune 2.0)
+(lang dune 2.6)
 (name ez-api)
 
 (generate_opam_files true)

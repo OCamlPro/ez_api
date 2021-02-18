@@ -13,7 +13,7 @@ homepage: "https://github.com/ocamlpro/ez-api"
 doc: "https://ocamlpro.github.io/ez-api/doc"
 bug-reports: "https://github.com/ocamlpro/ez-api/issues"
 depends: [
-  "dune" {>= "2.0"}
+  "dune" {>= "2.6"}
   "json-data-encoding" {>= "0.7.0"}
   "lwt" {>= "4.0.0"}
   "ezjsonm" {>= "1.0.0"}
@@ -24,8 +24,8 @@ depopts: [
   "geoip" {>= "0.0.3"}
   "cohttp-lwt-unix"
   "cohttp-lwt-jsoo"
-  "tls"
   "lwt_log"
+  "tls"
   "httpaf-lwt-unix" {>= "0.6.0"}
   "ocurl" {>= "0.8.0"}
   "ezjs_fetch" {> "0.2.0"}

@@ -2,4 +2,10 @@
  (name ezEncoding)
  (public_name ez-api.encoding)
  (modules ezEncoding)
- (libraries json-data-encoding ezjsonm))
+ (libraries json-data-encoding ezjsonm_interface hex uutf))
+
+(library
+ (name ezEncodingJS)
+ (public_name ez-api.encoding-js)
+ (modules)
+ (libraries ezEncoding ezjsonm_js))

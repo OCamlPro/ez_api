@@ -1,59 +1,5 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2018 - OCamlPro SAS                                   *)
-(*    Alain Mebsout <alain.mebsout@ocamlpro.com>                          *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
-
-(*
- * Copyright (c) 2013 Thomas Gazagnaire <thomas@gazagnaire.org>
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *)
-
 open Js_of_ocaml
-open Ezjsonm
 
-(*
-type value =
-  [ `Null
-  | `Bool of bool
-  | `Float of float
-  | `String of string
-  | `A of value list
-  | `O of (string * value) list ]
-
-type t =
-  [ `A of value list
-  | `O of (string * value) list ]
-
-let value: t -> value = fun t -> (t :> value)
-
-exception Parse_error of value * string
-
-let parse_error t fmt =
-  Printf.kprintf (fun msg ->
-      raise (Parse_error (t, msg))
-    ) fmt
-
-let wrap t = `A [t]
-
-let unwrap = function
-  | `A [t] -> t
-  | v -> parse_error (v :> value) "Not unwrappable"
- *)
 type ('a, 'b) kind =
   | Leaf of 'b
   | Arr of 'a list
@@ -75,11 +21,11 @@ module type Converter = sig
 end
 
 module Js_to_JSON_Converter : Converter with type 'a _from = 'a Js.t Js.opt
-                                         and type _to = value
+                                         and type _to = Json_repr.ezjsonm
 = struct
 
   type 'a _from = 'a Js.t Js.opt
-  type _to = value
+  type _to = Json_repr.ezjsonm
 
   let arr l = `A l
 
@@ -115,11 +61,11 @@ module Js_to_JSON_Converter : Converter with type 'a _from = 'a Js.t Js.opt
       )
 end
 
-module JSON_to_Js_Converter : Converter with type 'a _from = value
+module JSON_to_Js_Converter : Converter with type 'a _from = Json_repr.ezjsonm
                                          and type _to = Js.Unsafe.any
 = struct
 
-  type 'a _from = value
+  type 'a _from = Json_repr.ezjsonm
   type _to = Js.Unsafe.any
 
   let arr l = Js.array (Array.of_list l) |> Js.Unsafe.inject
@@ -179,24 +125,22 @@ module JSON_to_Js = Make_Conv (JSON_to_Js_Converter)
 let json_of_js j =
   Js_to_JSON.convert [LeafZip j]
 
-let json_of_string (s : string) =
+exception Parse_error of Json_repr.ezjsonm * string
+
+let from_string s =
   try
     Js._JSON##parse (Js.string s) |> json_of_js
   with (Js.Error e) ->
     if Js.to_string e##.name = "SyntaxError" then
-      parse_error `Null "Ezjsonm.from_string %s" (Js.to_string e##.message)
+      raise @@ Parse_error (`Null, Printf.sprintf "Ezjsonm.from_string %s" (Js.to_string e##.message))
     else Js.raise_js_error e
 
 let js_of_json j  = JSON_to_Js.convert [LeafZip j]
 
-let string_of_json ?(minify=true) (j : value) : string =
+let to_string ?(minify=true) j =
   if minify then
     Js._JSON##stringify (js_of_json j) |> Js.to_string
   else
     Js.Unsafe.fun_call (Js.Unsafe.variable "JSON.stringify")
       [| js_of_json j; Js.Unsafe.inject (Js.null); Js.Unsafe.inject 2 |]
     |> Js.to_string
-
-let init () =
-  EzEncoding.json_of_string := json_of_string;
-  EzEncoding.string_of_json := string_of_json

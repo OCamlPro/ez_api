@@ -1,0 +1,5 @@
+(library
+ (name ezDebug)
+ (public_name ez-api.debug)
+ (virtual_modules ezDebug)
+ (default_implementation ezDebug_unix))

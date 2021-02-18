@@ -1,19 +1,5 @@
-module Ezjsonm_direct = Ezjsonm
 open Json_encoding
-
-let json_of_string = ref Ezjsonm.value_from_string
-let string_of_json = ref Ezjsonm.value_to_string
-
-module Ezjsonm : sig
-
-  val from_string : string -> Json_repr.ezjsonm
-  val to_string : ?minify:bool -> Json_repr.ezjsonm -> string
-
-  end = struct
-
-  let from_string s = !json_of_string s
-  let to_string ?minify json = !string_of_json ?minify json
-end
+module Ezjsonm  = Ezjsonm_interface
 
 exception DestructError
 
@@ -21,17 +7,18 @@ exception DestructError
 let destruct encoding buf =
   try
     let json = Ezjsonm.from_string buf in
-    Json_encoding.destruct encoding json
-  with Json_encoding.Cannot_destruct (path, exn)  ->
+    destruct encoding json
+  with
+  | Cannot_destruct (path, exn)  ->
     Format.eprintf "Error during destruction path %a : %s\n\n %s\n%!"
       (Json_query.print_path_as_json_path ~wildcards:true) path
       (Printexc.to_string exn)
-      buf ;
+      buf;
     raise DestructError
-     | Json_encoding.Unexpected_field field ->
-       Format.eprintf "Error during destruction path, unexpected field %S %s\n%!"
-         field buf ;
-       raise DestructError
+  | Unexpected_field field ->
+    Format.eprintf "Error during destruction path, unexpected field %S %s\n%!"
+      field buf ;
+    raise DestructError
 
 let construct ?(compact=true) encoding data =
   let ezjson =
@@ -44,31 +31,41 @@ let construct ?(compact=true) encoding data =
   Format.flush_str_formatter ()
 
 let unexpected_error ~kind ~expected =
-  raise (Json_encoding.Cannot_destruct
-           ([],
-            Json_encoding.Unexpected (kind, expected)))
+  raise @@ Cannot_destruct ([], Unexpected (kind, expected))
+
+exception Not_utf8
+
+let is_valid_utf8 str =
+  try
+    Uutf.String.fold_utf_8 (fun _ _ -> function
+        | `Malformed _ -> raise Not_utf8
+        | _ -> ()
+      ) () str;
+    true
+  with Not_utf8 -> false
+
+let encode_string str =
+  if is_valid_utf8 str then `String str
+  else
+    let `Hex h = Hex.of_string str in
+    `O [ "hex", `String h ]
+
+let decode_string = function
+  | `String str -> str
+  | `O [ "hex", `String str ] -> Hex.to_string (`Hex str)
+  | _ -> unexpected_error ~kind:"raw string" ~expected:"encoded string"
 
 let encoded_string =
-  conv
-    (fun s -> Ezjsonm_direct.encode_string s)
-    (fun enc ->
-      match Ezjsonm_direct.decode_string enc with
-          | None -> unexpected_error
-                      ~kind:"raw string"
-                      ~expected:"encoded string"
-          | Some s -> s)
-      any_ezjson_value
+  conv encode_string decode_string any_ezjson_value
 
 let () =
-  Printexc.register_printer (fun exn ->
-      match exn with
-      | Json_encoding.Cannot_destruct (path, exn) ->
-        let s = Printf.sprintf "Cannot destruct JSON (%s, %s)"
-            (Json_query.json_pointer_of_path path)
-            (Printexc.to_string exn)
-        in
-        Some s
-      | _ -> None)
+  Printexc.register_printer @@ function
+  | Cannot_destruct (path, exn) ->
+    let s = Printf.sprintf "Cannot destruct JSON (%s, %s)"
+        (Json_query.json_pointer_of_path path)
+        (Printexc.to_string exn) in
+    Some s
+  | _ -> None
 
 let obj11 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 =
   conv
@@ -388,8 +385,6 @@ let obj24
           (obj4 f21 f22 f23 f24)
        )
     )
-
-let init () = ()
 
 (* for swagger *)
 

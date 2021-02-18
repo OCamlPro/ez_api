@@ -231,8 +231,9 @@ let connection_handler :
     let request = Reqd.request request_descriptor in
     let uri = mk_uri request in
     let req_params = Uri.query uri in
-    debug "[%t] REQUEST: %s %S"
-      pp_time
+    let time = pp_time () in
+    debug "[%s] REQUEST: %s %S"
+      time
       (Method.to_string request.Request.meth)
       request.Request.target;
     debugf ~v:1 (fun () ->

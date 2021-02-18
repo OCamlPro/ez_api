@@ -58,8 +58,6 @@ include Make(Interface)
 
 (* Use our own version of Ezjsonm.from_string to avoid errors *)
 let init () =
-  EzEncodingJS.init ();
-  EzDebugJS.init ();
   init ();
   EzRequest.log := (fun s -> Firebug.console##log (Js.string s));
   !EzRequest.log "ezXhr Loaded"

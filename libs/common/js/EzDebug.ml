@@ -2,6 +2,6 @@ open Js_of_ocaml
 
 let printf fmt =
   Format.kfprintf
-    (fun _fmt -> Firebug.console##debug (string (Format.flush_str_formatter ()))))
+    (fun _fmt -> Firebug.console##debug (Js.string (Format.flush_str_formatter ())))
     Format.str_formatter
     fmt

@@ -2,5 +2,11 @@
  (name ezAPI)
  (public_name ez-api.common)
  (wrapped false)
- (modules stringCompat resto1 ezDebug ezUrl ezAPI ezErrorCodes)
- (libraries lwt ezEncoding))
+ (modules stringCompat resto1 ezUrl ezAPI ezErrorCodes)
+ (libraries lwt ezEncoding ezDebug))
+
+(library
+ (name ezAPIJS)
+ (public_name ez-api.js)
+ (modules)
+ (libraries ezAPI ezjsonm_js ezDebug_js))

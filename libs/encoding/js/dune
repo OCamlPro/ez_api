@@ -1,8 +1,6 @@
 (library
- (name ezEncodingJS)
- (public_name ez-api.encoding-js)
- (optional)
- (modules ezEncodingJS)
+ (public_name ez-api.ezjsonm-js)
+ (name ezjsonm_js)
+ (implements ezjsonm_interface)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezEncoding js_of_ocaml)
- (modes byte))
+ (modules ezjsonm_interface))

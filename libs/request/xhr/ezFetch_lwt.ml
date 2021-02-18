@@ -30,8 +30,6 @@ include Make(Interface)
 
 (* Use our own version of Ezjsonm.from_string to avoid errors *)
 let init () =
-  EzEncodingJS.init ();
-  EzDebugJS.init ();
   init ();
   EzRequest_lwt.log := Ezjs_min.log_str;
   !EzRequest_lwt.log "ezFetch Loaded"

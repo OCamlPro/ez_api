@@ -4,7 +4,7 @@
  (wrapped false)
  (optional)
  (modules restoDirectory1 gMTime timings ezAPIServerUtils ezOpenAPI)
- (libraries ezSession geoip lwt.unix))
+ (libraries ezSession geoip lwt.unix ezjsonm_unix))
 
 (library
  (name ezAPIServer)

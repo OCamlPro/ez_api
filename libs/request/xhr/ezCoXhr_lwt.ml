@@ -11,8 +11,6 @@ end
 include EzRequest_lwt.Make(Interface)
 
 let init () =
-  EzEncodingJS.init ();
-  EzDebugJS.init ();
   init ();
   EzRequest_lwt.log := (fun s -> Js_of_ocaml.(Firebug.console##log (Js.string s)));
   !EzRequest_lwt.log "ezCoXhr Loaded"

@@ -597,7 +597,7 @@ let definitions_schemas definitions =
       | _ -> None end
   | _ -> None
 
-let json_map f (j : Ezjsonm.value) : Ezjsonm.value =
+let json_map f (j : Json_repr.ezjsonm) : Json_repr.ezjsonm =
   let rec map j =
     let j' = match j with
       | `Null | `Bool _ | `Float _ | `String _ -> j
