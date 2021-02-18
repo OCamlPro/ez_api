@@ -9,7 +9,7 @@
  (public_name ez-api.session-client)
  (optional)
  (modules ezSessionClient)
- (libraries ezRequest ezSession))
+ (libraries ezReq ezSession))
 
 (library
  (name ezSessionServer)

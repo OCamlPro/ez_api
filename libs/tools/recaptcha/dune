@@ -3,4 +3,4 @@
  (public_name ez-api.recaptcha)
  (optional)
  (modules ezRecaptcha)
- (libraries ezRequest_lwt calendar))
+ (libraries ezReq_lwt calendar))

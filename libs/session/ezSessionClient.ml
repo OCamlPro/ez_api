@@ -89,7 +89,7 @@ module Make(S: SessionArg) : Make_S with
          | Some token -> Some (auth_headers ~token)
          | None -> None
        in
-       EzRequest.ANY.get0
+       EzReq.get0
          api
          Service.connect "connect"
          ?headers
@@ -118,7 +118,7 @@ module Make(S: SessionArg) : Make_S with
     | Connected _
       -> (try f (Ok false) with _ -> ())
     | User u ->
-      EzRequest.ANY.get0
+      EzReq.get0
         api
         Service.logout "logout"
         ~params:[]
@@ -176,7 +176,7 @@ module Make(S: SessionArg) : Make_S with
             | None -> pwhash
             | Some f -> f pwhash in
           let login_challenge_reply = EzSession.Hash.challenge ~challenge ~pwhash in
-          EzRequest.ANY.post0 api Service.login "login"
+          EzReq.post0 api Service.login "login"
             ~input:(Local {
                 login_user = login;
                 login_challenge_id = challenge_id;
@@ -194,7 +194,7 @@ module Make(S: SessionArg) : Make_S with
               | Error e -> f (Error (e :> login_error))
             )
         | _, _, Some (foreign_origin, foreign_token) ->
-          EzRequest.ANY.post0 api Service.login "login"
+          EzReq.post0 api Service.login "login"
             ~input:(Foreign { foreign_origin; foreign_token })
             (function
               | Ok (LoginOk u) ->

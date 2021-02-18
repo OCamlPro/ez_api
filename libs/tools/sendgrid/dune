@@ -16,7 +16,6 @@
 (library
  (name ezSendgrid)
  (public_name ez-api.sendgrid)
- (wrapped false)
  (optional)
  (modules ezSendgrid)
- (libraries ezRequest_lwt calendar ezSendgrid_services))
+ (libraries ezReq_lwt calendar ezSendgrid_services))
