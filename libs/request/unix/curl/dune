@@ -1,0 +1,15 @@
+(library
+ (name ezCurl)
+ (public_name ez-api.curl)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries curl ezRequest))
+
+(library
+ (name ezCurl_lwt)
+ (public_name ez-api.curl-lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries curl.lwt ezRequest_lwt))

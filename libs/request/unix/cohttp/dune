@@ -1,0 +1,15 @@
+(library
+ (name ezCohttp)
+ (public_name ez-api.cohttp)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries cohttp-lwt-unix ezRequest ezCohttp_base))
+
+(library
+ (name ezCohttp_lwt)
+ (public_name ez-api.cohttp-lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))

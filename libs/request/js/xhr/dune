@@ -1,0 +1,19 @@
+(library
+ (name ezXhr)
+ (public_name ez-api.xhr)
+ (optional)
+ (modules ezReq)
+ (preprocess (pps js_of_ocaml-ppx))
+ (implements ezReq)
+ (libraries ezRequest ezAPIJS)
+ (modes byte))
+
+(library
+ (name ezXhr_lwt)
+ (public_name ez-api.xhr-lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (implements ezReq_lwt)
+ (libraries ezRequest_lwt js_of_ocaml-lwt ezAPIJS)
+ (modes byte))

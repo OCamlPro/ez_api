@@ -2,13 +2,13 @@
  (name ezRequest)
  (public_name ez-api.request)
  (modules ezRequest)
- (libraries ezAPI))
+ (libraries ezReq_S))
 
 (library
  (name ezRequest_lwt)
  (public_name ez-api.request-lwt)
  (modules ezRequest_lwt)
- (libraries ezAPI))
+ (libraries ezReq_lwt_S))
 
 (library
  (name ezCohttp_base)

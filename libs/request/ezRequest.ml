@@ -490,21 +490,4 @@ module Default = Make(struct
 
   end)
 
-module type Interface = sig
-  val get :
-    ?meth:string ->
-    string -> string ->
-    ?headers:(string * string) list ->
-    ((string, int * string option) result -> unit) -> unit
-
-  val post :
-    ?meth:string ->
-    ?content_type:string ->
-    ?content:string ->
-    string -> string ->
-    ?headers:(string * string) list ->
-    ((string, int * string option) result -> unit) -> unit
-end
-
-
 let () = Default.init ()

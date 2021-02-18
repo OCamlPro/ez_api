@@ -1,0 +1,6 @@
+(library
+ (name ezReq_lwt)
+ (public_name ez-api.req-lwt)
+ (virtual_modules ezReq_lwt)
+ (libraries ezReq_lwt_S)
+ (default_implementation ezCurl_lwt))
