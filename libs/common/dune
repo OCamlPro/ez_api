@@ -8,5 +8,6 @@
 (library
  (name ezAPIJS)
  (public_name ez-api.js)
+ (optional)
  (modules)
  (libraries ezAPI ezjsonm_js ezDebug_js))

@@ -1,6 +1,7 @@
 (library
  (public_name ez-api.ezjsonm-js)
  (name ezjsonm_js)
+ (optional)
  (implements ezjsonm_interface)
  (preprocess (pps js_of_ocaml-ppx))
  (modules ezjsonm_interface))

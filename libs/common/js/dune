@@ -2,4 +2,5 @@
  (name ezDebug_js)
  (public_name ez-api.debug-js)
  (modules ezDebug)
+ (optional)
  (preprocess (pps js_of_ocaml-ppx)))

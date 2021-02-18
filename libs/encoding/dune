@@ -7,5 +7,6 @@
 (library
  (name ezEncodingJS)
  (public_name ez-api.encoding-js)
+ (optional)
  (modules)
  (libraries ezEncoding ezjsonm_js))
