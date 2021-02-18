@@ -135,6 +135,8 @@ module type S = sig
 
   (* hook executed before every request *)
   val add_hook : (unit -> unit) -> unit
+  (* hook executed after every request *)
+  val add_reply_hook : (unit -> unit) -> unit
 
   val get :
     ?meth:Resto1.method_type ->

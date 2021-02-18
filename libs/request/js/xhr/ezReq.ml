@@ -1,5 +1,4 @@
 open Js_of_ocaml
-open EzRequest
 
 let log ?(meth="GET") msg url = Firebug.console##log (
     Js.string ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]"))
@@ -54,10 +53,6 @@ module Interface = struct
     xhr##send (Js.some @@ Js.string content)
 end
 
-include Make(Interface)
+include EzRequest.Make(Interface)
 
-(* Use our own version of Ezjsonm.from_string to avoid errors *)
-let init () =
-  init ();
-  EzRequest.log := (fun s -> Firebug.console##log (Js.string s));
-  !EzRequest.log "ezXhr Loaded"
+let () = EzDebug.log "ezXhr Loaded"

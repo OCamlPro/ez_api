@@ -7,11 +7,12 @@
 
 val request_reply_hook : (unit -> unit) ref
 
-val log : (string -> unit) ref
-
-
 (* Engine independent implementation. Beware: if you use these calls,
-you must initialize an engine independantly.*)
-module ANY : EzReq_S.S
+   you must initialize an engine independantly.*)
 
-module Make(_ : EzReq_S.Interface) : EzReq_S.S
+module type S = EzReq_S.S
+module type Interface = EzReq_S.Interface
+
+module ANY : S
+
+module Make(_ : Interface) : S

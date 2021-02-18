@@ -3,4 +3,4 @@
  (public_name ez-api.req-lwt)
  (virtual_modules ezReq_lwt)
  (libraries ezReq_lwt_S)
- (default_implementation ezCurl_lwt))
+ (default_implementation ezCurl_lwt_i))

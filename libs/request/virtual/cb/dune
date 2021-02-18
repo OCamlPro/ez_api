@@ -3,4 +3,4 @@
  (public_name ez-api.req)
  (virtual_modules ezReq)
  (libraries ezReq_S)
- (default_implementation ezCurl))
+ (default_implementation ezCurl_i))

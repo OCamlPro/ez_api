@@ -41,8 +41,4 @@ end
 
 include Make(Interface)
 
-(* Use our own version of Ezjsonm.from_string to avoid errors *)
-let init () =
-  init ();
-  EzRequest_lwt.log := (fun s -> Firebug.console##log (Js.string s));
-  !EzRequest_lwt.log "ezXhr Loaded"
+let () = EzDebug.log "ezXhr Loaded"

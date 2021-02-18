@@ -143,6 +143,8 @@ module type S = sig
 
   (* hook executed before every xhr *)
   val add_hook : (unit -> unit) -> unit
+  (* hook executed after every request *)
+  val add_reply_hook : (unit -> unit) -> unit
 
 end
 

@@ -1,5 +1,8 @@
 open EzAPI.TYPES
 
+module type S = EzReq_lwt_S.S
+module type Interface = EzReq_lwt_S.Interface
+
 let (>|=) = Lwt.(>|=)
 let return = Lwt.return
 
@@ -20,8 +23,6 @@ let string_of_error kn = function
   | UnknownError {code; msg} ->
     let content = match msg with None -> "" | Some s -> ": " ^ s in
     Printf.sprintf "Unknown Error %d%s" code content
-
-let log = ref prerr_endline
 
 let request_reply_hook = ref (fun () -> ())
 
@@ -59,35 +60,16 @@ let any_post = ref (fun ?meth:_m ?content_type:_ ?content:_ ?headers:_ ?msg:_ _u
   )
 
 
-module Make(S : sig
-
-    val get :
-      ?meth:string ->
-      ?headers:(string * string) list ->
-      ?msg:string -> string ->
-      (string, int * string option) result Lwt.t
-
-    val post :
-      ?meth:string ->
-      ?content_type:string ->
-      ?content:string ->
-      ?headers:(string * string) list ->
-      ?msg:string -> string ->
-      (string, int * string option) result Lwt.t
-
-    end) = struct
+module Make(S : Interface) : S = struct
 
   let init () =
     any_get := S.get;
-    any_post := S.post;
-    ()
-
-  let () = init ()
+    any_post := S.post
 
   (* print warnings generated when building the URL before
    sending the request *)
   let internal_get ?meth ?headers ?msg (URL url) =
-    EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
+    EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ EzAPI.str_of_method m) in
     S.get ?meth ?headers ?msg url >|= fun code ->
@@ -95,7 +77,7 @@ module Make(S : sig
     code
 
   let internal_post ?meth ?content_type ?content ?headers ?msg (URL url) =
-    EzAPI.warnings (fun s -> Printf.kprintf !log "EzRequest.warning: %s" s);
+    EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ EzAPI.str_of_method m) in
     S.post ?meth ?content_type ?content ?headers ?msg url >|= fun code ->
@@ -106,6 +88,9 @@ module Make(S : sig
     let old_hook = !before_hook in
     before_hook := (fun () -> old_hook (); f ())
 
+  let add_reply_hook f =
+    let old_hook = !request_reply_hook in
+    request_reply_hook := (fun () -> old_hook (); f ())
 
   let get = internal_get
   let post = internal_post
@@ -314,12 +299,3 @@ module ANY = Make(struct
     let post ?meth ?content_type ?content ?headers ?msg url =
       !any_post ?meth ?content_type ?content ?headers ?msg url
   end)
-
-module Default = Make(struct
-    let get ?meth:_ ?headers:_ ?msg:_ _url =
-      return (Error (-2, Some "No http client loaded"))
-    let post ?meth:_ ?content_type:(_x="") ?content:(_y="") ?headers:_ ?msg:_ _url =
-      return (Error (-2, Some "No http client loaded"))
-  end)
-
-let () = Default.init ()

@@ -1,6 +1,6 @@
 (library
- (name ezCoXhr)
- (public_name ez-api.coxhr)
+ (name ezCoXhr_i)
+ (public_name ez-api.icoxhr)
  (optional)
  (modules ezReq)
  (preprocess (pps js_of_ocaml-ppx))
@@ -9,11 +9,27 @@
  (modes byte))
 
 (library
- (name ezCoXhr_lwt)
- (public_name ez-api.coxhr-lwt)
+ (name ezCoXhr)
+ (public_name ez-api.coxhr)
+ (optional)
+ (modules ezCoXhr)
+ (libraries ezCoXhr_i)
+ (modes byte))
+
+(library
+ (name ezCoXhr_lwt_i)
+ (public_name ez-api.icoxhr-lwt)
  (optional)
  (modules ezReq_lwt)
  (preprocess (pps js_of_ocaml-ppx))
  (implements ezReq_lwt)
  (libraries ezRequest_lwt ezCohttp_base cohttp-lwt-jsoo ezAPIJS)
+ (modes byte))
+
+(library
+ (name ezCoXhr_lwt)
+ (public_name ez-api.coxhr-lwt)
+ (optional)
+ (modules ezCoXhr_lwt)
+ (libraries ezCoXhr_lwt_i)
  (modes byte))

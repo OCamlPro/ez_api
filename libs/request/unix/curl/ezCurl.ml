@@ -1,0 +1,3 @@
+include EzReq
+
+let () = init ()

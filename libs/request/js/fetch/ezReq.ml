@@ -26,8 +26,4 @@ end
 
 include Make(Interface)
 
-(* Use our own version of Ezjsonm.from_string to avoid errors *)
-let init () =
-  init ();
-  EzRequest.log := Ezjs_min.log_str;
-  !EzRequest.log "ezFetch Loaded"
+let () = EzDebug.log "ezFetch Loaded"
