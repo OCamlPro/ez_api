@@ -203,6 +203,10 @@ let af_headers_from_string_map m =
   StringMap.fold (fun k v acc -> Headers.add acc k @@ List.hd v)
     m Headers.empty
 
+let af_headers_to_string_map m =
+  Headers.fold ~f:(fun k v acc -> StringMap.add (String.lowercase_ascii k) [v] acc)
+    ~init:StringMap.empty m
+
 let add_headers_response headers =
   let h = StringMap.add "access-control-allow-origin" [ "*" ] headers in
   let h =
@@ -236,9 +240,7 @@ let connection_handler :
       time
       (Method.to_string request.Request.meth)
       request.Request.target;
-    debugf ~v:1 (fun () ->
-        List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
-          (Headers.to_list request.Request.headers));
+    debug "%a" Headers.pp_hum request.Request.headers;
     begin match client_address with
       | Unix.ADDR_INET (iaddr, _port) ->
         let ip = Unix.string_of_inet_addr iaddr in
@@ -253,14 +255,7 @@ let connection_handler :
     let local_path = Uri.path uri in
     let path = local_path |> String.split_on_char '/' |> list_trim in
 
-    let headers =
-      let headers = ref StringMap.empty in
-      Headers.iter ~f:(fun s v ->
-          headers :=
-            StringMap.add (String.lowercase_ascii s) [v] !headers)
-        (request.Httpaf.Request.headers);
-      !headers
-    in
+    let headers = af_headers_to_string_map request.Request.headers in
     let version =
       if request.Request.version.Version.minor = 0
       then HTTP_1_0
@@ -341,17 +336,20 @@ let connection_handler :
         let body_str, headers = match reply with
           | ReplyNone -> "", headers
           | ReplyJson json ->
+            let headers = Headers.remove headers "content-type" in
             let content = Ezjsonm.to_string (json_root json) in
             debug ~v:3 "Reply content:\n  %s" content;
             content,
-            Headers.add headers "Content-Type" "application/json"
+            Headers.replace headers "content-type" "application/json"
           | ReplyString (content_type, content) ->
+            let headers = Headers.remove headers "content-type" in
             debug ~v:3 "Reply content:\n  %s" content;
             content,
-            Headers.add headers "Content-Type" content_type
+            Headers.replace headers "content-type" content_type
         in
         let len = String.length body_str in
-        let headers = Headers.add headers "content-length" (string_of_int len) in
+        let headers = Headers.remove headers "content-length" in
+        let headers = Headers.replace headers "content-length" (string_of_int len) in
         let response = Response.create ~headers status in
         Reqd.respond_with_string request_descriptor response body_str;
         Lwt.return_unit)
