@@ -1,4 +1,7 @@
-type 'a api_error = 'a EzReq_lwt_S.api_error
+type 'a api_error = 'a EzReq_lwt_S.api_error =
+  | KnownError of { code : int ; error : 'a }
+  | UnknownError of { code : int ; msg : string option }
+
 type ('output, 'error) api_result = ('output, 'error) EzReq_lwt_S.api_result
 
 val handle_error : ('a -> string option) -> 'a api_error -> int * string option
