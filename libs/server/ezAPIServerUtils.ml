@@ -270,13 +270,13 @@ module FileString = struct
       raise e
 end
 
-let rec reply_file ?(meth=Resto1.GET) ?default root path =
+let rec reply_file ?(meth=`GET) ?default root path =
   let path = normalize_path path in
   let file = Filename.concat root (String.concat "/" path) in
   try
     let content_type = content_type_of_file file in
     match meth with
-    | OPTIONS ->
+    | `OPTIONS ->
       if Sys.file_exists file then
         Lwt.return (200, ReplyNone)
       else raise Not_found

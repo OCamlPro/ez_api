@@ -235,12 +235,14 @@ module Path = struct
 
 end
 
-type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | OTHER of string
+type method_type = [
+  | `GET | `HEAD | `POST | `PUT | `DELETE | `OPTIONS | `PATCH
+  | `CONNECT | `TRACE | `Other of string ]
 
 type ('prefix, 'params, 'input, 'output) service =
   ('prefix, 'params, 'input, 'output, method_type) Internal.iservice
 
-let service ?description ?(meth=GET) ?(mime_types=[]) ~input ~output path =
+let service ?description ?(meth=`GET) ?(mime_types=[]) ~input ~output path =
   let mime_types = List.filter_map parse_mime mime_types in
   { description ; path ; input ; output; method_type = meth; mime_types }
 

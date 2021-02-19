@@ -2,25 +2,12 @@ open StringCompat
 open Lwt
 open EzAPI.TYPES
 open EzAPIServerUtils
-open Resto1
 
 module Header = Cohttp.Header
 module Request = Cohttp.Request
 module Server = Cohttp_lwt_unix.Server
 
 let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
-
-let of_cohttp_meth = function
-  | `GET -> Resto1.GET
-  | `HEAD -> HEAD
-  | `POST -> POST
-  | `PUT -> PUT
-  | `DELETE -> DELETE
-  | `CONNECT -> CONNECT
-  | `OPTIONS -> OPTIONS
-  | `TRACE -> TRACE
-  | `PATCH -> PATCH
-  | `Other s -> OTHER s
 
 (* Resolve handler matching request and run it *)
 let dispatch ~require_method ?catch s (io, _conn) req body =
@@ -92,7 +79,7 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
       StringMap.iter (fun s v ->
           List.iter (fun v -> EzDebug.printf "  %s: %s" s v) v)
         headers);
-  let req_meth = of_cohttp_meth @@ Cohttp.Request.meth req in
+  let req_meth = Cohttp.Request.meth req in
   Lwt.catch
     (fun () ->
        if path = ["debug"] then
@@ -111,7 +98,7 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
        else
          let meth = if require_method then Some req_meth else None in
          match s.server_kind, req_meth, request.req_body with
-         | API dir, OPTIONS, _ ->
+         | API dir, `OPTIONS, _ ->
            RestoDirectory1.lookup dir.meth_OPTIONS request path
            >>= fun (handler, _) -> handler None >>= fun _answer ->
            (* Note: this path always fails with EzReturnOPTIONS *)
@@ -172,11 +159,11 @@ let dispatch ~require_method ?catch s (io, _conn) req body =
       let content = Ezjsonm.to_string (json_root json) in
       debug ~v:3 "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
-      Header.add headers "Content-Type" "application/json"
+      Header.replace headers "content-type" "application/json"
     | ReplyString (content_type, content) ->
       debug ~v:3 "Reply content:\n  %s" content;
       Cohttp_lwt__Body.of_string content,
-      Header.add headers "Content-Type" content_type
+      Header.replace headers "content-type" content_type
   in
   Cohttp_lwt__Body.to_string body >>= fun body ->
   Server.respond_string ~headers ~status ~body ()

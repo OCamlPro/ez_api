@@ -105,7 +105,7 @@ module Make(S : Interface) : S = struct
         let url = EzAPI.forge0 api service [] in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        let meth = if meth = Resto1.GET then Resto1.POST else meth in
+        let meth = if meth = `GET then `POST else meth in
         internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge0 api service params in
@@ -127,7 +127,7 @@ module Make(S : Interface) : S = struct
         let url = EzAPI.forge1 api service arg []  in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        let meth = if meth = Resto1.GET then Resto1.POST else meth in
+        let meth = if meth = `GET then `POST else meth in
         internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge1 api service arg params in
@@ -149,7 +149,7 @@ module Make(S : Interface) : S = struct
         let url = EzAPI.forge2 api service arg1 arg2 []  in
         let content = EzAPI.encode_args service url params in
         let content_type = EzUrl.content_type in
-        let meth = if meth = Resto1.GET then Resto1.POST else meth in
+        let meth = if meth = `GET then `POST else meth in
         internal_post ~meth msg url ~content ~content_type ?headers ~error ok
       else
         let url = EzAPI.forge2 api service arg1 arg2 params in

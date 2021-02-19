@@ -74,7 +74,9 @@ type mime = {
 val parse_mime : string -> mime option
 
 (** Services. *)
-type method_type = GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | OTHER of string
+type method_type = [
+  | `GET | `HEAD | `POST | `PUT | `DELETE | `OPTIONS | `PATCH
+  | `CONNECT | `TRACE | `Other of string ]
 
 type ('prefix, 'params, 'input, 'output) service
 

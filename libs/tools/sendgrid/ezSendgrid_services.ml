@@ -25,7 +25,7 @@ let add_contacts : (string list option * contact list, string, string option, Ez
     ~name:"sendgrid_add_contacts"
     ~input:add_contacts_enc
     ~output:job_output
-    ~meth:Resto1.PUT
+    ~meth:`PUT
     EzAPI.Path.(root // "marketing" // "contacts")
 
 let delete_contacts : (unit, string, string option, EzAPI.bearer_security) EzAPI.post_service0 =
@@ -35,7 +35,7 @@ let delete_contacts : (unit, string, string option, EzAPI.bearer_security) EzAPI
     ~name:"sendgrid_delete_contacts"
     ~input:Json_encoding.empty
     ~output:job_output
-    ~meth:Resto1.DELETE
+    ~meth:`DELETE
     ~params:[ids_param; delete_all_param]
     EzAPI.Path.(root // "marketing" // "contacts")
 
@@ -70,6 +70,6 @@ let remove_contact_list : (string, string, string option, EzAPI.bearer_security)
     ~section:sendgrid_section
     ~name:"sendgrid_remove_contact_list"
     ~output:job_output
-    ~meth:Resto1.DELETE
+    ~meth:`DELETE
     ~params:[contact_ids_param]
     EzAPI.Path.(root // "marketing" // "lists" /: arg_id // "contacts")

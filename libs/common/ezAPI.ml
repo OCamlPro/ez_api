@@ -362,16 +362,16 @@ let params_of_query_security (l : [< security_scheme ] list) =
     ) [] l
 
 let str_of_method = function
-  | GET -> "get"
-  | HEAD -> "head"
-  | POST -> "post"
-  | PUT -> "put"
-  | DELETE -> "delete"
-  | CONNECT -> "connect"
-  | OPTIONS -> "options"
-  | TRACE -> "trace"
-  | PATCH -> "patch"
-  | OTHER s -> s
+  | `GET -> "get"
+  | `HEAD -> "head"
+  | `POST -> "post"
+  | `PUT -> "put"
+  | `DELETE -> "delete"
+  | `OPTIONS -> "options"
+  | `PATCH -> "patch"
+  | `TRACE -> "trace"
+  | `CONNECT -> "connect"
+  | `Other s -> s
 
 let post_service :
   type i.
@@ -390,7 +390,7 @@ let post_service :
   ?output_example:'output ->
   ('b, 'c) p ->
   ('b, 'c, i, 'output, 'error, 'security) service =
-  fun ?(section=default_section) ?name ?descr ?(meth=POST)
+  fun ?(section=default_section) ?name ?descr ?(meth=`POST)
     ?input ?input_type ~output ?(error_outputs=[]) ?(params = [])
     ?(security=[]) ?(register=true) ?input_example ?output_example
     (doc_path,path1,path2,sample) ->
@@ -452,7 +452,7 @@ let post_service :
       ]) in
   let service = {
     s = service ~meth ~input ~output:resto_output ~mime_types:doc_mime path1;
-    s_OPTIONS = service ~meth:OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
+    s_OPTIONS = service ~meth:`OPTIONS ~input:Json_encoding.empty ~output:resto_output path1;
     s_internal = service ~input:Json_encoding.empty ~output:resto_output path2;
     params;
     doc;
@@ -466,7 +466,7 @@ let post_service :
   doc.doc_sample <- make_sample;
   service
 
-let service ?section ?name ?descr ?(meth=GET) ~output ?error_outputs ?params
+let service ?section ?name ?descr ?(meth=`GET) ~output ?error_outputs ?params
     ?security ?register ?output_example arg =
   post_service ?section ?name ?descr
     ~input_type:Empty

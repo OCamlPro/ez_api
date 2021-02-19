@@ -3,7 +3,6 @@ open Lwt
 open StringCompat
 open Httpaf
 open EzAPIServerUtils
-open Resto1
 
 external limit_open_file : unit -> int = "rlimit_no_file_c"
 
@@ -12,17 +11,8 @@ type lwt_server = {
 }
 
 let of_httpaf_meth = function
-  | `GET -> GET
-  | `HEAD -> HEAD
-  | `POST -> POST
-  | `PUT -> PUT
-  | `DELETE -> DELETE
-  | `CONNECT -> CONNECT
-  | `OPTIONS -> OPTIONS
-  | `TRACE -> TRACE
-  | `Other "patch" -> PATCH
-  | `Other s -> OTHER s
-
+  | `Other "patch" -> `PATCH
+  | #Resto1.method_type as m -> m
 
 let () =
   Lwt.async_exception_hook := (fun exn -> EzDebug.printf "Exception %s" (Printexc.to_string exn))
@@ -288,7 +278,7 @@ let connection_handler :
                 let req_meth = of_httpaf_meth request.Request.meth in
                 let meth = if require_method then Some req_meth else None in
                 match s.server_kind, req_meth, ez_request.req_body with
-                | API dir, OPTIONS, _ ->
+                | API dir, `OPTIONS, _ ->
                   RestoDirectory1.lookup dir.meth_OPTIONS ez_request path
                   >>= fun (handler, _) -> handler None >>= fun _answer ->
                   reply_none 200
