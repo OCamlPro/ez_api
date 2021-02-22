@@ -20,45 +20,45 @@ module type Converter = sig
   val obj : (string * _to) list -> _to
 end
 
-module Js_to_JSON_Converter : Converter with type 'a _from = 'a Js.t Js.opt
+module Js_to_JSON_Converter : Converter with type _ _from = Js.Unsafe.any
                                          and type _to = Json_repr.ezjsonm
 = struct
 
-  type 'a _from = 'a Js.t Js.opt
+  type _ _from = Js.Unsafe.any
   type _to = Json_repr.ezjsonm
 
   let arr l = `A l
 
   let obj l = `O l
 
+  external js_equals : 'a -> 'b -> bool = "caml_js_equals"
+  let null = Js.Unsafe.pure_js_expr "null"
+
   let kind_of j =
-    Js.Opt.case j
-      (fun () -> (* null *)
-         Leaf (`Null))
-      (fun j -> (* not null *)
-         match Js.to_string (Js.typeof j) with
-         | "object" ->
-           begin
-             try Arr
-                   (Array.to_list
-                      (Js.to_array (Js.Unsafe.coerce j : 'a Js.js_array Js.t)))
-             with _ ->
-               let keys = Array.to_list (Js.to_array (Js.object_keys j)) in
-               let l =
-                 List.map (fun k -> Js.to_string k, Js.Unsafe.get j k) keys in
-               Obj l
-           end
-         | "string" ->
-           Leaf (`String
-                   (Js.to_string (Js.Unsafe.coerce j : Js.js_string Js.t)))
-         | "number" ->
-           Leaf (`Float
-                   (Js.float_of_number (Js.Unsafe.coerce j : Js.number Js.t)))
-         | "boolean" ->
-           Leaf (`Bool (Js.to_bool (Js.Unsafe.coerce j : bool Js.t)))
-         (* | "undefined" -> Leaf (`Null) *)
-         | tof -> raise (Invalid_argument ("json_of_js: "^tof))
-      )
+    if js_equals j null then Leaf (`Null)
+    else
+      match Js.to_string (Js.typeof j) with
+      | "object" ->
+        begin
+          try Arr
+                (Array.to_list
+                   (Js.to_array (Js.Unsafe.coerce j : 'a Js.js_array Js.t)))
+          with _ ->
+            let keys = Array.to_list (Js.to_array (Js.object_keys j)) in
+            let l =
+              List.map (fun k -> Js.to_string k, Js.Unsafe.get j k) keys in
+            Obj l
+        end
+      | "string" ->
+        Leaf (`String
+                (Js.to_string (Js.Unsafe.coerce j : Js.js_string Js.t)))
+      | "number" ->
+        Leaf (`Float
+                (Js.float_of_number (Js.Unsafe.coerce j : Js.number Js.t)))
+      | "boolean" ->
+        Leaf (`Bool (Js.to_bool (Js.Unsafe.coerce j : bool Js.t)))
+      (* | "undefined" -> Leaf (`Null) *)
+      | tof -> raise (Invalid_argument ("json_of_js: "^tof))
 end
 
 module JSON_to_Js_Converter : Converter with type 'a _from = Json_repr.ezjsonm
