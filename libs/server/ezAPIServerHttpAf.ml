@@ -330,16 +330,16 @@ let connection_handler :
             let content = Ezjsonm.to_string (json_root json) in
             debug ~v:3 "Reply content:\n  %s" content;
             content,
-            Headers.replace headers "content-type" "application/json"
+            Headers.add headers "content-type" "application/json"
           | ReplyString (content_type, content) ->
             let headers = Headers.remove headers "content-type" in
             debug ~v:3 "Reply content:\n  %s" content;
             content,
-            Headers.replace headers "content-type" content_type
+            Headers.add headers "content-type" content_type
         in
         let len = String.length body_str in
         let headers = Headers.remove headers "content-length" in
-        let headers = Headers.replace headers "content-length" (string_of_int len) in
+        let headers = Headers.add headers "content-length" (string_of_int len) in
         let response = Response.create ~headers status in
         Reqd.respond_with_string request_descriptor response body_str;
         Lwt.return_unit)
