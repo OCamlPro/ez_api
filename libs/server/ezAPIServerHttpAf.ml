@@ -225,12 +225,12 @@ let connection_handler :
     let request = Reqd.request request_descriptor in
     let uri = mk_uri request in
     let req_params = Uri.query uri in
-    let time = pp_time () in
-    debug "[%s] REQUEST: %s %S"
-      time
+    debug "[%t] REQUEST: %s %S" pp_time
       (Method.to_string request.Request.meth)
       request.Request.target;
-    debug "%a" Headers.pp_hum request.Request.headers;
+    debugf ~v:1 (fun () ->
+        List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
+          (Headers.to_list request.Request.headers));
     begin match client_address with
       | Unix.ADDR_INET (iaddr, _port) ->
         let ip = Unix.string_of_inet_addr iaddr in

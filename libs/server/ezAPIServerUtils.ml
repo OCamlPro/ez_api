@@ -32,7 +32,7 @@ let pp_time () =
 
 let debug ?(v=0) fmt =
   if !verbose > v then EzDebug.printf fmt
-  else Printf.ifprintf Format.err_formatter fmt
+  else Printf.ifprintf () fmt
 
 let debugf ?(v=0) f =
   if !verbose > v then f ()
