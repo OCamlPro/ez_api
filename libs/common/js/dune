@@ -1,6 +1,15 @@
 (library
  (name ezDebug_js)
  (public_name ez-api.debug-js)
- (modules ezDebug)
  (optional)
- (preprocess (pps js_of_ocaml-ppx)))
+ (modules ezDebug)
+ (preprocess (pps js_of_ocaml-ppx))
+ (implements ezDebug))
+
+(library
+ (name ezLwtSys_js)
+ (public_name ez-api.lwt-js)
+ (optional)
+ (modules ezLwtSys)
+ (implements ezLwtSys)
+ (libraries js_of_ocaml-lwt))

@@ -1,0 +1,7 @@
+(library
+ (name ezWs)
+ (public_name ez-api.ws)
+ (optional)
+ (virtual_modules ezWs)
+ (libraries ezWsCommon)
+ (default_implementation ezWs_cohttp))
