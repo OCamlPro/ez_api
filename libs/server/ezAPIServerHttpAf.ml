@@ -11,7 +11,7 @@ type lwt_server = {
 }
 
 let of_httpaf_meth = function
-  | `Other "patch" -> `PATCH
+  | `Other "patch" | `Other "PATCH" | `Other "Patch" -> `PATCH
   | #Resto1.method_type as m -> m
 
 let () =
