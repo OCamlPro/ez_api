@@ -1,6 +1,7 @@
 open Lwt.Infix
 
 let () =
+  Cohttp_lwt_unix.Debug.activate_debug ();
   EzLwtSys.run @@ fun () ->
   EzWs.connect ~msg:"test" ~react:(fun s -> EzDebug.printf "message received %s" s; Lwt.return_unit)
     "ws://localhost:9000" >>= function

@@ -53,3 +53,21 @@ let connect ?msg ~react:f url =
   let send content =
     catch (fun () -> send @@ Frame.create ~content () >>= fun () -> Lwt.return_ok ()) in
   Lwt.return_ok {send; close; react = react ()}
+
+let connect0 :
+  type i. ?msg:string -> react:('output -> unit Lwt.t) -> EzAPI.base_url ->
+  (i, 'output, 'error, 'security) EzAPI.ws_service ->
+  (i ws_res, int * string option) result Lwt.t = fun ?msg ~react base service ->
+  let EzAPI.TYPES.URL url = EzAPI.forge0 base service [] in
+  let input_type = EzAPI.service_input service in
+  let output = EzAPI.service_output service in
+  connect ?msg ~react:(fun s -> react (EzEncoding.destruct output s)) url >|= function
+  | Error e -> Error e
+  | Ok r ->
+    let send (input : i) =
+      let content = match input_type with
+        | EzAPI.Empty -> ""
+        | EzAPI.Binary _ -> input
+        | EzAPI.Json enc -> EzEncoding.construct enc input in
+      r.send content in
+    Ok {r with send}
