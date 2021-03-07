@@ -1,3 +1,7 @@
+let verbose = match Sys.getenv_opt "EZAPICLIENT" with
+  | Some "true" | Some "1" -> true
+  | _ -> false
+
 module Interface = struct
 
   let log ?(meth="GET") url = function
@@ -16,7 +20,7 @@ module Interface = struct
     Curl.set_sslverifyhost c Curl.SSLVERIFYHOST_EXISTENCE;
     Curl.set_writefunction c (writer_callback r);
     Curl.set_tcpnodelay c true;
-    Curl.set_verbose c false;
+    Curl.set_verbose c verbose;
     Curl.set_post c false;
     Curl.set_url c url;
     r,c
