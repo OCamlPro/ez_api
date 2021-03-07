@@ -1,5 +1,4 @@
-open EzAPI.TYPES
-open StringCompat
+open EzAPIServerUtils
 
 (* RFC 2965 has
     cookie          =  "Cookie:" cookie-version 1*((";" | ",") cookie-value)
@@ -15,7 +14,7 @@ open StringCompat
 let cookie_re = Re.Str.regexp "[;,][ \t]*"
 let equals_re = Re.Str.regexp_string "="
 
-let get ( req : EzAPI.request ) =
+let get ( req : Req.t ) =
   List.fold_left
     (fun acc header ->
       let comps = Re.Str.split_delim cookie_re header in
@@ -29,23 +28,12 @@ let get ( req : EzAPI.request ) =
         | n :: v :: _ -> StringMap.add n v acc
       in
       List.fold_left split_pair acc cookies
-    ) StringMap.empty (StringMap.find "cookie" req.req_headers)
+    ) StringMap.empty (StringMap.find "cookie" req.Req.req_headers)
 
-
-
-let set ?secure ?http_only ?expiration (req : EzAPI.request) ~name ~value =
-  let version = match req.req_version with
-    | HTTP_1_0 -> `HTTP_1_0
-    | HTTP_1_1 -> `HTTP_1_1
-  in
-  let header =
-    Cohttp.Cookie.Set_cookie_hdr.serialize
-      ~version
-      (Cohttp.Cookie.Set_cookie_hdr.make ?expiration ?secure ?http_only
-         (name, value)
-      )
-  in
-  req.rep_headers <- header :: req.rep_headers
+let set ?secure ?http_only ?expiration (req : Req.t) ~name ~value =
+  let version = req.Req.req_version in
+  Cohttp.Cookie.Set_cookie_hdr.serialize ~version @@
+  Cohttp.Cookie.Set_cookie_hdr.make ?expiration ?secure ?http_only (name, value)
 
 let clear req ~name =
   set req ~name ~value:"" ~expiration:(`Max_age 0L)

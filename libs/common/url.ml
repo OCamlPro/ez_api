@@ -1,3 +1,8 @@
+module TYPES = struct
+  type base_url = BASE of string
+  type url = URL of string
+end
+include TYPES
 
 let cut_at s c =
   try
@@ -6,8 +11,6 @@ let cut_at s c =
     String.sub s 0 pos,
     String.sub s (pos+1) (len - pos - 1)
   with _ -> s, ""
-
-
 
 (* encode using x-www-form-urlencoded form *)
 let encode s =
@@ -111,3 +114,10 @@ let encode_obj ?(url=false) enc x =
   match aux (Json_encoding.construct enc x) with
   | None -> ""
   | Some s -> s
+
+let assemble (BASE url) parts args =
+  let n = String.length url in
+  let sep =
+    if n = 0 || url.[n - 1] = '/' || parts = "" then "" else "/" in
+  let url = Printf.sprintf "%s%s%s%s" url sep parts args in
+  URL url

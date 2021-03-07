@@ -1,0 +1,14 @@
+(library
+ (name test_ws_lib)
+ (modules test_ws_lib)
+ (libraries ez-api))
+
+(executable
+ (name test_ws_server)
+ (modules test_ws_server)
+ (libraries test_ws_lib ez-api.server))
+
+(executable
+ (name test_ws_client)
+ (modules test_ws_client)
+ (libraries test_ws_lib ez-api.ws-cohttp))

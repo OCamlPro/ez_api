@@ -1,22 +1,20 @@
 (library
  (name ezAPIServerUtils)
  (public_name ez-api.server-utils)
- (wrapped false)
  (optional)
- (modules restoDirectory1 gMTime timings ezAPIServerUtils ezOpenAPI)
- (libraries ezSession geoip lwt.unix ezjsonm_unix))
+ (modules answer directory gMTime timings ip file ezAPIServerUtils)
+ (libraries ezAPI geoip lwt.unix ezjsonm_unix))
+
+(library
+ (name ezOpenAPI)
+ (public_name ez-api.openAPI)
+ (optional)
+ (modules ezOpenAPI)
+ (libraries ezAPI ezjsonm_unix))
 
 (library
  (name ezAPIServer)
  (public_name ez-api.server)
  (optional)
  (modules ezAPIServer)
- (libraries ezAPIServerUtils cohttp-lwt-unix lwt_log))
-
-(library
- (name ezAPIServerHttpAf)
- (public_name ez-api.server-httpaf)
- (optional)
- (modules ezAPIServerHttpAf)
- (libraries ezAPIServerUtils httpaf-lwt-unix)
- (foreign_stubs (language c) (names rlimit_no_file)))
+ (libraries ezServer))

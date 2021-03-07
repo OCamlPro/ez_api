@@ -8,201 +8,223 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ty : sig
+
+  exception Not_equal
+  type (_, _) eq = Eq : ('a, 'a) eq
+
+  type 'a id
+  val eq : 'a id -> 'b id -> ('a, 'b) eq
+
+end
+
 (** Typed path argument. *)
 module Arg : sig
-
-  type 'a arg
-  val make:
-    ?example:'a ->
-    ?descr:string ->
-    name:string ->
-    destruct:(string -> ('a, string) result) ->
-    construct:('a -> string) ->
-    unit -> 'a arg
 
   type descr = {
     name: string ;
     descr: string option ;
     example: string option
   }
-  val descr: 'a arg -> descr
 
-  val int: int arg
-  val int32: int32 arg
-  val int64: int64 arg
-  val float: float arg
+  type 'a t = {
+    id: 'a Ty.id;
+    destruct: string -> ('a, string) result ;
+    construct: 'a -> string ;
+    description: descr ;
+  }
+
+  val make:
+    ?example:'a ->
+    ?descr:string ->
+    name:string ->
+    destruct:(string -> ('a, string) result) ->
+    construct:('a -> string) ->
+    unit -> 'a t
+
+  val descr: 'a t -> descr
+
+  val int: int t
+  val int32: int32 t
+  val int64: int64 t
+  val float: float t
 
 end
-
 
 (** Parametrized path to services. *)
 module Path : sig
 
-  type ('prefix, 'params) path
-  type 'prefix context = ('prefix, 'prefix) path
+  type _ t =
+    | Root : unit t
+    | Static : 'key t * string -> 'key t
+    | Dynamic : 'key t * 'a Arg.t -> ('key * 'a) t
 
-  val root: 'a context
+  val root: unit t
 
-  val add_suffix:
-    ('prefix, 'params) path -> string -> ('prefix, 'params) path
-  val (/):
-    ('prefix, 'params) path -> string -> ('prefix, 'params) path
+  val add_suffix: 'args t -> string -> 'args t
+  val (/): 'args t -> string -> 'args t
 
-  val add_arg:
-    ('prefix, 'params) path -> 'a Arg.arg -> ('prefix, 'params * 'a) path
-  val (/:):
-    ('prefix, 'params) path -> 'a Arg.arg -> ('prefix, 'params * 'a) path
+  val add_arg: 'args t -> 'a Arg.t -> ('args * 'a) t
+  val (/:): 'args t -> 'a Arg.t -> ('args * 'a) t
 
-  val prefix:
-    ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
+  val to_list : ?root:string list -> ?wrap:(string -> string) -> _ t -> string list
+  val to_string : ?root:string -> ?wrap:(string -> string) -> _ t -> string
 
-  val map:
-    ('a -> 'b) -> ('b -> 'a) -> ('prefix, 'a) path -> ('prefix, 'b) path
+  val forge: 'args t -> 'args -> string list
+
+  val args : _ t -> Arg.descr list
 
 end
 
-(** mime *)
+(** Mime *)
+module Mime : sig
+  type str_or_star = [ `star | `str of string ]
 
-type str_or_star = [ `star | `str of string ]
+  type t = {
+    typ : str_or_star;
+    subtyp : str_or_star;
+    param : (string * string) option
+  }
 
-type mime = {
-  typ : str_or_star;
-  subtyp : str_or_star;
-  param : (string * string) option
-}
+  val parse : string -> t option
 
-val parse_mime : string -> mime option
+  val to_string : t -> string
+
+  val json : t
+end
+
+(** Query param *)
+module Param : sig
+  type kind = PARAM_INT | PARAM_STRING | PARAM_BOOL
+
+  type param = {
+    param_id : string;
+    param_name : string option;
+    param_descr : string option;
+    param_type : kind;
+    param_required : bool;
+    param_examples : string list;
+  }
+
+  val make : kind -> ?name:string -> ?descr:string
+    -> ?required:bool -> ?examples:string list -> string -> param
+
+  val string : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
+
+  val int : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
+
+  val bool : ?name:string -> ?descr:string -> ?required:bool
+    -> ?examples:string list -> string -> param
+
+  type value =
+    | I of int
+    | S of string
+    | B of bool
+    | LS of string list
+end
+
+(** Security *)
+module Security : sig
+  type uninhabited = |
+  type no_security = [ `Nosecurity of uninhabited ]
+  type 'a apikey_security = { ref_name : string; name : 'a }
+  type bearer_security_desc = { bearer_name : string ; format : string option }
+  type basic_security_desc = { basic_name : string }
+  type bearer_security = [ `Bearer of bearer_security_desc ]
+  type basic_security = [ `Basic of basic_security_desc ]
+  type header_security = [ `Header of string apikey_security ]
+  type cookie_security = [ `Cookie of string apikey_security ]
+  type query_security = [ `Query of Param.param apikey_security ]
+  type scheme = [
+    | no_security
+    | basic_security
+    | bearer_security
+    | header_security
+    | cookie_security
+    | query_security ]
+
+  val unreachable : uninhabited -> _
+
+  val ref_name : [< scheme ] -> string
+
+  val params : [< scheme ] list -> Param.param list
+
+end
+
+(** Errors *)
+module Err : sig
+  type _ case =
+      Case : {
+        code : int;
+        name : string;
+        encoding : 'a Json_encoding.encoding;
+        select : 'b -> 'a option;
+        deselect: 'a -> 'b;
+      } -> 'b case
+
+  val make : code:int -> name:string -> encoding:'a Json_encoding.encoding
+    -> select:('b -> 'a option) -> deselect:('a -> 'b) -> 'b case
+
+  val merge_errs_same_code : 'a case list -> (int * Json_schema.schema lazy_t) list
+
+  val catch_all_error_case : unit -> 'a case
+end
 
 (** Services. *)
-type method_type = [
-  | `GET | `HEAD | `POST | `PUT | `DELETE | `OPTIONS | `PATCH
-  | `CONNECT | `TRACE | `Other of string ]
+type 'a arg = 'a Arg.t
+type 'a path = 'a Path.t
+type mime = Mime.t
 
-type ('prefix, 'params, 'input, 'output) service
+type empty_meth = [ `OPTIONS | `HEAD ]
+type meth = [ `GET | `POST | `PUT | `DELETE | `PATCH ]
+type all_meth = [ meth | empty_meth ]
+
+val str_of_meth : [< all_meth ] -> string
+
+type _ input =
+  | Empty : unit input
+  | Json : 'a Json_encoding.encoding -> 'a input
+  | Raw : mime list -> string input
+
+type ('args, 'input, 'output, 'error, 'security) service
 
 val service:
-  ?description: string ->
-  ?meth: method_type ->
-  ?mime_types: string list ->
-  input: 'input Json_encoding.encoding ->
-  output: 'output Json_encoding.encoding ->
-  ('prefix, 'params) Path.path ->
-  ('prefix, 'params, 'input, 'output) service
+  ?meth:meth ->
+  ?params:Param.param list ->
+  ?security:[< Security.scheme as 'security] list ->
+  ?errors:'error Err.case list ->
+  input:'input input ->
+  output:'output Json_encoding.encoding ->
+  'args path ->
+  ('args, 'input, 'output, 'error, 'security) service
 
-val prefix:
-  ('prefix, 'inner_prefix) Path.path ->
-  ('inner_prefix, 'params, 'input, 'output) service ->
-  ('prefix, 'params, 'input, 'output) service
+val input : (_, 'input, _, _, _) service -> 'input input
+val output : (_, _, 'output, _, _) service -> 'output Json_encoding.encoding
+val meth : (_, _, _, _, _) service -> meth
+val path : ('args, _, _, _, _) service -> 'args path
+val security : (_, _, _, _, 'security) service -> 'security list
+val errors : (_, _, _, 'error, _) service -> 'error Err.case list
+val params : (_, _, _, _, _) service -> Param.param list
 
 type json = Json_repr.Ezjsonm.value
 
 val forge_request:
-  (unit, 'params, 'input, 'output) service ->
-  'params -> 'input -> string list * json
+  ('args, 'input, _, _, _) service ->
+  'args -> 'input -> string list * json
 
 val read_answer:
-  (unit, 'params, 'input, 'output) service ->
+  ('args, _, 'output, _, _) service ->
   json -> ('output, string) result
 
 module Make (Repr : Json_repr.Repr) : sig
 
   val forge_request:
-    (unit, 'params, 'input, 'output) service ->
-    'params -> 'input -> string list * Repr.value
+    ('args, 'input, _, _, _) service ->
+    'args -> 'input -> string list * Repr.value
 
   val read_answer:
-    (unit, 'params, 'input, 'output) service ->
+    ('args, _, 'output, _, _) service ->
     Repr.value -> ('output, string) result
-
 end
-
-(** Service directory description *)
-module Description : sig
-
-  type service_descr = {
-    description: string option ;
-    input: Json_schema.schema ;
-    output: Json_schema.schema ;
-  }
-
-  type directory_descr =
-    | Static of static_directory_descr
-    | Dynamic of string option
-
-  and static_directory_descr = {
-    service: service_descr option ;
-    subdirs: static_subdirectories_descr option ;
-  }
-
-  and static_subdirectories_descr =
-    | Suffixes of directory_descr Map.Make(String).t
-    | Arg of Arg.descr * directory_descr
-
-  val service:
-    ?description:string ->
-    ('prefix, 'params) Path.path ->
-    ('prefix, 'params, bool option, directory_descr) service
-
-  val pp_print_directory_descr:
-    Format.formatter -> directory_descr -> unit
-
-end
-
-
-(**/**)
-
-module Internal : sig
-
-  module Ty : sig
-
-    exception Not_equal
-    type (_, _) eq = Eq : ('a, 'a) eq
-
-    type 'a id
-    val eq : 'a id -> 'b id -> ('a, 'b) eq
-
-  end
-
-  type 'a arg = {
-    id: 'a Ty.id;
-    destruct: string -> ('a, string) result ;
-    construct: 'a -> string ;
-    descr: Arg.descr ;
-  }
-
-  val from_arg : 'a arg -> 'a Arg.arg
-  val to_arg : 'a Arg.arg -> 'a arg
-
-  type (_, _) rpath =
-    | Root : ('rkey, 'rkey) rpath
-    | Static : ('rkey, 'key) rpath * string -> ('rkey, 'key) rpath
-    | Dynamic : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a) rpath
-
-  type (_, _) path =
-    | Path: ('prefix, 'params) rpath -> ('prefix, 'params) path
-    | MappedPath:
-        ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
-      ('prefix, 'params) path
-
-  val from_path : ('a, 'b) path -> ('a, 'b) Path.path
-  val to_path : ('a, 'b) Path.path -> ('a, 'b) path
-
-  type ('prefix, 'params, 'input, 'output, 'method_type) iservice = {
-    description : string option ;
-    path : ('prefix, 'params) path ;
-    input : 'input Json_encoding.encoding ;
-    output : 'output Json_encoding.encoding ;
-    method_type : 'method_type ;
-    mime_types : mime list;
-  }
-
-  val from_service:
-    ('prefix, 'params, 'input, 'output, method_type) iservice ->
-     ('prefix, 'params, 'input, 'output) service
-  val to_service:
-    ('prefix, 'params, 'input, 'output) service ->
-    ('prefix, 'params, 'input, 'output, method_type) iservice
-
-end
-
-(**/**)

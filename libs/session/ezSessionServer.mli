@@ -1,4 +1,5 @@
 open EzSession.TYPES
+open EzAPIServerUtils
 
 val random_challenge : unit -> string
 
@@ -30,13 +31,12 @@ module Make(S: Arg) : sig
   (* User `register_handlers` to declare the handlers for the authentification
      services *)
   val register_handlers :
-    EzAPI.request EzAPIServerUtils.directory ->
-    EzAPI.request EzAPIServerUtils.directory
+    Directory.t -> Directory.t
 
  (* handlers that need authentification should use `get_request_session`
    to collect the user identity and session. *)
   val get_request_session :
-    EzAPI.request -> S.SessionArg.user_id session option Lwt.t
+    Req.t -> S.SessionArg.user_id session option Lwt.t
 
 end
 

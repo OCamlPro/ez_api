@@ -187,7 +187,7 @@ module Make(S : SessionArg) = struct
           (fun x -> LoginWait x) ]
 
     let session_expired_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 440;
         name = "SessionExpired";
         encoding = (obj1 (req "error" (constant "SessionExpired")));
@@ -196,7 +196,7 @@ module Make(S : SessionArg) = struct
       }
 
     let bad_user_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 401;
         name = "BadUserOrPassword";
         encoding = (obj1 (req "error" (constant "BadUserOrPassword")));
@@ -205,7 +205,7 @@ module Make(S : SessionArg) = struct
       }
 
     let user_not_registered_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 400;
         name = "UserNotRegistered";
         encoding = (obj1 (req "error" (constant "UserNotRegistered")));
@@ -214,7 +214,7 @@ module Make(S : SessionArg) = struct
       }
 
     let unverified_user_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 400;
         name = "UnverifiedUser";
         encoding = (obj1 (req "error" (constant "unverified")));
@@ -223,7 +223,7 @@ module Make(S : SessionArg) = struct
       }
 
     let challenge_not_found_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 401;
         name = "ChallengeNotFoundOrExpired";
         encoding = (obj2
@@ -234,7 +234,7 @@ module Make(S : SessionArg) = struct
       }
 
     let invalid_session_login_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 400;
         name = "InvalidSession";
         encoding = (obj2
@@ -245,7 +245,7 @@ module Make(S : SessionArg) = struct
       }
 
     let invalid_session_logout_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 400;
         name = "InvalidSession";
         encoding = (obj2
@@ -256,7 +256,7 @@ module Make(S : SessionArg) = struct
       }
 
     let invalid_session_connect_case =
-      EzAPI.ErrCase {
+      EzAPI.Err.Case {
         code = 400;
         name = "InvalidSession";
         encoding = (obj2
@@ -270,26 +270,26 @@ module Make(S : SessionArg) = struct
 
   module Service = struct
 
-    let section_session = EzAPI.section "Session Requests"
+    let section_session = EzAPI.Doc.section "Session Requests"
 
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
     type token_security =
-      [ EzAPI.cookie_security | EzAPI.header_security | EzAPI.query_security ]
+      [ EzAPI.Security.cookie | EzAPI.Security.header | EzAPI.Security.query ]
 
     let param_security =
       EzAPI.(`Query {
-          ref_name = "Token parameter";
+          Security.ref_name = "Token parameter";
           name = param_token
         })
 
     let header_cookie_security =
       match S.token_kind with
       | `CSRF name ->
-        EzAPI.(`Header { ref_name = name ^ " Header"; name })
+        EzAPI.(`Header { Security.ref_name = name ^ " Header"; name })
       | `Cookie name ->
-        EzAPI.(`Cookie { ref_name = name ^ " Cookie"; name })
+        EzAPI.(`Cookie { Security.ref_name = name ^ " Cookie"; name })
 
     let security : token_security list = [
       param_security; (* Parameter fisrt *)
@@ -306,21 +306,21 @@ module Make(S : SessionArg) = struct
         ~section:section_session
         ~name:"connect"
         ~output:Encoding.connect_response
-        ~error_outputs:[Encoding.session_expired_case; Encoding.invalid_session_connect_case]
+        ~errors:[Encoding.session_expired_case; Encoding.invalid_session_connect_case]
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
-    let login : (login_message, (S.user_id, S.user_info) login_response, login_error, EzAPI.no_security) EzAPI.post_service0  =
+    let login : (login_message, (S.user_id, S.user_info) login_response, login_error, EzAPI.Security.none) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
         ~name:"login"
         ~input:Encoding.login_message
         ~output:Encoding.login_response
-        ~error_outputs:[Encoding.bad_user_case;
-                        Encoding.user_not_registered_case;
-                        Encoding.unverified_user_case;
-                        Encoding.challenge_not_found_case;
-                        Encoding.invalid_session_login_case]
+        ~errors:[Encoding.bad_user_case;
+                 Encoding.user_not_registered_case;
+                 Encoding.unverified_user_case;
+                 Encoding.challenge_not_found_case;
+                 Encoding.invalid_session_login_case]
         EzAPI.Path.(rpc_root // "login")
 
     let logout : (auth_needed, logout_error, token_security) EzAPI.service0  =
@@ -329,7 +329,7 @@ module Make(S : SessionArg) = struct
         ~name:"logout"
         ~meth:`PUT
         ~output:Encoding.auth_needed
-        ~error_outputs:[Encoding.invalid_session_logout_case]
+        ~errors:[Encoding.invalid_session_logout_case]
         ~security
         EzAPI.Path.(rpc_root // "logout")
   end

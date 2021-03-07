@@ -1,3 +1,4 @@
+open EzAPI
 
 let (>>=) = Lwt.(>>=)
 
@@ -67,46 +68,46 @@ end
 module MakeService(_ : sig end) = struct
 
   let arg_test =
-    EzAPI.arg_string "arg-in-path" "example-of-value"
+    Arg.string ~example:"example-of-value" "arg-in-path"
 
   let param_arg =
-    EzAPI.Param.string ~name:"arg-string" ~descr:"An example argument" "arg"
+    Param.string ~name:"arg-string" ~descr:"An example argument" "arg"
 
-  let section_test = EzAPI.section "Tests Requests"
+  let section_test = Doc.section "Tests Requests"
 
-  let test1 : (Types.output, exn, EzAPI.no_security) EzAPI.service0  =
-    EzAPI.service
+  let test1 : (Types.output, exn, no_security) service0  =
+    service
       ~section:section_test
       ~name:"test1"
       ~params:[param_arg]
       ~output:Encoding.output
-      EzAPI.Path.(root // "test1")
+      Path.(root // "test1")
 
-  let test2 : (string, Types.output, exn, EzAPI.no_security) EzAPI.service1  =
-    EzAPI.service
+  let test2 : (string, Types.output, exn, no_security) service1  =
+    service
       ~section:section_test
       ~name:"test2"
       ~params:[param_arg]
       ~output:Encoding.output
-      EzAPI.Path.(root // "test2" /: arg_test)
+      Path.(root // "test2" /: arg_test)
 
-  let test3 : (Types.input,Types.output, exn, EzAPI.no_security) EzAPI.post_service0  =
-    EzAPI.post_service
+  let test3 : (Types.input,Types.output, exn, no_security) post_service0  =
+    post_service
       ~section:section_test
       ~name:"test3"
       ~params:[]
       ~input:Encoding.input
       ~output:Encoding.output
-      EzAPI.Path.(root // "test3")
+      Path.(root // "test3")
 
-  let test4 : (string,Types.input,Types.output, exn, EzAPI.no_security) EzAPI.post_service1  =
-    EzAPI.post_service
+  let test4 : (string,Types.input,Types.output, exn, no_security) post_service1  =
+    post_service
       ~section:section_test
       ~name:"test4"
       ~params:[param_arg]
       ~input:Encoding.input
       ~output:Encoding.output
-      EzAPI.Path.(root // "test4" /: arg_test)
+      Path.(root // "test4" /: arg_test)
 
 end
 
@@ -120,39 +121,40 @@ module MakeServer(S : sig end) = struct
 
     open Types
     open EzSession.TYPES
+    open EzAPIServer
 
     let test1 params _ () =
-      match EzAPI.find_param Service.param_arg params with
+      match Req.find_param Service.param_arg params with
       | None -> failwith "test1: missing argument"
       | Some s ->
-        EzAPIServerUtils.return (Ok { name = "test1"; query = s; version = 1 })
+        return (Ok { name = "test1"; query = s; version = 1 })
 
     let test2 (params, s) _ () =
-      match EzAPI.find_param Service.param_arg params with
+      match Req.find_param Service.param_arg params with
       | None -> failwith "test2: missing argument"
       | Some arg ->
-        EzAPIServerUtils.return (Ok { name = "test2";
-                                      query = s ^ arg; version = 1 })
+        return (Ok { name = "test2";
+                     query = s ^ arg; version = 1 })
 
     let test3 _params _ r =
-      EzAPIServerUtils.return (Ok { name = "test3";
-                                    query = r.user^r.hash; version = 1 })
+      return (Ok { name = "test3";
+                   query = r.user^r.hash; version = 1 })
 
     let test4 (req, _arg) _ r =
       Session.get_request_session req >>= function
       | Some { session_login; _ } ->
-        EzAPIServerUtils.return (Ok { name = "test4 for " ^ session_login;
-                                      query = r.user^r.hash; version = 1 })
+        return (Ok { name = "test4 for " ^ session_login;
+                     query = r.user^r.hash; version = 1 })
       | None ->
-        EzAPIServerUtils.return_error 401
+        return ~code:401 (Error (failwith "test4"))
   end
 
   let dir =
-    EzAPIServerUtils.empty
-    |> EzAPIServerUtils.register Service.test1 Handler.test1
-    |> EzAPIServerUtils.register Service.test2 Handler.test2
-    |> EzAPIServerUtils.register Service.test3 Handler.test3
-    |> EzAPIServerUtils.register Service.test4 Handler.test4
+    EzAPIServer.empty
+    |> EzAPIServer.register Service.test1 Handler.test1
+    |> EzAPIServer.register Service.test2 Handler.test2
+    |> EzAPIServer.register Service.test3 Handler.test3
+    |> EzAPIServer.register Service.test4 Handler.test4
     |> Session.register_handlers
 
   let main () =
@@ -364,6 +366,7 @@ module MakeClient(S : sig end) = struct
 end
 
 let main () =
+  let open Stdlib in
   Arg.parse [
     "--client", Arg.Clear server_mode, " Run in client mode";
     "--api-port", Arg.Int ((:=) api_port), "PORT Run API on this port";

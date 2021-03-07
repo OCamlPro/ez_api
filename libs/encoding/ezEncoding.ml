@@ -20,6 +20,27 @@ let destruct encoding buf =
       field buf ;
     raise DestructError
 
+type destruct_error = [
+  | `cannot_destruct of string * string
+  | `unexpected_field of string ]
+
+let destruct_res encoding s =
+  try Ok (Json_encoding.destruct encoding (Ezjsonm.from_string s))
+  with
+  | Cannot_destruct (path, exn)  ->
+    Json_query.print_path_as_json_path ~wildcards:true Format.str_formatter path;
+    Error (`cannot_destruct ((Format.flush_str_formatter ()), Printexc.to_string exn))
+  | Unexpected_field field ->
+    Error (`unexpected_field field)
+
+let error_to_string ?from e =
+  let from = match from with None -> "" | Some s -> " in\n" ^s in
+  match e with
+  | `cannot_destruct (path, exn) ->
+    Printf.sprintf "Cannot destruct: %s from %s%s" path exn from
+  | `unexpected_field field ->
+    Printf.sprintf "Unexpected_field: %s%s" field from
+
 let construct ?(compact=true) encoding data =
   let ezjson =
     (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in

@@ -1,10 +1,15 @@
 include EzWsCommon.S
 
 val connect :
-  ?msg:string -> react:(string -> unit Lwt.t) -> string ->
-  (string ws_res, int * string option) result Lwt.t
+  ?msg:string ->
+  react:((string -> unit rp) -> string -> unit rp) ->
+  string ->
+  string ws rp
+
 
 val connect0 :
-  ?msg:string -> react:('output -> unit Lwt.t) -> EzAPI.base_url ->
-  ('input, 'output, 'error, 'security) EzAPI.ws_service ->
-  ('input ws_res, int * string option) result Lwt.t
+  ?msg:string ->
+  react:(('input -> unit rp) -> ('output, 'error) result -> unit rp) ->
+  EzAPI.base_url ->
+  ('input, 'output, 'error, _) EzAPI.ws_service0 ->
+  'input ws rp

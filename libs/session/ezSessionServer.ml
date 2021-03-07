@@ -1,9 +1,6 @@
-open StringCompat
-open EzAPI.TYPES
+open EzAPIServerUtils
 open EzSession.TYPES
 open Lwt.Infix
-
-let debug = EzAPIServerUtils.debug
 
 (* WARNINGS:
    * A user might try to fill the table of cookies with useless entries
@@ -67,11 +64,10 @@ let default_register_foreign ~origin ~token =
 module Make(S: Arg) : sig
 
   val register_handlers :
-    EzAPI.request EzAPIServerUtils.directory ->
-    EzAPI.request EzAPIServerUtils.directory
+    Directory.t -> Directory.t
 
   val get_request_session :
-    EzAPI.request -> S.SessionArg.user_id session option Lwt.t
+    Req.t -> S.SessionArg.user_id session option Lwt.t
 
 end = struct
 
@@ -84,16 +80,16 @@ end = struct
   module M = EzSession.Make(S)
   include M
 
-  let cookie_of_param req (`Query { EzAPI.name = param ; _}) =
-    EzAPI.find_param param req
+  let cookie_of_param req (`Query { EzAPI.Security.name = param ; _}) =
+    Req.find_param param req
 
-  let cookie_of_cookie req (`Cookie { EzAPI.name ; _ }) =
+  let cookie_of_cookie req (`Cookie { EzAPI.Security.name ; _ }) =
     try Some (StringMap.find name (EzCookieServer.get req))
     with Not_found -> None
 
-  let cookie_of_header req (`Header { EzAPI.name ; _ }) =
+  let cookie_of_header req (`Header { EzAPI.Security.name ; _ }) =
     let name = String.lowercase_ascii name in
-    match StringMap.find name req.req_headers with
+    match StringMap.find name req.Req.req_headers with
     | exception Not_found -> None
     | [] -> None
     | cookie :: _ -> Some cookie
@@ -122,7 +118,7 @@ end = struct
         new_challenge ()
       else
         let challenge = random_challenge () in
-        let t0 = EzAPIServerUtils.req_time () in
+        let t0 = Timings.req_time () in
         if Queue.length challenge_queue > max_challenges then begin
             let challenge_id = Queue.take challenge_queue in
             Hashtbl.remove challenges challenge_id
@@ -135,19 +131,17 @@ end = struct
       match S.token_kind with
       | `Cookie name ->
         begin match cookie with
-          | None -> ()
+          | None -> []
           | Some cookie ->
-            EzCookieServer.set req ~name ~value:cookie
+            [ EzCookieServer.set req ~name ~value:cookie ]
         end
       | `CSRF header ->
-        req.rep_headers <-
-          ("access-control-allow-headers", header) ::
-          req.rep_headers
+        [ "access-control-allow-headers", header ]
 
     let request_auth_base req f =
-      add_auth_header req;
+      let headers = add_auth_header req in
       let res, code = f @@ new_challenge () in
-      EzAPIServerUtils.return ?code res
+      return ?code ~headers res
 
     let request_auth req =
       request_auth_base req (fun auth_needed ->
@@ -155,8 +149,8 @@ end = struct
         )
 
     let request_error ~code req msg =
-      add_auth_header req;
-      EzAPIServerUtils.return ~code (Error msg)
+      let headers = add_auth_header req in
+      return ~code ~headers (Error msg)
 
     let return_auth_base req ?cookie ?foreign ~login user_id user_info f =
       begin match cookie with
@@ -166,13 +160,13 @@ end = struct
             Lwt.return s.session_cookie
       end
       >>= function cookie ->
-        add_auth_header ~cookie req;
+        let headers = add_auth_header ~cookie req in
         let auth = {
           auth_login = login;
           auth_user_id = user_id;
           auth_token = cookie;
           auth_user_info = user_info } in
-        EzAPIServerUtils.return (f auth)
+        return ~headers (f auth)
 
     let return_auth req ?cookie ?foreign ~login user_id user_info =
       match user_info with
@@ -180,7 +174,7 @@ end = struct
         return_auth_base req ?cookie ?foreign ~login user_id user_info
           (fun auth -> Ok (LoginOk auth))
       | None ->
-        EzAPIServerUtils.return (Ok (LoginWait user_id))
+        return (Ok (LoginWait user_id))
 
     let connect req security () =
       get_request_session security req >>= function
@@ -247,14 +241,13 @@ end = struct
 
     let logout req security () =
        get_request_session security req >>= function
-      | None -> EzAPIServerUtils.return ~code:400 (Error (`Invalid_session_logout "session doesn't exist"))
+      | None -> return ~code:400 (Error (`Invalid_session_logout "session doesn't exist"))
       | Some { session_user_id ; session_cookie = cookie; _ } ->
          remove_session session_user_id ~cookie >>= fun () ->
          request_auth_base req (fun auth_needed -> Ok auth_needed, None)
   end
 
   let register_handlers dir =
-    let open EzAPIServerUtils in
     dir
     |> register Service.connect Handler.connect
     |> register Service.login Handler.login
@@ -292,7 +285,7 @@ module SessionStoreInMemory :
         session_user_id = user_id;
         session_cookie = cookie;
         session_foreign = foreign;
-        session_last = EzAPIServerUtils.req_time ();
+        session_last = Timings.req_time ();
       } in
       Hashtbl.add session_by_cookie cookie s;
       Lwt.return s
@@ -303,7 +296,7 @@ module SessionStoreInMemory :
     | exception Not_found ->
        Lwt.return None
     | s ->
-       Lwt.return (Some { s with session_last = EzAPIServerUtils.req_time () })
+       Lwt.return (Some { s with session_last = Timings.req_time () })
 
   let remove_session user_id ~cookie =
     get_session ~cookie >>= function

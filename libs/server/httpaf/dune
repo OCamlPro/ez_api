@@ -1,0 +1,15 @@
+(library
+ (name ezServerHttpaf)
+ (public_name ez-api.iserver-httpaf)
+ (optional)
+ (modules ezServer)
+ (implements ezServer)
+ (libraries httpaf-lwt-unix)
+ (foreign_stubs (language c) (names rlimit_no_file)))
+
+(library
+ (name ezAPIServerHttpAf)
+ (public_name ez-api.server-httpaf)
+ (optional)
+ (modules ezAPIServerHttpAf)
+ (libraries ezServerHttpaf))

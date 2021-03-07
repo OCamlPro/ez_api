@@ -1,0 +1,6 @@
+(library
+ (name ezServer)
+ (public_name ez-api.server-s)
+ (virtual_modules ezServer)
+ (default_implementation ezServerCohttp)
+ (libraries ezAPIServerUtils))

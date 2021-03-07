@@ -2,4 +2,4 @@
  (name ezWsCommon)
  (public_name ez-api.ws-types)
  (modules ezWsCommon)
- (libraries lwt ezDebug))
+ (libraries lwt ezDebug ezEncoding))

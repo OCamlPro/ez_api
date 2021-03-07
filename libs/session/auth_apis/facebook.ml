@@ -63,23 +63,25 @@ module Encoding = struct
 end
 
 module Services = struct
-  let arg_user_id = EzAPI.arg_string "user_id" "68746545"
+  open EzAPI
 
-  let input_token_param = EzAPI.Param.string ~descr:"input token" "input_token"
-  let access_token_param = EzAPI.Param.string ~descr:"access token" "access_token"
-  let fields_param = EzAPI.Param.string ~descr:"output fields" "fields"
+  let arg_user_id = Arg.string ~example:"68746545" "user_id"
 
-  let facebook_auth = EzAPI.TYPES.BASE "https://graph.facebook.com/v8.0/"
+  let input_token_param = Param.string ~descr:"input token" "input_token"
+  let access_token_param = Param.string ~descr:"access token" "access_token"
+  let fields_param = Param.string ~descr:"output fields" "fields"
 
-  let debug_token : (Types.info, exn, EzAPI.no_security) EzAPI.service0 =
+  let facebook_auth = BASE "https://graph.facebook.com/v8.0/"
+
+  let debug_token : (Types.info, exn, Security.none) EzAPI.service0 =
     EzAPI.service
       ~register:false
       ~name:"debug_token"
       ~params:[input_token_param; access_token_param]
       ~output:Encoding.encoding
-      EzAPI.Path.(root // "debug_token")
+      Path.(root // "debug_token")
 
-  let nodes ?name output : (string, 'a, exn, EzAPI.no_security) EzAPI.service1 =
+  let nodes ?name output : (string, 'a, exn, Security.none) EzAPI.service1 =
     EzAPI.service
       ~register:false
       ?name
@@ -87,7 +89,7 @@ module Services = struct
       ~output
       EzAPI.Path.(root /: arg_user_id)
 
-  let edges ?name output : (string, 'a, exn, EzAPI.no_security) EzAPI.service1 =
+  let edges ?name output : (string, 'a, exn, Security.none) EzAPI.service1 =
     EzAPI.service
       ~register:false
       ?name
@@ -106,8 +108,8 @@ let handle_error e = Error (handle_error (fun exn -> Some (Printexc.to_string ex
 
 let check_token ~app_secret ~app_id input_token =
   let params = [
-    access_token_param, EzAPI.TYPES.S (app_id ^ "|" ^ app_secret);
-    input_token_param, EzAPI.TYPES.S input_token] in
+    access_token_param, EzAPI.S (app_id ^ "|" ^ app_secret);
+    input_token_param, EzAPI.S input_token] in
   ANY.get0 ~params facebook_auth debug_token >|= function
   | Error e -> handle_error e
   | Ok token ->
@@ -118,8 +120,8 @@ let fields = "email,name,last_name,first_name,picture"
 
 let get_info ~user_id user_access_token : (profile, int * string option) result Lwt.t =
   let params = [
-    access_token_param, EzAPI.TYPES.S user_access_token;
-    fields_param, EzAPI.TYPES.S fields
+    access_token_param, EzAPI.S user_access_token;
+    fields_param, EzAPI.S fields
   ] in
   ANY.get1 ~params facebook_auth (nodes ~name:"facebook_profile" Encoding.profile) user_id >|= function
   | Error e -> handle_error e

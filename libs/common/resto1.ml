@@ -9,417 +9,47 @@
 (**************************************************************************)
 
 
-module StringMap = Map.Make(String)
 
-type str_or_star = [ `star | `str of string ]
-
-type mime = {
-  typ : str_or_star;
-  subtyp : str_or_star;
-  param : (string * string) option
-}
-
-let parse_mime m =
-  match String.index_opt m '/' with
-  | None -> None
-  | Some i ->
-    let typ = String.sub m 0 i in
-    let typ = if typ = "*" then `star else `str typ in
-    match String.index_from_opt m (i+1) ';' with
-    | None ->
-      let subtyp = String.sub m (i+1) (String.length m - i - 1) in
-      let subtyp = if subtyp = "*" then `star else `str subtyp in
-      Some {typ; subtyp; param = None}
-    | Some j ->
-      let subtyp = String.sub m (i+1) (j - i - 1) in
-      let subtyp = if subtyp = "*" then `star else `str subtyp in
-      match String.index_from_opt m (j+1) '=' with
-        | None -> Some {typ; subtyp; param = None}
-        | Some k ->
-          let key = String.sub m (j+1) (k - j - 1) in
-          let v = String.sub m (k+1) (String.length m - k - 1) in
-          Some {typ; subtyp; param = Some (key, v)}
-
-module Internal = struct
-
-  module Ty = struct
-
-    type 'a witness = ..
-    exception Not_equal
-    type (_, _) eq = Eq : ('a, 'a) eq
-    module type Ty = sig
-      type t val witness : t witness
-      val eq: 'a witness -> ('a, t) eq
-    end
-    type 'a id = (module Ty with type t = 'a)
-    let new_id (type a) () =
-      let module Ty = struct
-        type t = a
-        type 'a witness += Ty : t witness
-        let witness = Ty
-        let eq (type b) : b witness -> (b, t) eq =
-          function Ty -> Eq | _ -> raise Not_equal
-      end in
-      (module Ty : Ty with type t = a)
-    let eq : type a b. a id -> b id -> (a, b) eq =
-      fun (module TyA) (module TyB) ->  TyB.eq TyA.witness
-
+module Mime = struct
   end
 
-  type descr = {
-    name: string ;
-    descr: string option ;
-    example: string option
-  }
+type mime = Mime.t
 
-  type 'a arg = {
-    id: 'a Ty.id;
-    destruct: string -> ('a, string) result ;
-    construct: 'a -> string ;
-    descr: descr ;
-  }
+module Param = struct
+end
 
-  let from_arg x = x
-  let to_arg x = x
-
-  type (_,_) rpath =
-    | Root : ('rkey, 'rkey) rpath
-    | Static : ('rkey, 'key) rpath * string -> ('rkey, 'key) rpath
-    | Dynamic : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a) rpath
-
-  type (_,_) path =
-    | Path: ('prefix, 'params) rpath -> ('prefix, 'params) path
-    | MappedPath:
-        ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
-      ('prefix, 'params) path
-
-  let from_path x = x
-  let to_path x = x
-
-  type ('prefix, 'params, 'input, 'output, 'method_type) iservice = {
-    description : string option ;
-    path : ('prefix, 'params) path ;
-    input : 'input Json_encoding.encoding ;
-    output : 'output Json_encoding.encoding ;
-    method_type : 'method_type ;
-    mime_types : mime list ;
-  }
-
-  let from_service x = x
-  let to_service x = x
+module Security = struct
 
 end
 
-open Internal
 
-module Ty = Internal.Ty
 
-module Arg = struct
-
-  type descr = Internal.descr = {
-    name: string ;
-    descr: string option ;
-    example: string option
-  }
-  type 'a arg = 'a Internal.arg
-
-  (*  let eq a b = Ty.eq a.id b.id *)
-
-  let make ?example ?descr name destruct construct () =
-    let id = Ty.new_id () in
-    let example = match example with
-      | None -> None
-      | Some example -> Some (construct example) in
-    let descr = { name ; descr; example } in
-    { Internal.descr ; id ; construct ; destruct }
-
-  let descr (ty: 'a arg) = ty.Internal.descr
-
-  let descr_encoding =
-    let open Json_encoding in
-    conv
-      (fun {name; descr; example} -> (name, descr, example))
-      (fun (name, descr, example) -> {name; descr; example})
-      (obj3 (req "name" string) (opt "descr" string) (opt "example" string))
-
-  let int =
-    let int_of_string s =
-      try Ok (int_of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse integer value: %S." s) in
-    make "int" int_of_string string_of_int ()
-  let float =
-    let float_of_string s =
-      try Ok (float_of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse float value: %S." s) in
-    make "float" float_of_string string_of_float ()
-  let int32 =
-    let int32_of_string s =
-      try Ok (Int32.of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse int32 value: %S." s) in
-    make "int32" int32_of_string Int32.to_string ()
-  let int64 =
-    let int64_of_string s =
-      try Ok (Int64.of_string s)
-      with Failure _ ->
-        Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
-    make "int64" int64_of_string Int64.to_string ()
-
-  let make ?example ?descr ~name ~destruct ~construct () =
-    make ?example ?descr name destruct construct ()
-
+module Err = struct
 end
 
-module Path = struct
 
-  type ('a, 'b) rpath = ('a, 'b) Internal.rpath
-  type ('a, 'b) path = ('a, 'b) Internal.path
-
-  type 'prefix context = ('prefix, 'prefix) path
-
-  let root = Path Root
-
-  let add_suffix path name =
-    match path with
-    | Path path -> Path (Static (path, name))
-    | MappedPath (path, map, rmap) ->
-        MappedPath (Static (path, name), map, rmap)
-
-  let add_arg path arg =
-    match path with
-    | Path path -> Path (Dynamic (path, arg))
-    | MappedPath (path, map, rmap) ->
-        MappedPath (Dynamic (path, arg),
-                    (fun (x, y) -> (map x, y)),
-                    (fun (x, y) -> (rmap x, y)))
-
-  (*
-  let add_context :
-    type a p. a Arg.arg -> p context -> (p * a) context =
-    fun _arg path ->
-      match path with
-      | Path Root -> Path Root
-      | MappedPath (Root, map, rmap) ->
-          MappedPath (Root,
-                      (fun (x, y) -> (map x, y)),
-                      (fun (x, y) -> (rmap x, y)))
-      | _ -> failwith "Resto.Path.prefix: cannot prefix non-root path."
-*)
-
-  let map map rmap = function
-    | Path p -> MappedPath (p, map, rmap)
-    | MappedPath (p, map', rmap') ->
-        MappedPath (p, (fun x -> map (map' x)), (fun x -> rmap' (rmap x)))
-
-  let prefix
-    : type p pr a. (pr, a) path -> (a, p) path -> (pr, p) path
-    = fun p1 p2 ->
-      let rec prefix
-        : type pr a k.
-          (pr, a) path -> (a, k) rpath -> (pr, k) path
-        = fun p1 p2 ->
-          match p2 with
-          | Root -> p1
-          | Static (path, name) -> add_suffix (prefix p1 path) name
-          | Dynamic (path, arg) -> add_arg (prefix p1 path) arg in
-      match p2 with
-      | Path p2 -> prefix p1 p2
-      | MappedPath (p2, m, rm) -> map m rm (prefix p1 p2)
-
-  let (/) = add_suffix
-  let (/:) = add_arg
-  (*  let ( **/ ) = add_context *)
-
-
-end
-
-type method_type = [
-  | `GET | `HEAD | `POST | `PUT | `DELETE | `OPTIONS | `PATCH
-  | `CONNECT | `TRACE | `Other of string ]
-
-type ('prefix, 'params, 'input, 'output) service =
-  ('prefix, 'params, 'input, 'output, method_type) Internal.iservice
-
-let service ?description ?(meth=`GET) ?(mime_types=[]) ~input ~output path =
-  let mime_types = List.filter_map parse_mime mime_types in
-  { description ; path ; input ; output; method_type = meth; mime_types }
-
-let prefix path s = { s with path = Path.prefix path s.path }
 
 module Make(Repr : Json_repr.Repr) = struct
 
-  open Json_encoding
-  include Make(Repr)
+  include Json_encoding.Make(Repr)
 
   type json = Repr.value
 
-  let forge_request_args
-    : type p. (unit, p) Path.path -> p -> string list
-    = fun path args ->
-      let rec forge_request_args
-        : type k. (unit, k) Path.rpath -> k -> string list -> string list
-        = fun path args acc ->
-          match path, args with
-          | Root, _ ->
-              acc
-          | Static (path, name), args ->
-              forge_request_args path args (name :: acc)
-          | Dynamic (path, arg), (args, x) ->
-              forge_request_args path args (arg.construct x :: acc) in
-      match path with
-      | Path path -> forge_request_args path args []
-      | MappedPath (path, _, rmap) -> forge_request_args path (rmap args) []
-
   let forge_request
-    : type p i o.
-      (unit, p, i, o) service -> p -> i -> string list * Repr.value
-    = fun s args arg ->
-      forge_request_args s.path args,
-      construct s.input arg
+    : type a i . (a, i, _, _, _) service -> a -> i -> string list * Repr.value
+    = fun s args content ->
+      let json : json = match s.input with
+        | Json enc -> construct enc content
+        | Empty -> Repr.repr (`String "")
+        | Raw _ -> Repr.repr (`String content) in
+      Path.forge s.path args, json
 
   let read_answer
-    : type p i o.
-      (unit, p, i, o) service -> Repr.value -> (o, string) result
+    : type a o . (a, _, o, _, _) service -> Repr.value -> (o, string) result
     = fun s json ->
       try Ok (destruct s.output json)
       with exn ->
-        Error
-          (Format.asprintf "%a" (fun ppf -> Json_encoding.print_error ppf) exn)
-
+        Error (Format.asprintf "%a" (fun ppf -> Json_encoding.print_error ppf) exn)
 end
 
 include Make(Json_repr.Ezjsonm)
-
-module Description = struct
-
-  module TYPES = struct
-    type service_descr = {
-      description: string option ;
-      input: Json_schema.schema ;
-      output: Json_schema.schema ;
-    }
-
-    type directory_descr =
-      | Static of static_directory_descr
-      | Dynamic of string option
-
-    and static_directory_descr = {
-      service: service_descr option ;
-      subdirs: static_subdirectories_descr option ;
-    }
-
-    and static_subdirectories_descr =
-      | Suffixes of directory_descr Map.Make(String).t
-      | Arg of Arg.descr * directory_descr
-
-  end
-
-  include TYPES
-
-  let service_descr_encoding =
-    let open Json_encoding in
-    conv
-      (fun {TYPES.description; input; output} -> (description, input, output))
-      (fun (description, input, output) -> {description; input; output})
-      (obj3 (opt "description" string)
-         (req "input" any_schema)
-         (req "output" any_schema))
-
-
-  let directory_descr_encoding =
-    let open Json_encoding in
-    mu "service_tree" @@ fun directory_descr_encoding ->
-    let static_subdirectories_descr_encoding =
-      union [
-        case (obj1 (req  "suffixes"
-                      (list (obj2 (req "name" string)
-                               (req "tree" directory_descr_encoding)))))
-          (function Suffixes map ->
-            Some (StringMap.bindings map) | _ -> None)
-          (fun m ->
-             let add acc (n,t) =  StringMap.add n t acc in
-             Suffixes (List.fold_left add StringMap.empty m)) ;
-        case (obj1 (req "dynamic_dispatch"
-                      (obj2 (req "arg" Arg.descr_encoding)
-                         (req "tree" directory_descr_encoding))))
-          (function Arg (ty, tree) -> Some (ty, tree) | _ -> None)
-          (fun (ty, tree) -> Arg (ty, tree))
-      ] in
-    let static_directory_descr_encoding =
-      conv
-        (fun { service ; subdirs } -> (service, subdirs))
-        (fun (service, subdirs) -> { service ; subdirs })
-        (obj2 (opt "service" service_descr_encoding)
-           (opt "subdirs" static_subdirectories_descr_encoding)) in
-    union [
-      case (obj1 (req "static" static_directory_descr_encoding))
-        (function TYPES.Static descr -> Some descr | _ -> None)
-        (fun descr -> TYPES.Static descr) ;
-      case (obj1 (req "dynamic" (option string)))
-        (function TYPES.Dynamic descr -> Some descr | _ -> None)
-        (fun descr -> Dynamic descr) ;
-    ]
-
-  let service ?description path =
-    let description =
-      match description with
-      | Some descr -> descr
-      | None -> "<TODO>"
-    in
-    service
-      ~description
-      ~input:Json_encoding.(obj1 (opt "recursive" bool))
-      ~output:directory_descr_encoding
-      path
-
-  let rec pp_print_directory_descr ppf =
-    let open Format in
-    function
-    | TYPES.Static dir ->
-        fprintf ppf "@[%a@]" pp_print_static_directory_descr dir
-    | Dynamic None ->
-        fprintf ppf "<dyntree>"
-    | Dynamic (Some descr) ->
-        fprintf ppf "<dyntree> : %s" descr
-
-  and pp_print_static_directory_descr ppf =
-    let open Format in
-    function
-    | { service = None ; subdirs = None } ->
-        fprintf ppf "{}"
-    | { service = Some service ; subdirs = None } ->
-        fprintf ppf "%a"
-          pp_print_dispatch_service_descr service
-    | { service = None ; subdirs = Some subdirs } ->
-        fprintf ppf "%a"
-          pp_print_static_subdirectories_descr subdirs
-    | { service = Some service ; subdirs = Some subdirs } ->
-        fprintf ppf "@[<v>%a@ %a@]"
-          pp_print_dispatch_service_descr service
-          pp_print_static_subdirectories_descr subdirs
-
-  and pp_print_static_subdirectories_descr ppf =
-    let open Format in
-    function
-    | Suffixes map ->
-        let print_binding ppf (name, tree) =
-          fprintf ppf "@[<hov 2>%s:@ %a@]"
-            name pp_print_directory_descr tree in
-        fprintf ppf "@[<v>%a@]"
-          (pp_print_list ~pp_sep:pp_print_cut print_binding)
-          (StringMap.bindings map)
-    | Arg (arg, tree) ->
-        fprintf ppf "@[<hov 2>[:%s:]@ @[%a@]@]"
-          (arg.name) pp_print_directory_descr tree
-
-  and pp_print_dispatch_service_descr ppf =
-    let open Format in
-    function
-    | { description = None ; input = _ ; output = _ } ->
-        fprintf ppf "<service>"
-    | { description = Some descr ; input = _ ; output = _ } ->
-        fprintf ppf "<service> : %s" descr
-
-end
