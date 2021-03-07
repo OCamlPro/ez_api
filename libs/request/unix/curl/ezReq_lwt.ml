@@ -1,6 +1,6 @@
-open EzRequest_lwt
-
-let (>|=) = Lwt.(>|=)
+let verbose = match Sys.getenv_opt "EZAPICLIENT" with
+  | Some "true" | Some "1" -> true
+  | _ -> false
 
 let log ?(meth="GET") url = function
   | None -> ()
@@ -18,7 +18,7 @@ let initialize_connection url =
   Curl.set_sslverifyhost c Curl.SSLVERIFYHOST_EXISTENCE;
   Curl.set_writefunction c (writer_callback r);
   Curl.set_tcpnodelay c true;
-  Curl.set_verbose c false;
+  Curl.set_verbose c verbose;
   Curl.set_post c false;
   Curl.set_url c url;
   r,c
@@ -29,13 +29,14 @@ let make ?msg ~headers prepare url =
     prepare c;
     Curl.set_httpheader c (
       List.map (fun (name, value) -> Printf.sprintf "%s: %s" name value) headers);
-    Curl_lwt.perform c >|= fun _code ->
-    let rc = Curl.get_responsecode c in
-    Curl.cleanup c;
-    let data = Buffer.contents r in
-    log ~meth:("RECV " ^ string_of_int rc) url msg;
-    if rc >= 200 && rc < 300 then Ok data
-    else Error (rc, Some data) in
+    Lwt.map (fun _code ->
+        let rc = Curl.get_responsecode c in
+        Curl.cleanup c;
+        let data = Buffer.contents r in
+        log ~meth:("RECV " ^ string_of_int rc) url msg;
+        if rc >= 200 && rc < 300 then Ok data
+        else Error (rc, Some data))
+      (Curl_lwt.perform c) in
   Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
 module Interface = struct
@@ -54,4 +55,4 @@ module Interface = struct
       ) url
 end
 
-include Make(Interface)
+include EzRequest_lwt.Make(Interface)
