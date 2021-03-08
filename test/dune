@@ -15,3 +15,9 @@
  (modules main_curl)
  (optional)
  (libraries test ezCurl))
+
+(executable
+ (name test_ws)
+ (modules test_ws)
+ (optional)
+ (libraries ezLwtSys ezWs))

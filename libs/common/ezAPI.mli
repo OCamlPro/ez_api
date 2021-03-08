@@ -133,6 +133,8 @@ type ('arg,'input,'output, 'error, 'security) post_service1 =
 type ('arg1, 'arg2,'input,'output, 'error, 'security) post_service2 =
   ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output, 'error, 'security) service
 
+type ('input, 'output, 'error, 'security) ws_service =
+  (request, unit, 'input, 'output, 'error, 'security) service
 
 type ('a, 'b) p
 
@@ -197,6 +199,21 @@ val post_service :
   ?meth:Resto.method_type (* meth type: get, post *) ->
   ?input:'input Json_encoding.encoding ->
   ?input_type:'input input_type ->
+  output: 'output Json_encoding.encoding ->
+  ?error_outputs: 'error err_case list ->
+  ?params:param list ->
+  ?security:([< security_scheme ] as 'security) list ->
+  ?register:bool ->
+  ?input_example:'input ->
+  ?output_example:'output ->
+  ('b, 'c) p ->
+  ('b, 'c, 'input, 'output, 'error, 'security) service
+
+val ws_service :
+  ?section: section ->
+  ?name: string ->
+  ?descr: string ->
+  input_type:'input input_type ->
   output: 'output Json_encoding.encoding ->
   ?error_outputs: 'error err_case list ->
   ?params:param list ->

@@ -3,11 +3,11 @@
  (public_name ez-api.common)
  (wrapped false)
  (modules stringCompat resto1 ezUrl ezAPI ezErrorCodes)
- (libraries lwt ezEncoding ezDebug))
+ (libraries lwt ezEncoding ezDebug ezLwtSys))
 
 (library
  (name ezAPIJS)
  (public_name ez-api.js)
  (optional)
  (modules)
- (libraries ezAPI ezjsonm_js ezDebug_js))
+ (libraries ezAPI ezjsonm_js ezDebug_js ezLwtSys_js))

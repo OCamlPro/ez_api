@@ -30,7 +30,5 @@
   tls
   (httpaf-lwt-unix (>= 0.6.0))
   (ocurl (>= 0.8.0))
-  (ezjs_fetch (> 0.2.0)))
- (conflicts
-  (cohttp-lwt-unix (> 2.5.4))
-  (cohttp-lwt-jsoo (> 2.5.4))))
+  (ezjs_fetch (> 0.2.0))
+  websocket-lwt-unix))

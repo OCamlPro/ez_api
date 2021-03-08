@@ -167,6 +167,9 @@ type ('arg,'input,'output, 'error, 'security) post_service1 =
 type ('arg1, 'arg2,'input,'output, 'error, 'security) post_service2 =
   ((request * 'arg1) * 'arg2, (unit * 'arg1) * 'arg2, 'input, 'output, 'error, 'security) service
 
+type ('input, 'output, 'error, 'security) ws_service =
+  (request, unit, 'input, 'output, 'error, 'security) service
+
 let arg_string ?descr name example: string Arg.arg * string =
   Arg.make
     ~name
@@ -471,6 +474,11 @@ let service ?section ?name ?descr ?(meth=`GET) ~output ?error_outputs ?params
   post_service ?section ?name ?descr
     ~input_type:Empty
     ~output ?error_outputs ~meth ?params ?security ?register ?output_example arg
+
+let ws_service ?section ?name ?descr ~input_type ~output ?error_outputs ?params
+    ?security ?register ?input_example ?output_example p =
+  post_service ?section ?name ?descr ~input_type ~output ?error_outputs ?params
+    ?security ?register ?input_example ?output_example p
 
 let section section_name =
   let s = { section_name; section_docs = [] } in

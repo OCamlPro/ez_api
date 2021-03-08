@@ -3,3 +3,11 @@
  (public_name ez-api.debug-unix)
  (modules ezDebug)
  (implements ezDebug))
+
+(library
+ (name ezLwtSys_unix)
+ (public_name ez-api.lwt-unix)
+ (optional)
+ (modules ezLwtSys)
+ (implements ezLwtSys)
+ (libraries lwt.unix))
