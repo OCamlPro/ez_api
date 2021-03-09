@@ -3,5 +3,4 @@
  (public_name ez-api.ws)
  (optional)
  (virtual_modules ezWs)
- (libraries ezWsCommon ezAPI)
- (default_implementation ezWs_cohttp))
+ (libraries ezWsCommon ezAPI))
