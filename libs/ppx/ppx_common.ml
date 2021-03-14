@@ -164,6 +164,21 @@ let register name a =
     ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ]
   | _ -> Location.raise_errorf ~loc "service name not understood"
 
+let register_ws react_name bg_name a =
+  let loc = a.attr_loc in
+  let ppx_dir = ppx_dir ~loc in
+  match a.attr_payload with
+  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
+    let register =
+      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
+            Nolabel, e;
+            Labelled "react", evar ~loc react_name;
+            Labelled "bg", evar ~loc bg_name;
+            Nolabel, evar ~loc "ppx_dir" ]) in
+    ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ]
+  | _ -> Location.raise_errorf ~loc "service name not understood"
+
 let process name a =
   let loc = a.attr_loc in
   let service_name = if name = "handler" then "service" else name ^ "_s" in
@@ -177,6 +192,22 @@ let process name a =
   if debug then Format.printf "%s@." @@ str_of_structure [ register ];
   ppx_dir @ [ service; register ]
 
+let process_ws react_name bg_name a =
+  let loc = a.attr_loc in
+  let service_name =  react_name ^ "_s" in
+  let service, service_name, debug =
+    service_value ~name:service_name { a with attr_name = { a.attr_name with txt = "get" } } in
+  let ppx_dir = ppx_dir ~loc in
+  let register =
+    pstr_value ~loc Nonrecursive [
+      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
+            Nolabel, evar ~loc service_name;
+            Labelled "react", evar ~loc react_name;
+            Labelled "bg", evar ~loc bg_name;
+            Nolabel, evar ~loc "ppx_dir" ]) ] in
+  if debug then Format.printf "%s@." @@ str_of_structure [ register ];
+  ppx_dir @ [ service; register ]
 
 let handler_args e =
   let loc = e.pexp_loc in
@@ -255,6 +286,39 @@ let impl ?kind str =
                     let pvb_expr = handler_args v.pvb_expr in
                     let str = {str with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
                     (List.rev @@ register name a) @ str :: acc
+                  | _ -> str :: acc
+                end
+              | _ -> str :: acc
+            end
+          | _ -> str :: acc
+        end
+      | Pstr_value (rflag, [ v_react; v_bg ]) when kind <> Some `client ->
+        begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") v_bg.pvb_attributes with
+          (* service for websocket handlers *)
+          | [ a ], pvb_attributes ->
+            begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
+              | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
+                let pvb_expr_react = handler_args v_react.pvb_expr in
+                let pvb_expr_bg = handler_args v_bg.pvb_expr in
+                let str = {str with pstr_desc = Pstr_value (rflag, [
+                    {v_react with pvb_expr = pvb_expr_react };
+                    {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
+                (List.rev @@ process_ws name_react name_bg a) @ str :: acc
+              | _ ->
+                str :: acc
+            end
+          (* link websocket service *)
+          | [], attributes ->
+            begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with
+              | [ a ], pvb_attributes ->
+                begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
+                  | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
+                    let pvb_expr_react = handler_args v_react.pvb_expr in
+                    let pvb_expr_bg = handler_args v_bg.pvb_expr in
+                    let str = {str with pstr_desc = Pstr_value (rflag, [
+                        {v_react with pvb_expr = pvb_expr_react };
+                        {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
+                    (List.rev @@ register_ws name_react name_bg a) @ str :: acc
                   | _ -> str :: acc
                 end
               | _ -> str :: acc
