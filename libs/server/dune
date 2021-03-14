@@ -3,7 +3,7 @@
  (public_name ez-api.server-utils)
  (optional)
  (modules answer directory gMTime timings ip file ezAPIServerUtils)
- (libraries ezAPI geoip lwt.unix ezjsonm_unix))
+ (libraries ezAPI geoip))
 
 (library
  (name ezOpenAPI)

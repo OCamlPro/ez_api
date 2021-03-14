@@ -33,18 +33,20 @@ let to_string m =
   let param = match m.param with None -> "" | Some (k, v) -> ";" ^ k ^ "=" ^ v in
   typ ^ "/" ^ subtyp ^ param
 
-let allowed l = function
-  | None -> List.exists (fun {typ; subtyp; _} -> typ = `star && subtyp = `star) l
-  | Some s ->
-    match parse s with
-    | None -> false
-    | Some {typ; subtyp; _} ->
-      let rec aux = function
-        | [] -> false
-        | h :: t ->
-          ((h.typ = `star || h.typ = typ) && (h.subtyp = `star || h.subtyp = subtyp)) ||
-          aux t in
-      aux l
+let allowed l c =
+  if l = [] then true
+  else match c with
+    | None -> List.exists (fun {typ; subtyp; _} -> typ = `star && subtyp = `star) l
+    | Some s ->
+      match parse s with
+      | None -> false
+      | Some {typ; subtyp; _} ->
+        let rec aux = function
+          | [] -> false
+          | h :: t ->
+            ((h.typ = `star || h.typ = typ) && (h.subtyp = `star || h.subtyp = subtyp)) ||
+            aux t in
+        aux l
 
 let json = {typ = `str "application"; subtyp = `str "json"; param = None }
 let multipart = {typ = `str "multipart"; subtyp = `str "form-data"; param = None }
@@ -54,7 +56,8 @@ let content_type_of_file file =
   let exts =
     List.rev (String.split_on_char '.' (String.lowercase_ascii (Filename.basename file))) in
   match exts with
-  | "js" :: _ -> "application/javascript"
+  | "js" :: _ -> "text/javascript"
+  | "txt" :: _ -> "text/plain"
   | "pdf" :: _ -> "application/pdf"
   | "json" :: _ -> "application/json"
   | "xml" :: _ -> "application/xml"
@@ -63,7 +66,10 @@ let content_type_of_file file =
   | "map" :: "css" :: _
   | "css" :: _ -> "text/css"
   | "png" :: _ -> "image/png"
-  | "jpg" :: _ -> "image/jpeg"
+  | "jpg" :: _ | "jpeg" :: _ | "jfif" :: _ | "pjpeg" :: _ | "pjp" :: _ -> "image/jpeg"
   | "gif" :: _ -> "image/gif"
   | "svg" :: _ -> "image/svg+xml"
+  | "webp" :: _ -> "image/webp"
+  | "avif" :: _ -> "image/avif"
+  | "apng" :: _ -> "image/apng"
   | _ -> "application/octet-stream"

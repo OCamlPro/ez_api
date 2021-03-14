@@ -98,7 +98,7 @@ let io_to_answer : type a. code:int -> a io -> a -> string Answer.t = fun ~code 
   | Empty -> {Answer.code; body=""; headers=[]}
   | Raw l ->
     let content_type = match l with
-      | [] -> "multipart/form-data"
+      | [] -> "application/octet-stream"
       | h :: _ -> Mime.to_string h in
     {Answer.code; body; headers=["content-type", content_type]}
   | Json enc ->

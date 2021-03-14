@@ -4,7 +4,7 @@
  (optional)
  (modules ws ezServer)
  (implements ezServer)
- (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar))
+ (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezLwtSys_unix ezjsonm_unix))
 
 (library
  (name ezAPIServerCohttp)

@@ -4,7 +4,7 @@
  (optional)
  (modules ezServer)
  (implements ezServer)
- (libraries httpaf-lwt-unix)
+ (libraries httpaf-lwt-unix ezLwtSys_unix ezjsonm_unix)
  (foreign_stubs (language c) (names rlimit_no_file)))
 
 (library

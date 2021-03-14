@@ -165,13 +165,12 @@ module MakeServer(S : sig end) = struct
       | Some root ->
         (!root_port, EzAPIServerUtils.Root (root, !default)) :: servers
     in
-    Lwt_main.run (
-      Printf.eprintf "Starting servers on ports %s\n%!"
-        (String.concat ","
-           (List.map (fun (port,_) ->
-                string_of_int port) servers));
-      EzAPIServer.server servers
-    )
+    EzLwtSys.run @@ fun () ->
+    Printf.eprintf "Starting servers on ports %s\n%!"
+      (String.concat ","
+         (List.map (fun (port,_) ->
+              string_of_int port) servers));
+    EzAPIServer.server servers
 
 end
 
@@ -360,7 +359,7 @@ module MakeClient(S : sig end) = struct
     List.iter (fun test -> test api) requests;
     if !nrequests > 0 then begin
       waiting := true;
-      Lwt_main.run waiter
+      EzLwtSys.run (fun () -> waiter)
     end
 
 end

@@ -18,4 +18,12 @@
  (modules ppx)
  (kind ppx_rewriter)
  (libraries ppx_common)
+ (ppx_runtime_libraries ezAPIServerUtils))
+
+(library
+ (name ppx_server)
+ (public_name ez-api.ppx-server)
+ (modules ppx_server)
+ (kind ppx_rewriter)
+ (libraries ppx_common)
  (ppx_runtime_libraries ezAPIServer))

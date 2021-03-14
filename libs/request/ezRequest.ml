@@ -170,7 +170,7 @@ module Make(S : Interface) : S = struct
       let url = forge0 api service params in
       let content, content_type = match input_encoding with
         | Empty -> "", "application/json"
-        | Raw [] -> input, "multipart/form-data"
+        | Raw [] -> input, "application/octet-stream"
         | Raw (h :: _) -> input, Mime.to_string h
         | Json enc ->
           if not url_encode then
@@ -200,7 +200,7 @@ module Make(S : Interface) : S = struct
       let url = forge1 api service arg params in
       let content, content_type = match input_encoding with
         | Empty -> "", "application/json"
-        | Raw [] -> input, "multipart/form-data"
+        | Raw [] -> input, "application/octet-stream"
         | Raw (h :: _) -> input, Mime.to_string h
         | Json enc ->
           if not url_encode then
@@ -230,7 +230,7 @@ module Make(S : Interface) : S = struct
       let url = forge2 api service arg1 arg2 params in
       let content, content_type = match input_encoding with
         | Empty -> "", "application/json"
-        | Raw [] -> input, "multipart/form-data"
+        | Raw [] -> input, "application/octet-stream"
         | Raw (h :: _) -> input, Mime.to_string h
         | Json enc ->
           if not url_encode then
