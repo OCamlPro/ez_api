@@ -12,3 +12,4 @@ clean:
 
 doc:
 	dune build @doc
+	rsync -r _build/default/_doc/_html/* docs/

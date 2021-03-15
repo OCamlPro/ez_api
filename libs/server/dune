@@ -9,7 +9,7 @@
  (name ezOpenAPI)
  (public_name ez-api.openAPI)
  (modules ezOpenAPI)
- (libraries ezAPI ezjsonm_unix))
+ (libraries ezAPI ezjsonm))
 
 (library
  (name ezAPIServer)

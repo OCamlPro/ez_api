@@ -5,7 +5,7 @@
 
 ## Encoding
 
-Ez-api proposes a small addition to `ocplib-json-typed/ezjsonm` for easier coding and to avoid overflow when using js_of_ocaml.
+Ez-api proposes a small addition to `json-data-encoding` for easier coding and to avoid overflow when using js_of_ocaml.
 
 ## Server
 
@@ -13,7 +13,7 @@ The server can be implememted using different libraries cohttp or httpaf.
 Some optional libraries are required to use the server part:
 ```
 opam depext geoip
-opam install calendar geoip re
+opam install calendar geoip
 ```
 
 In order to use cohttp, the optional library `cohttp-lwt-unix` must be installed:
@@ -23,7 +23,7 @@ opam install cohttp-lwt-unix
 
 Same thing to use httpaf, the optional library `httpaf-lwt-unix` must be installed:
 ```
-opam install extunix httpaf-lwt-unix
+opam install httpaf-lwt-unix
 ```
 
 Moreover ez-api provides useful tools for server:
@@ -44,7 +44,7 @@ opam install ocurl
 - cohttp implementation that requires tls library:
 ```
 opam depext tls
-opam install tls
+opam install tls cohttp-lwt-unix
 ```
 
 For web:
@@ -53,9 +53,9 @@ For web:
 ```
 opam install cohttp-lwt-jsoo
 ```
-- fetch requiring `ezjs-fetch`
+- fetch requiring `ezjs_fetch`
 ```
-opam pin add ezjs-fetch git+https://github.com/ocamlpro/ezjs.git
+opam install ezjs_fetch
 ```
 
 ## Installation

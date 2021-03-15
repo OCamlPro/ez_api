@@ -3,7 +3,7 @@
  (public_name ez-api.server-cohttp)
  (optional)
  (modules ws ezAPIServerCohttp)
- (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezLwtSys_unix ezjsonm_unix ezAPIServerUtils))
+ (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezAPIServerUtils))
 
 (library
  (name ezServerCohttp)
