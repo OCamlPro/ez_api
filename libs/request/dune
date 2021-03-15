@@ -16,3 +16,17 @@
  (optional)
  (modules ezCohttp_base)
  (libraries cohttp-lwt))
+
+(library
+ (name ezReq_default)
+ (public_name ez-api.req-default)
+ (implements ezReq)
+ (modules ezReq)
+ (libraries ezRequest))
+
+(library
+ (name ezReq_lwt_default)
+ (public_name ez-api.req-lwt-default)
+ (implements ezReq_lwt)
+ (modules ezReq_lwt)
+ (libraries ezRequest_lwt))
