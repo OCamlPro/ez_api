@@ -3,5 +3,5 @@
  (public_name ez-api.server-s)
  (optional)
  (virtual_modules ezServer)
- (default_implementation ezServerCohttp)
+ (default_implementation ezServerDefault)
  (libraries ezAPIServerUtils))
