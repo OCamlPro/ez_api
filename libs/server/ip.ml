@@ -1,9 +1,4 @@
-type t = {
-  ip_ip : string;
-  mutable ip_last : float;
-  mutable ip_nb : int;
-  ip_country : string * string;
-}
+open EzAPI.TYPES
 
 let req_ips = Hashtbl.create 1111
 

@@ -1,4 +1,3 @@
-
 type period = {
   name : string;
   mutable prev : int;

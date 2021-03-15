@@ -5,10 +5,10 @@ module StringMap = Map.Make(String)
 module Timings = Timings
 module Directory = Directory
 module Answer = Answer
-module Ip = Ip
 module Req = Req
 module File = File
 module GMTime = GMTime
+module Ip = Ip
 
 (** Server *)
 

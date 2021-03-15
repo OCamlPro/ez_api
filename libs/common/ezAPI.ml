@@ -20,6 +20,13 @@ module TYPES = struct
     | S of string
     | B of bool
     | LS of string list
+
+  type ip_info = {
+    ip_ip : string;
+    mutable ip_last : float;
+    mutable ip_nb : int;
+    ip_country : string * string;
+  }
 end
 include TYPES
 

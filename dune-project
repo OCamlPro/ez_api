@@ -21,9 +21,9 @@
   (lwt (>= 4.0.0))
   (ezjsonm (>= 1.0.0)))
  (depopts
+  (geoip (>= 0.0.3))
   (js_of_ocaml-lwt (>= 3.4.0))
   (calendar (>= 2.03))
-  (geoip (>= 0.0.3))
   cohttp-lwt-unix
   cohttp-lwt-jsoo
   lwt_log
@@ -31,4 +31,5 @@
   (httpaf-lwt-unix (>= 0.6.0))
   (ocurl (>= 0.8.0))
   (ezjs_fetch (> 0.2.0))
-  websocket-lwt-unix))
+  websocket-lwt-unix
+  (ppxlib (and :build (>= 0.16.0)))))
