@@ -1,14 +1,14 @@
 (library
- (name ezServerCohttp)
- (public_name ez-api.iserver-cohttp)
- (optional)
- (modules ws ezServer)
- (implements ezServer)
- (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezLwtSys_unix ezjsonm_unix))
-
-(library
  (name ezAPIServerCohttp)
  (public_name ez-api.server-cohttp)
  (optional)
- (modules ezAPIServerCohttp)
- (libraries ezServerCohttp))
+ (modules ws ezAPIServerCohttp)
+ (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezLwtSys_unix ezjsonm_unix ezAPIServerUtils))
+
+(library
+ (name ezServerCohttp)
+ (public_name ez-api.iserver-cohttp)
+ (optional)
+ (implements ezServer)
+ (modules ezServer)
+ (libraries ezAPIServerCohttp))
