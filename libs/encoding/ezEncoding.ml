@@ -41,15 +41,8 @@ let error_to_string ?from e =
   | `unexpected_field field ->
     Printf.sprintf "Unexpected_field: %s%s" field from
 
-let construct ?(compact=true) encoding data =
-  let ezjson =
-    (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in
-  Json_repr.pp
-    ~compact
-    ezjson
-    Format.str_formatter
-    (Json_encoding.construct encoding data) ;
-  Format.flush_str_formatter ()
+let construct ?compact encoding data =
+  Ezjsonm.to_string ?minify:compact (Json_encoding.construct encoding data)
 
 let unexpected_error ~kind ~expected =
   raise @@ Cannot_destruct ([], Unexpected (kind, expected))
