@@ -51,10 +51,11 @@ let empty = Directory.empty
 
 let register_res service handler dir =
   let security = Service.security service.s in
+  let path = Service.path service.s in
   let handler args input =
-    let t0 = Timings.req_time () in
+    let t0 = (Path.get_root path args).Req.req_time in
     let add_timing_wrap b =
-      let t1 = Unix.gettimeofday () in
+      let t1 = GMTime.time () in
       Timings.add_timing (EzAPI.id service) b t0 (t1-.t0) in
     Lwt.catch
       (function () ->

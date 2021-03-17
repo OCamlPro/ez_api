@@ -220,14 +220,14 @@ let debug_httpaf req =
       List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value)
         (Headers.to_list req.Request.headers))
 
-let register_ip req = function
+let register_ip req time = function
   | Unix.ADDR_INET (iaddr, _port) ->
     let ip = Unix.string_of_inet_addr iaddr in
     let ip = match Headers.get (req.Request.headers) "x-forwarded-for" with
       | None -> ip
       | Some ip -> ip
     in
-    Ip.register ip
+    Ip.register time ip
   | Unix.ADDR_UNIX _ -> ()
 
 let connection_handler :
@@ -236,12 +236,12 @@ let connection_handler :
   fun ?catch s sockaddr fd ->
   let request_handler sockaddr reqd =
     let req = Reqd.request reqd in
-    Timings.set_req_time () ;
-    register_ip req sockaddr;
+    let time = GMTime.time () in
+    register_ip req time sockaddr;
     let headers = headers_from_httpaf req in
     let version = version_from_httpaf req in
     let path_str, path, content_type, r =
-      Req.request ~version ~headers (mk_uri req) in
+      Req.request ~version ~headers ~time (mk_uri req) in
     let meth = meth_from_httpaf req in
     debug_httpaf req;
     Lwt.async @@ fun () ->
@@ -297,7 +297,7 @@ let connection_handler :
 
 let create_server ?catch ~max_connections server_port server_kind =
   let s = { server_port; server_kind } in
-  Timings.init @@ Doc.nservices ();
+  Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
   let listen_address = Unix.(ADDR_INET (inet_addr_any, server_port)) in
   EzDebug.printf "Starting HTTPAF server (port=%d, connection=%d)" server_port max_connections;

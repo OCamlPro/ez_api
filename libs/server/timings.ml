@@ -118,12 +118,7 @@ let add_timing n ok t dt =
   if ok then add timings.timings_ok.(n) t dt
   else add timings.timings_fail.(n) t dt
 
-let t0 = GMTime.time ()
-let req_time = ref t0
-let set_req_time () = req_time := GMTime.time ()
-let req_time () = !req_time
-
-let init nservices =
+let init t0 nservices =
   timings.timings_ok <-Array.init nservices
       (fun _ -> create t0);
   timings.timings_fail <- Array.init nservices

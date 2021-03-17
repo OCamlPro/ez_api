@@ -5,8 +5,8 @@ val random_challenge : unit -> string
 
 module type SessionStore = sig
   type user_id
-  val create_session : ?foreign:foreign_info -> login:string -> user_id -> user_id session Lwt.t
-  val get_session : cookie:string -> user_id session option Lwt.t
+  val create_session : ?foreign:foreign_info -> login:string -> req:Req.t -> user_id -> user_id session Lwt.t
+  val get_session : ?req:Req.t -> string -> user_id session option Lwt.t
   val remove_session : user_id -> cookie:string -> unit Lwt.t
 end
 

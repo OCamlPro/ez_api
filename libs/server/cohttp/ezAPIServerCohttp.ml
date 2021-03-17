@@ -7,7 +7,7 @@ module Server = Cohttp_lwt_unix.Server
 
 let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
 
-let register_ip req io =
+let register_ip req io time =
   let open Conduit_lwt_unix in match io with
   | Domain_socket _
   | Vchan _ -> ()
@@ -19,7 +19,7 @@ let register_ip req io =
         match Header.get (Request.headers req) "x-forwarded-for" with
         | None -> ip
         | Some ip -> ip in
-      Ip.register ip
+      Ip.register time ip
     | Lwt_unix.ADDR_UNIX _path -> ()
 
 let headers_from_cohttp req =
@@ -50,13 +50,13 @@ let debug_cohttp req =
         (Request.headers req))
 
 let dispatch ?catch s io req body =
-  Timings.set_req_time ();
-  register_ip req io;
+  let time = GMTime.time () in
+  register_ip req io time ;
   debug_cohttp req;
   let headers = headers_from_cohttp req in
   let version = version_from_cohttp req in
   let path_str, path, content_type, r =
-    Req.request ?version ~headers (Request.uri req) in
+    Req.request ?version ~headers ~time (Request.uri req) in
   let meth = meth_from_cohttp req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = Ws.ws req in
@@ -79,7 +79,7 @@ let dispatch ?catch s io req body =
 
 let create_server ?catch server_port server_kind =
   let s = { server_port; server_kind } in
-  Timings.init @@ Doc.nservices ();
+  Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
   let callback conn req body = dispatch ?catch s (fst conn) req body in
   let on_exn = function

@@ -37,3 +37,10 @@ let forge path args =
       | Static (path, name), args -> aux path args (name :: acc)
       | Dynamic (path, arg), (args, x) -> aux path args (arg.Arg.construct x :: acc) in
   aux path args []
+
+let rec get_root : type r a. (r, a) t -> a -> r =
+  fun p a ->
+  match p, a with
+  | Root, _ -> a
+  | Static (p, _), _ -> get_root p a
+  | Dynamic (p, _), (a, _) -> get_root p a

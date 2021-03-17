@@ -35,8 +35,8 @@ let random_challenge () =
 module type SessionStore = sig
   type user_id
   val create_session : ?foreign:foreign_info ->
-    login:string -> user_id -> user_id session Lwt.t
-  val get_session : cookie:string -> user_id session option Lwt.t
+    login:string -> req:Req.t -> user_id -> user_id session Lwt.t
+  val get_session : ?req:Req.t -> string -> user_id session option Lwt.t
   val remove_session : user_id -> cookie:string -> unit Lwt.t
 end
 
@@ -104,7 +104,7 @@ end = struct
         | Some s -> fun _ -> Lwt.return_some s
         | None -> function
           | None -> Lwt.return_none
-          | Some cookie -> get_session ~cookie
+          | Some cookie -> get_session ~req cookie
       ) None
 
   module Handler = struct
@@ -112,18 +112,17 @@ end = struct
     let challenges = Hashtbl.create initial_hashtbl_size
     let challenge_queue = Queue.create ()
 
-    let rec new_challenge () =
+    let rec new_challenge req =
       let challenge_id = random_challenge () in
       if Hashtbl.mem challenges challenge_id then
-        new_challenge ()
+        new_challenge req
       else
         let challenge = random_challenge () in
-        let t0 = Timings.req_time () in
         if Queue.length challenge_queue > max_challenges then begin
             let challenge_id = Queue.take challenge_queue in
             Hashtbl.remove challenges challenge_id
           end;
-        Hashtbl.add challenges challenge_id (challenge, t0);
+        Hashtbl.add challenges challenge_id (challenge, req.Req.req_time);
         Queue.add challenge_id challenge_queue;
         { challenge_id; challenge }
 
@@ -140,7 +139,7 @@ end = struct
 
     let request_auth_base req f =
       let headers = add_auth_header req in
-      let res, code = f @@ new_challenge () in
+      let res, code = f @@ new_challenge req in
       return ?code ~headers res
 
     let request_auth req =
@@ -156,7 +155,7 @@ end = struct
       begin match cookie with
         | Some cookie -> Lwt.return cookie
         | None ->
-          create_session ?foreign ~login user_id >>= function s ->
+          create_session ?foreign ~login ~req user_id >>= function s ->
             Lwt.return s.session_cookie
       end
       >>= function cookie ->
@@ -275,31 +274,32 @@ module SessionStoreInMemory :
   let (session_by_cookie : (string, user_id session) Hashtbl.t) =
     Hashtbl.create initial_hashtbl_size
 
-  let rec create_session ?foreign ~login user_id =
+  let rec create_session ?foreign ~login ~req user_id =
     let cookie = random_challenge () in
     if Hashtbl.mem session_by_cookie cookie then
-      create_session ~login user_id
+      create_session ~login ~req user_id
     else begin
       let s = {
         session_login = login;
         session_user_id = user_id;
         session_cookie = cookie;
         session_foreign = foreign;
-        session_last = Timings.req_time ();
+        session_last = req.Req.req_time;
       } in
       Hashtbl.add session_by_cookie cookie s;
       Lwt.return s
     end
 
-  let get_session ~cookie =
+  let get_session ?req cookie =
     match Hashtbl.find session_by_cookie cookie with
     | exception Not_found ->
        Lwt.return None
     | s ->
-       Lwt.return (Some { s with session_last = Timings.req_time () })
+      let s = match req with None -> s | Some req -> { s with session_last = req.Req.req_time } in
+      Lwt.return (Some s)
 
   let remove_session user_id ~cookie =
-    get_session ~cookie >>= function
+    get_session cookie >>= function
     | None -> Lwt.return ()
     | Some s ->
       if s.session_user_id = user_id then

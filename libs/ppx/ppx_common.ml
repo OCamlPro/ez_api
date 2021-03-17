@@ -44,11 +44,14 @@ let json e =
   let loc = e.pexp_loc in
   pexp_construct ~loc (llid ~loc "EzAPI.Json") @@ Some e
 
-let options ~loc = {
+let options ?register loc =
+  let register = match register with
+    | None -> pexp_construct ~loc (llid ~loc "true") None
+    | Some register -> register in {
   path = pexp_ident ~loc (llid ~loc "EzAPI.Path.root");
   input = empty ~loc; output = empty ~loc; errors = enone ~loc; params = enone ~loc;
   section = enone ~loc; name = enone ~loc; descr = enone ~loc;
-  security = enone ~loc; register = enone ~loc; input_example = enone ~loc;
+  security = enone ~loc; register; input_example = enone ~loc;
   output_example = enone ~loc; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
   security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
   debug = false
@@ -79,7 +82,8 @@ let parse_path ~loc s =
       | _ -> eapply ~loc (path ~loc "add_suffix") [ acc; estring ~loc s ]
     ) (path ~loc "root") l
 
-let get_options ~loc ?name a =
+let get_options ~loc ?name ?(client=false) a =
+  let register = if not client then None else Some (pexp_construct ~loc (llid ~loc "false") None) in
   match a.attr_payload with
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ] ->
     let l = List.filter_map (function ({txt=Lident s; loc}, e) -> Some (s, loc, e) | _ -> None) l in
@@ -105,17 +109,17 @@ let get_options ~loc ?name a =
           end
         | "descr" -> name, { acc with descr = esome e }
         | "security" -> name, { acc with security = esome e; security_type = ptyp_any ~loc }
-        | "register" -> name, { acc with register = esome e }
+        | "register" -> name, { acc with register = e }
         | "input_example" -> name, { acc with input_example = esome e }
         | "output_example" -> name, { acc with input_example = esome e }
         | "debug" -> name, { acc with debug = true }
-        | _ -> name, acc) (name, options ~loc) l
-  | _ -> name, options ~loc
+        | _ -> name, acc) (name, options ?register loc) l
+  | _ -> name, options ?register loc
 
-let service_value ?name a =
+let service_value ?name ?client a =
   let loc = a.attr_loc in
   let meth = pexp_variant ~loc (String.uppercase_ascii a.attr_name.txt) None in
-  let name, options = get_options ~loc ?name a in
+  let name, options = get_options ~loc ?name ?client a in
   match name with
   | None -> Location.raise_errorf ~loc "service doesn't have a name"
   | Some name ->
@@ -128,7 +132,7 @@ let service_value ?name a =
         Labelled "output", options.output;
         Optional "errors", options.errors;
         Optional "security", options.security;
-        Optional "register", options.register;
+        Labelled "register", options.register;
         Optional "input_example", options.input_example;
         Optional "output_example", options.output_example;
         Nolabel, options.path ] in
@@ -332,7 +336,7 @@ let impl ?kind str =
         pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
       (* client service *)
       | Pstr_attribute a when List.mem a.attr_name.txt methods ->
-        let service, _, _ = service_value a in
+        let service, _, _ = service_value ~client:true a in
         service :: acc
       | _ -> str :: acc
     ) [] str
