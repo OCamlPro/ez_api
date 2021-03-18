@@ -2,6 +2,9 @@
 all: build
 
 build:
+	dune build libs
+
+dev:
 	dune build
 
 install:
