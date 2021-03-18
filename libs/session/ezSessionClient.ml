@@ -89,9 +89,9 @@ module Make(S: SessionArg) : Make_S with
          | Some token -> Some (auth_headers ~token)
          | None -> None
        in
-       EzReq.get0
+       EzReq.get0 ~msg:"connect"
          api
-         Service.connect "connect"
+         Service.connect
          ?headers
          ~params:[]
          (function
@@ -105,7 +105,6 @@ module Make(S: SessionArg) : Make_S with
              state := Disconnected;
              f (Error e)
          )
-         ()
     | Connected _ ->
        (try f (Ok None) with _ -> ())
     | User u ->
@@ -118,9 +117,9 @@ module Make(S: SessionArg) : Make_S with
     | Connected _
       -> (try f (Ok false) with _ -> ())
     | User u ->
-      EzReq.get0
+      EzReq.get0 ~msg:"logout"
         api
-        Service.logout "logout"
+        Service.logout
         ~params:[]
         ~headers:(auth_headers ~token)
         (function
@@ -131,7 +130,6 @@ module Make(S: SessionArg) : Make_S with
           | Error e ->
             f (Error e)
         )
-        ()
 
   let rec login_rec ?format ntries api ?login ?password ?foreign
       (f : (('a, login_error) result -> unit)) =
@@ -176,7 +174,7 @@ module Make(S: SessionArg) : Make_S with
             | None -> pwhash
             | Some f -> f pwhash in
           let login_challenge_reply = EzSession.Hash.challenge ~challenge ~pwhash in
-          EzReq.post0 api Service.login "login"
+          EzReq.post0 ~msg:"login" api Service.login
             ~input:(Local {
                 login_user = login;
                 login_challenge_id = challenge_id;
@@ -194,7 +192,7 @@ module Make(S: SessionArg) : Make_S with
               | Error e -> f (Error (e :> login_error))
             )
         | _, _, Some (foreign_origin, foreign_token) ->
-          EzReq.post0 api Service.login "login"
+          EzReq.post0 ~msg:"login" api Service.login
             ~input:(Foreign { foreign_origin; foreign_token })
             (function
               | Ok (LoginOk u) ->

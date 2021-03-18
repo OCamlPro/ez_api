@@ -201,8 +201,8 @@ module MakeClient(S : sig end) = struct
 
   let test1 api =
     begin_request ();
-    EzRequest.ANY.get0 api
-      Service.test1 "test1"
+    EzRequest.ANY.get0 ~msg:"test1" api
+      Service.test1
       ~error:(error "test1")
       ~params:[ Service.param_arg, S "example-of-arg"]
       (function
@@ -215,12 +215,11 @@ module MakeClient(S : sig end) = struct
           Printf.eprintf "%s\n%!" @@ Printexc.to_string e;
           end_request ()
       )
-      ()
 
   let test1' api =
     begin_request ();
-    EzRequest.ANY.get0 api
-      Service.test1 "test1"
+    EzRequest.ANY.get0 ~msg:"test1" api
+      Service.test1
       ~post:true
       ~error:(error "test1'")
       ~params:[ Service.param_arg, S "example-of-arg"]
@@ -234,14 +233,14 @@ module MakeClient(S : sig end) = struct
           Printf.eprintf "%s\n%!" @@ Printexc.to_string e;
           end_request ()
       )
-      ()
 
   let test2 api =
     begin_request ();
-    EzRequest.ANY.get1 api
-      Service.test2 "test2"
+    EzRequest.ANY.get1 ~msg:"test2" api
+      Service.test2
       ~error:(error "test2")
       ~params: [Service.param_arg, S " -- arg" ]
+      "arg-of-test2"
       (function
         | Ok r ->
           Printf.eprintf
@@ -252,15 +251,16 @@ module MakeClient(S : sig end) = struct
           Printf.eprintf "%s\n%!" @@ Printexc.to_string e;
           end_request ()
       )
-      "arg-of-test2"
+
 
   let test2' api =
     begin_request ();
-    EzRequest.ANY.get1 api
-      Service.test2 "test2"
+    EzRequest.ANY.get1 ~msg:"test2" api
+      Service.test2
       ~post:true
       ~error:(error "test2'")
       ~params: [Service.param_arg, S " -- arg" ]
+      "arg-of-test2"
       (function
         | Ok r ->
           Printf.eprintf
@@ -271,12 +271,12 @@ module MakeClient(S : sig end) = struct
           Printf.eprintf "%s\n%!" @@ Printexc.to_string e;
           end_request ()
       )
-      "arg-of-test2"
+
 
   let test3 arg api =
     begin_request ();
-    EzRequest.ANY.post0 api
-      Service.test3 "test3"
+    EzRequest.ANY.post0 ~msg:"test3" api
+      Service.test3
       ~error:(error "test3")
       ~input:arg
       (function
@@ -312,9 +312,9 @@ module MakeClient(S : sig end) = struct
                 Printf.eprintf "auth login = %S\n%!" u.auth_login;
                 assert (u.auth_login = user1_login);
                 assert (u.auth_user_info = user1_info);
-                EzRequest.ANY.post1
+                EzRequest.ANY.post1 ~msg:"test4"
                   api
-                  Service.test4 "test4"
+                  Service.test4
                   ~error:(error "test4")
                   ~input:arg
                   ~headers:(

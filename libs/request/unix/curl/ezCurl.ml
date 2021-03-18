@@ -1,5 +1,4 @@
-let make ?meth ?headers ?content ?content_type url msg f =
-  let msg = if msg = "" then None else (Some msg) in
+let make ?meth ?headers ?content ?content_type ?msg url f =
   EzCurl_common.log ?meth url msg;
   let rc, data =
     try
@@ -18,12 +17,12 @@ let make ?meth ?headers ?content ?content_type url msg f =
 
 module Interface = struct
 
-  let get ?(meth="GET") msg url ?headers f =
-    make ~meth ?headers url msg f
+  let get ?(meth="GET") ?headers ?msg url f =
+    make ~meth ?headers ?msg url f
 
   let post ?(meth="POST") ?(content_type="application/json") ?(content="{}")
-      msg url ?headers f =
-    make ~meth ?headers ~content_type ~content url msg f
+      ?headers ?msg url  f =
+    make ~meth ?headers ?msg ~content_type ~content url f
 end
 
 include EzRequest.Make(Interface)

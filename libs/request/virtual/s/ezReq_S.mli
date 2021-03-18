@@ -2,73 +2,156 @@ open EzAPI
 
 type error_handler = (int -> string option -> unit)
 
-module type RAWGEN = sig
+module type CURRENT = sig
 
-  type ('output, 'error, 'security) service0
-    constraint 'security = [< Security.scheme ]
-  type ('arg, 'output, 'error, 'security) service1
-    constraint 'security = [< Security.scheme ]
-  type ('arg1, 'arg2, 'output, 'error, 'security) service2
-    constraint 'security = [< Security.scheme ]
-  type ('input, 'output, 'error, 'security) post_service0
-    constraint 'security = [< Security.scheme ]
-  type ('arg, 'input, 'output, 'error, 'security) post_service1
-    constraint 'security = [< Security.scheme ]
-  type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2
-    constraint 'security = [< Security.scheme ]
-  type ('output, 'error) reply_handler
+  val get0 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string -> (* debug msg *)
+    ?error: error_handler ->            (* unhandled error handler *)
+    base_url ->                   (* API url *)
+    ('output, 'error, [< Security.scheme ]) service0 -> (* GET service *)
+    (('output, 'error) result -> unit) -> (* reply handler *)
+    unit
+
+  val get1 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg: string ->
+    ?error: error_handler ->
+    base_url ->
+    ('arg, 'output, 'error, [< Security.scheme ]) service1 ->
+    'arg ->
+    (('output, 'error) result -> unit) ->
+    unit
+
+  val get2 :
+    ?post:bool ->
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?error: error_handler ->
+    base_url ->
+    ('arg1, 'arg2, 'output, 'error, [< Security.scheme ]) service2 ->
+    'arg1 -> 'arg2 ->
+    (('output, 'error) result -> unit) ->
+    unit
+
+  val post0 :
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?url_encode:bool ->
+    ?error: error_handler ->          (* error handler *)
+    input:'input ->                           (* input *)
+    base_url ->                 (* API url *)
+    ('input, 'output, 'error, [< Security.scheme ]) post_service0 -> (* POST service *)
+    (('output, 'error) result -> unit) -> (* reply handler *)
+    unit
+
+  val post1 :
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?url_encode:bool ->
+    ?error: error_handler ->          (* error handler *)
+    input:'input ->                           (* input *)
+    base_url ->                 (* API url *)
+    ('arg, 'input, 'output, 'error, [< Security.scheme ]) post_service1 -> (* POST service *)
+    'arg ->
+    (('output, 'error) result -> unit) -> (* reply handler *)
+    unit
+
+  val post2 :
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?url_encode:bool ->
+    ?error: error_handler ->          (* error handler *)
+    input:'input ->                           (* input *)
+    base_url ->                 (* API url *)
+    ('arg1, 'arg2, 'input, 'output, 'error, [< Security.scheme ]) post_service2 -> (* POST service *)
+    'arg1 -> 'arg2 ->
+    (('output, 'error) result -> unit) -> (* reply handler *)
+    unit
+
+  val get :
+    ?meth:Meth.all ->
+    ?headers:(string * string) list ->
+    ?msg:string ->                 (* debug msg *)
+    ?error:error_handler ->   (* error handler *)
+    url ->              (* url *)
+    (string -> unit) ->       (* normal handler *)
+    unit
+
+  val post :
+    ?meth:Meth.all ->
+    ?content_type:string ->
+    ?content:string ->
+    ?headers:(string * string) list ->
+    ?msg:string ->
+    ?error:error_handler ->
+    url ->
+    (string -> unit) -> unit
+
+end
+
+
+module type LEGACY = sig
 
   val get0 :
     base_url ->                   (* API url *)
-    ('output, 'error, 'security) service0 -> (* GET service *)
+    'output Legacy.service0 -> (* GET service *)
     string ->                           (* debug msg *)
     ?post:bool ->
     ?headers:(string * string) list ->
     ?error: error_handler ->            (* unhandled error handler *)
     ?params:(Param.t * param_value) list ->
-    (('output, 'error) reply_handler) -> (* reply handler *)
+    ('output -> unit) -> (* reply handler *)
     unit ->                           (* trigger *)
     unit
 
   val get1 :
     base_url ->
-    ('arg, 'output, 'error, 'security) service1 ->
+    ('arg, 'output) Legacy.service1 ->
     string ->
     ?post:bool ->
     ?headers:(string * string) list ->
     ?error: error_handler ->
     ?params:(Param.t * param_value) list ->
-    (('output, 'error) reply_handler) ->
+    ('output -> unit) ->
     'arg ->
     unit
 
   val get2 :
     base_url ->
-    ('arg1, 'arg2, 'output, 'error, 'security) service2 ->
+    ('arg1, 'arg2, 'output) Legacy.service2 ->
     string ->
     ?post:bool ->
     ?headers:(string * string) list ->
     ?error: error_handler ->
     ?params:(Param.t * param_value) list ->
-    (('output, 'error) reply_handler) ->
+    ('output -> unit) ->
     'arg1 -> 'arg2 ->
     unit
 
   val post0 :
     base_url ->                 (* API url *)
-    ('input, 'output, 'error, 'security) post_service0 -> (* POST service *)
+    ('input, 'output) Legacy.post_service0 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
     ?params:(Param.t * param_value) list ->
     ?url_encode:bool ->
     input:'input ->                           (* input *)
-    (('output, 'error) reply_handler) -> (* reply handler *)
+    ('output -> unit) -> (* reply handler *)
     unit
 
   val post1 :
     base_url ->                 (* API url *)
-    ('arg, 'input, 'output, 'error, 'security) post_service1 -> (* POST service *)
+    ('arg, 'input, 'output) Legacy.post_service1 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -76,12 +159,12 @@ module type RAWGEN = sig
     ?url_encode:bool ->
     input:'input ->                           (* input *)
     'arg ->
-    (('output, 'error) reply_handler) -> (* reply handler *)
+    ('output -> unit) -> (* reply handler *)
     unit
 
   val post2 :
     base_url ->                 (* API url *)
-    ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 -> (* POST service *)
+    ('arg1, 'arg2, 'input, 'output) Legacy.post_service2 -> (* POST service *)
     string ->                         (* debug msg *)
     ?headers:(string * string) list ->
     ?error: error_handler ->          (* error handler *)
@@ -89,56 +172,8 @@ module type RAWGEN = sig
     ?url_encode:bool ->
     input:'input ->                           (* input *)
     'arg1 -> 'arg2 ->
-    (('output, 'error) reply_handler) -> (* reply handler *)
+    ('output -> unit) -> (* reply handler *)
     unit
-
-end
-
-module type RAW = RAWGEN
-  with type ('output, 'error, 'security) service0 :=
-    ('output, 'error, 'security) EzAPI.service0
-   and type ('arg, 'output, 'error, 'security) service1 :=
-     ('arg, 'output, 'error, 'security) EzAPI.service1
-   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 :=
-     ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2
-   and type ('input, 'output, 'error, 'security) post_service0 :=
-     ('input, 'output, 'error, 'security) EzAPI.post_service0
-   and type ('arg, 'input, 'output, 'error, 'security) post_service1 :=
-     ('arg, 'input, 'output, 'error, 'security) EzAPI.post_service1
-   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 :=
-     ('arg1, 'arg2, 'input, 'output, 'error, 'security) EzAPI.post_service2
-   and type ('output, 'error) reply_handler := ('output, 'error) Result.result -> unit
-
-module type LEGACY = RAWGEN
-  with type ('output, 'error, 'security) service0 =
-         ('output) EzAPI.Legacy.service0
-   and type ('arg, 'output, 'error, 'security) service1 =
-         ('arg, 'output) EzAPI.Legacy.service1
-   and type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
-         ('arg1, 'arg2, 'output) EzAPI.Legacy.service2
-   and type ('input, 'output, 'error, 'security) post_service0 =
-         ('input, 'output) EzAPI.Legacy.post_service0
-   and type ('arg, 'input, 'output, 'error, 'security) post_service1 =
-         ('arg, 'input, 'output) EzAPI.Legacy.post_service1
-   and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
-         ('arg1, 'arg2, 'input, 'output) EzAPI.Legacy.post_service2
-   and type ('output, 'error) reply_handler := 'output -> unit
-
-
-(* This interface is exported by all engines, so that you can directly
-use them from there. *)
-module type S = sig
-
-  include RAW
-
-  module Legacy : LEGACY
-
-  val init : unit -> unit
-
-  (* hook executed before every request *)
-  val add_hook : (unit -> unit) -> unit
-  (* hook executed after every request *)
-  val add_reply_hook : (unit -> unit) -> unit
 
   val get :
     ?meth:Meth.all ->
@@ -162,18 +197,35 @@ module type S = sig
 
 end
 
+(* This interface is exported by all engines, so that you can directly
+use them from there. *)
+module type S = sig
+
+  include CURRENT
+
+  module Legacy : LEGACY
+
+  val init : unit -> unit
+
+  (* hook executed before every request *)
+  val add_hook : (unit -> unit) -> unit
+  (* hook executed after every request *)
+  val add_reply_hook : (unit -> unit) -> unit
+
+end
+
 module type Interface = sig
   val get :
     ?meth:string ->
-    string -> string ->
     ?headers:(string * string) list ->
+    ?msg:string -> string ->
     ((string, int * string option) result -> unit) -> unit
 
   val post :
     ?meth:string ->
     ?content_type:string ->
     ?content:string ->
-    string -> string ->
     ?headers:(string * string) list ->
+    ?msg:string -> string ->
     ((string, int * string option) result -> unit) -> unit
 end
