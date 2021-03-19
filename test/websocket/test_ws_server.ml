@@ -7,13 +7,12 @@ let react _req _sec s =
   Lwt.return_ok @@ "server echo: " ^ s
 
 (* background loop handler *)
-let rec bg =
-  let i = ref (-1) in fun _req _sec send ->
-  EzLwtSys.sleep 10. >>= fun () ->
-  incr i;
-  EzDebug.printf "server loop step %d" !i;
-  send @@ Ok ("server send " ^ string_of_int !i);
-  bg _req _sec send
+let bg _req _sec send =
+  let rec aux i =
+    EzDebug.printf "server loop step %d" i;
+    send @@ Ok ("server send " ^ string_of_int i);
+    EzLwtSys.sleep 10. >>= fun () -> aux (i+1) in
+  aux 0
 
 (* server services *)
 let services = register_ws Test_ws_lib.service ~react ~bg empty

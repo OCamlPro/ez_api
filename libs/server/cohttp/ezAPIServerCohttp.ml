@@ -59,15 +59,20 @@ let dispatch ?catch s io req body =
     Req.request ?version ~headers ~time (Request.uri req) in
   let meth = meth_from_cohttp req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
-  let ws = Ws.ws req in
+  let ws = WsCohttp.ws req in
   Lwt.catch (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
     (fun exn ->
        EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
        match catch with
-       | None -> Lwt.return (`http {Answer.code=500; body=""; headers=[]})
+       | None -> Answer.server_error exn >|= fun a -> `http a
        | Some c -> c path_str exn >|= fun a -> `http a)
   >>= function
-  | `ws ra -> Lwt.return ra
+  | `ws (Ok ra) -> Lwt.return ra
+  | `ws (Error _) ->
+    let headers = Header.of_list access_control_headers in
+    let status = Code.status_of_code 501 in
+    Server.respond_string ~headers ~status ~body:"" () >|= fun (r, b) ->
+    `Response (r, b)
   | `http {Answer.code; body; headers} ->
     let headers = headers @ access_control_headers in
     let status = Code.status_of_code code in

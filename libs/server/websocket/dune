@@ -1,0 +1,6 @@
+(library
+ (name wsCommon)
+ (public_name ez-api.ws-server-utils)
+ (optional)
+ (modules wsCommon)
+ (libraries websocket ezAPIServerUtils calendar))

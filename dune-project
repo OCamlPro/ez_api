@@ -1,8 +1,6 @@
 (lang dune 2.6)
 (name ez-api)
 
-(generate_opam_files true)
-
 (source (github ocamlpro/ez-api))
 (license GPL-3.0-or-later)
 (authors
@@ -32,4 +30,5 @@
   (ocurl (>= 0.8.0))
   (ezjs_fetch (> 0.2.0))
   websocket-lwt-unix
+  websocket-httpaf-lwt
   (ppxlib (and :build (>= 0.16.0)))))

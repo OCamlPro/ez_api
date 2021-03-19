@@ -30,6 +30,7 @@ depopts: [
   "ocurl" {>= "0.8.0"}
   "ezjs_fetch" {> "0.2.0"}
   "websocket-lwt-unix"
+  "websocket-httpaf-lwt"
   "ppxlib" {build & >= "0.16.0"}
 ]
 build: [
@@ -47,3 +48,7 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/ocamlpro/ez-api.git"
+pin-depends: [
+  [ "websocket-httpaf.~dev" "git+https://github.com/anmonteiro/websocket-httpaf.git" ]
+  [ "websocket-httpaf-lwt.~dev" "git+https://github.com/anmonteiro/websocket-httpaf.git" ]
+]

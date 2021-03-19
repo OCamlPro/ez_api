@@ -57,19 +57,11 @@ let ping_pong ?(step=30.) rsend =
   let content = string_of_int @@ Random.int 1_000_000_000 in
   let rec loop () =
     !rsend (Some (create ~opcode:Opcode.Ping ~content ()));
-    EzLwtSys.sleep step >>= fun () ->
-    if check_ping ~step id content then loop ()
+    EzLwtSys.sleep (step /. 2.) >>= fun () ->
+    if check_ping ~step id content then
+      EzLwtSys.sleep (step /. 2.) >>= fun () -> loop ()
     else Lwt.return_unit in
   let fill content =
     let now = CalendarLib.Fcalendar.Precise.now () in
     Hashtbl.replace ping_table (id ^ content) now in
   loop, fill
-
-let ws ?step req ~react ~bg =
-  let rsend = ref (fun _ -> ()) in
-  let ping_loop, pong_fill = ping_pong ?step rsend in
-  Websocket_cohttp_lwt.upgrade_connection
-    req (ws_react react pong_fill rsend) >>= fun (r, send) ->
-  rsend := send;
-  Lwt.async (fun () -> Lwt.pick [ws_loop bg send; ping_loop ()]);
-  Lwt.return r

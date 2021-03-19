@@ -12,17 +12,13 @@ let react _send = function
 let error content =
   Lwt.return @@ EzDebug.printf "client error %s" content
 
-
 let handle {conn; send; close} =
-  let i = ref (-1) in
-  let rec loop () =
-    EzLwtSys.sleep 11. >>= fun () ->
-    incr i;
-    EzDebug.printf "client loop step %d" !i;
-    send @@ "client send " ^ string_of_int !i >>= function
+  let rec loop i =
+    EzDebug.printf "client loop step %d" i;
+    send @@ "client send " ^ string_of_int i >>= function
     | Error _ -> close ()
-    | Ok () -> loop () in
-  Lwt.choose [ conn; loop () ]
+    | Ok () -> Lwt.bind (EzLwtSys.sleep 11.) (fun () -> loop (i+1)) in
+  Lwt.choose [ conn; loop 0 ]
 
 let main () =
   connect0 ~msg:"ws" ~react (EzAPI.BASE "http://localhost:8080") Test_ws_lib.service >>= function

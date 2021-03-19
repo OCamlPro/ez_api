@@ -2,8 +2,8 @@
  (name ezAPIServerCohttp)
  (public_name ez-api.server-cohttp)
  (optional)
- (modules ws ezAPIServerCohttp)
- (libraries cohttp-lwt-unix websocket-lwt-unix.cohttp calendar ezAPIServerUtils))
+ (modules ezAPIServerCohttp)
+ (libraries cohttp-lwt-unix wsCohttp))
 
 (library
  (name ezServerCohttp)

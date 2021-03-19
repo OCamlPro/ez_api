@@ -246,27 +246,33 @@ let connection_handler :
     debug_httpaf req;
     Lwt.async @@ fun () ->
     read_body (Reqd.request_body reqd) >>= fun body ->
-    Lwt.catch (fun () ->
-        handle ?meth ?content_type s.server_kind r path body >>= function
-        | `http a -> Lwt.return a
-        | `ws _ ->
-          EzDebug.printf "Websocket not handled by HTTPAF";
-          Answer.method_not_allowed ())
-    (fun exn ->
-       EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
-       match catch with
-       | None -> Lwt.return {Answer.code=500; body=""; headers=[]}
-       | Some c -> c path_str exn)
-    >>= fun {Answer.code; body; headers} ->
-    let status = Httpaf.Status.unsafe_of_code code in
-    debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    let headers = headers @ access_control_headers in
-    let headers = Headers.of_list headers in
-    let len = String.length body in
-    let headers = Headers.add headers "content-length" (string_of_int len) in
-    let response = Response.create ~headers status in
-    Reqd.respond_with_string reqd response body;
-    Lwt.return_unit
+    let ws = WsHttpaf.ws reqd fd in
+    Lwt.catch
+      (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
+      (fun exn ->
+         EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
+         match catch with
+         | None -> Answer.server_error exn >|= fun a -> `http a
+         | Some c -> c path_str exn >|= fun a -> `http a)
+    >>= function
+    | `ws (Error _) ->
+      let headers = Headers.of_list access_control_headers in
+      let status = Status.unsafe_of_code 501 in
+      let response = Response.create ~headers status in
+      Reqd.respond_with_string reqd response "";
+      Lwt.return_unit
+    | `ws (Ok (_response, _b)) ->
+      Lwt.return_unit
+    | `http {Answer.code; body; headers} ->
+      let status = Status.unsafe_of_code code in
+      debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
+      let headers = headers @ access_control_headers in
+      let headers = Headers.of_list headers in
+      let len = String.length body in
+      let headers = Headers.add headers "content-length" (string_of_int len) in
+      let response = Response.create ~headers status in
+      Reqd.respond_with_string reqd response body;
+      Lwt.return_unit
   in
 
   let error_handler :
