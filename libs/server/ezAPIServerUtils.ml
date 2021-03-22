@@ -125,7 +125,7 @@ let handle ?meth ?content_type ?ws s r path body =
     | Ok (`ws (react, bg, onclose)) ->
       begin match ws with
         | None -> assert false
-        | Some ws -> ws ?onclose ~react ~bg ()
+        | Some ws -> ws ?onclose ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
 let access_control_headers = [

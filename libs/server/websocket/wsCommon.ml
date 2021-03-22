@@ -55,13 +55,13 @@ let check_ping ?(step=30.) id key =
       false)
     else true
 
-let ping_pong ?(step=30.) ?onclose rsend =
-  let id = string_of_int @@ Random.int 1_000_000_000 in
+let ping_pong ?(step=30.) ?onclose id rsend =
+  let id_str = Uuidm.to_string id in
   let content = string_of_int @@ Random.int 1_000_000_000 in
   let rec loop () =
     !rsend (Some (create ~opcode:Opcode.Ping ~content ()));
     EzLwtSys.sleep (step /. 2.) >>= fun () ->
-    if check_ping ~step id content then
+    if check_ping ~step id_str content then
       EzLwtSys.sleep (step /. 2.) >>= fun () -> loop ()
     else (
       !rsend (Some (close 1000));
@@ -70,5 +70,5 @@ let ping_pong ?(step=30.) ?onclose rsend =
       | Some f -> f ()) in
   let fill content =
     let now = CalendarLib.Fcalendar.Precise.now () in
-    Hashtbl.replace ping_table (id ^ content) now in
+    Hashtbl.replace ping_table (id_str ^ content) now in
   loop, fill

@@ -17,7 +17,8 @@
  (depends
   (json-data-encoding (>= 0.7.0))
   (lwt (>= 4.0.0))
-  (ezjsonm (>= 1.0.0)))
+  (ezjsonm (>= 1.0.0))
+  uuidm)
  (depopts
   (geoip (>= 0.0.3))
   (js_of_ocaml-lwt (>= 3.4.0))

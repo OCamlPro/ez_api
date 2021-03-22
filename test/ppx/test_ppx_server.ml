@@ -11,7 +11,8 @@ let rec react s =
 and bg r sec send =
   send (Ok "Hey!");
   Lwt.bind (EzLwtSys.sleep 30.) (fun () -> bg r sec send)
-and onclose () = Lwt.return_unit
-[@@ws {path="/ws"; input=Json_encoding.string; output=Json_encoding.string}]
+and onclose _ =
+  Lwt.return_unit
+[@@websocket {path="/ws"; input=Json_encoding.string; output=Json_encoding.string}]
 
 [@@@server 8080]

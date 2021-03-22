@@ -46,7 +46,7 @@ and _ registered_service =
       service : ('a, 'i, 'o, 'e, 's) Service.t;
       react : ('a -> 'i -> ('o, 'e) result Lwt.t);
       bg : ('a -> (('o, 'e) result -> unit) -> unit Lwt.t);
-      onclose : (unit -> unit Lwt.t) option;
+      onclose : ('a -> unit Lwt.t) option;
     } -> 'a registered_service
 
 let empty = { services = MethMap.empty ; subdirs = None }
@@ -93,7 +93,6 @@ let rec resolve :
     | Ok x -> resolve (name :: prefix) dir (args, x) path
     | Error msg -> Lwt.return_error @@
       `Cannot_parse (arg.Arg.description, msg, name :: prefix)
-
 
 let io_to_answer : type a. code:int -> a io -> a -> string Answer.t = fun ~code io body ->
   match io with
@@ -186,6 +185,7 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
         let output = Service.output service in
         let errors = Service.errors_encoding service in
         let react, bg = ser_websocket react bg args input output errors in
+        let onclose = match onclose with None -> None | Some f -> Some (fun () -> f args) in
         Lwt.return_ok @@ `ws (react, bg, onclose)
       | _ -> Lwt.return_error `Method_not_allowed
 

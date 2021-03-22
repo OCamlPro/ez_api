@@ -2,7 +2,7 @@
  (name ezAPI)
  (public_name ez-api.common)
  (modules arg param req path mime meth err security service doc url error_codes ezAPI)
- (libraries lwt ezEncoding ezDebug ezLwtSys))
+ (libraries lwt ezEncoding ezDebug ezLwtSys uuidm))
 
 (library
  (name EzAPI_)

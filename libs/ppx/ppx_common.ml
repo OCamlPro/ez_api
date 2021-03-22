@@ -307,19 +307,25 @@ let impl ?kind str =
           | _ -> str :: acc
         end
       | Pstr_value (rflag, (v_react :: v_bg :: onclose)) when kind <> Some `client ->
-        begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") v_bg.pvb_attributes with
+        let attributes = match onclose with
+          | [] -> v_bg.pvb_attributes
+          | v :: _  -> v.pvb_attributes in
+        begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") attributes with
           (* service for websocket handlers *)
           | [ a ], pvb_attributes ->
             begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
               | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
                 let pvb_expr_react = handler_args v_react.pvb_expr in
                 let pvb_expr_bg = handler_args v_bg.pvb_expr in
-                let str = {str with pstr_desc = Pstr_value (rflag, [
-                    {v_react with pvb_expr = pvb_expr_react };
-                    {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
+                let pvb_attributes, vs = match onclose with
+                  | [] -> pvb_attributes, []
+                  | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
+                let str = {str with pstr_desc = Pstr_value (rflag, (
+                    {v_react with pvb_expr = pvb_expr_react } ::
+                    {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
+                    vs )) } in
                 (List.rev @@ process_ws ~onclose name_react name_bg a) @ str :: acc
-              | _ ->
-                str :: acc
+              | _ -> str :: acc
             end
           (* link websocket service *)
           | [], attributes ->
@@ -329,9 +335,13 @@ let impl ?kind str =
                   | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
                     let pvb_expr_react = handler_args v_react.pvb_expr in
                     let pvb_expr_bg = handler_args v_bg.pvb_expr in
-                    let str = {str with pstr_desc = Pstr_value (rflag, [
-                        {v_react with pvb_expr = pvb_expr_react };
-                        {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
+                    let pvb_attributes, vs = match onclose with
+                      | [] -> pvb_attributes, []
+                      | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
+                    let str = {str with pstr_desc = Pstr_value (rflag, (
+                        {v_react with pvb_expr = pvb_expr_react } ::
+                        {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
+                        vs )) } in
                     (List.rev @@ register_ws ~onclose name_react name_bg a) @ str :: acc
                   | _ -> str :: acc
                 end

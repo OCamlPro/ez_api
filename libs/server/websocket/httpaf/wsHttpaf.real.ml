@@ -1,8 +1,8 @@
 open WsCommon
 
-let ws ?step reqd fd ?onclose ~react ~bg () =
+let ws ?step reqd fd ?onclose ~react ~bg id =
   let rsend = ref (fun _ -> ()) in
-  let ping_loop, pong_fill = ping_pong ?step ?onclose rsend in
+  let ping_loop, pong_fill = ping_pong ?step ?onclose id rsend in
   Lwt.bind (Websocket_httpaf_lwt.upgrade_connection reqd fd
               (ws_react ?onclose react pong_fill rsend)) @@ fun (r, body, send) ->
   rsend := send;
