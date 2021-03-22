@@ -66,12 +66,12 @@ let register_res service handler dir =
   let service = register service in
   Directory.register_http dir service handler
 
-let register_ws_res service ~react ~bg ?onclose dir =
+let register_ws_res service ~react ~bg ?onclose ?step dir =
   let security = Service.security service.s in
   let bg r send = bg r security send in
   let react r i = react r security i in
   let service = register service in
-  Directory.register_ws dir ?onclose ~react ~bg service
+  Directory.register_ws dir ?onclose ?step ~react ~bg service
 
 exception Conflict of (Directory.Step.t list * Directory.conflict)
 
@@ -80,8 +80,8 @@ let register service handler dir =
   | Ok dir -> dir
   | Error e -> raise (Conflict e)
 
-let register_ws service ?onclose ~react ~bg dir =
-  match register_ws_res service ?onclose ~react ~bg dir with
+let register_ws service ?onclose ?step ~react ~bg dir =
+  match register_ws_res service ?onclose ?step ~react ~bg dir with
   | Ok dir -> dir
   | Error e -> raise (Conflict e)
 
@@ -122,10 +122,10 @@ let handle ?meth ?content_type ?ws s r path body =
           Answer.server_error exn
         | Ok a -> Lwt.return a
       end >|= fun a -> (`http a)
-    | Ok (`ws (react, bg, onclose)) ->
+    | Ok (`ws (react, bg, onclose, step)) ->
       begin match ws with
         | None -> assert false
-        | Some ws -> ws ?onclose ~react ~bg r.Req.req_id
+        | Some ws -> ws ?onclose ?step ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
 let access_control_headers = [
