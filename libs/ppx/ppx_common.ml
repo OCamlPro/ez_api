@@ -168,15 +168,20 @@ let register name a =
     ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ]
   | _ -> Location.raise_errorf ~loc "service name not understood"
 
-let register_ws react_name bg_name a =
+let register_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let ppx_dir = ppx_dir ~loc in
+  let onclose = match onclose with
+    | [] -> enone ~loc
+    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
+    | _ -> Location.raise_errorf ~loc "too many value bindings" in
   match a.attr_payload with
   | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
     let register =
       value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, e;
+            Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
             Nolabel, evar ~loc "ppx_dir" ]) in
@@ -196,17 +201,22 @@ let process name a =
   if debug then Format.printf "%s@." @@ str_of_structure [ register ];
   ppx_dir @ [ service; register ]
 
-let process_ws react_name bg_name a =
+let process_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let service_name =  react_name ^ "_s" in
   let service, service_name, debug =
     service_value ~name:service_name { a with attr_name = { a.attr_name with txt = "get" } } in
   let ppx_dir = ppx_dir ~loc in
+  let onclose = match onclose with
+    | [] -> enone ~loc
+    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
+    | _ -> Location.raise_errorf ~loc "too many value bindings" in
   let register =
     pstr_value ~loc Nonrecursive [
       value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, evar ~loc service_name;
+            Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
             Nolabel, evar ~loc "ppx_dir" ]) ] in
@@ -296,7 +306,7 @@ let impl ?kind str =
             end
           | _ -> str :: acc
         end
-      | Pstr_value (rflag, [ v_react; v_bg ]) when kind <> Some `client ->
+      | Pstr_value (rflag, (v_react :: v_bg :: onclose)) when kind <> Some `client ->
         begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") v_bg.pvb_attributes with
           (* service for websocket handlers *)
           | [ a ], pvb_attributes ->
@@ -307,7 +317,7 @@ let impl ?kind str =
                 let str = {str with pstr_desc = Pstr_value (rflag, [
                     {v_react with pvb_expr = pvb_expr_react };
                     {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
-                (List.rev @@ process_ws name_react name_bg a) @ str :: acc
+                (List.rev @@ process_ws ~onclose name_react name_bg a) @ str :: acc
               | _ ->
                 str :: acc
             end
@@ -322,7 +332,7 @@ let impl ?kind str =
                     let str = {str with pstr_desc = Pstr_value (rflag, [
                         {v_react with pvb_expr = pvb_expr_react };
                         {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ])} in
-                    (List.rev @@ register_ws name_react name_bg a) @ str :: acc
+                    (List.rev @@ register_ws ~onclose name_react name_bg a) @ str :: acc
                   | _ -> str :: acc
                 end
               | _ -> str :: acc

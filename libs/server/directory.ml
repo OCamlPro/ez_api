@@ -46,6 +46,7 @@ and _ registered_service =
       service : ('a, 'i, 'o, 'e, 's) Service.t;
       react : ('a -> 'i -> ('o, 'e) result Lwt.t);
       bg : ('a -> (('o, 'e) result -> unit) -> unit Lwt.t);
+      onclose : (unit -> unit Lwt.t) option;
     } -> 'a registered_service
 
 let empty = { services = MethMap.empty ; subdirs = None }
@@ -72,7 +73,8 @@ type lookup_ok = [
   | `head | `options of (string * string) list
   | `http of (string -> (string Answer.t, handler_error) result Lwt.t)
   | `ws of ((string -> (ws_frame, handler_error) result Lwt.t) *
-            (((ws_frame, handler_error) result -> unit) -> unit Lwt.t)) ]
+            (((ws_frame, handler_error) result -> unit) -> unit Lwt.t) *
+            (unit -> unit Lwt.t) option) ]
 
 let rec resolve :
   type a. string list -> a directory -> a -> string list ->
@@ -179,12 +181,12 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
         let errors = Service.errors_encoding service in
         let h = ser_handler ?content_type handler args input output errors in
         Lwt.return_ok @@ `http h
-      | `GET, Some (Websocket {service; react; bg}) ->
+      | `GET, Some (Websocket {service; react; bg; onclose}) ->
         let input = Service.input service in
         let output = Service.output service in
         let errors = Service.errors_encoding service in
         let react, bg = ser_websocket react bg args input output errors in
-        Lwt.return_ok @@ `ws (react, bg)
+        Lwt.return_ok @@ `ws (react, bg, onclose)
       | _ -> Lwt.return_error `Method_not_allowed
 
 let step_of_path path =
@@ -269,5 +271,5 @@ let register :
 let register_http root service handler =
   register root service (fun service -> Http {service; handler})
 
-let register_ws root service ~react ~bg =
-  register root service (fun service -> Websocket {service; react; bg})
+let register_ws root ?onclose ~react ~bg service =
+  register root service (fun service -> Websocket {service; react; bg; onclose})

@@ -2,7 +2,7 @@ open Lwt.Infix
 open Websocket.Frame
 open EzAPIServerUtils.Directory
 
-let ws_react f pong rsend fr =
+let ws_react ?onclose f pong rsend fr =
   match fr.opcode with
   | Opcode.Ping ->
     !rsend @@ Some (create ~opcode:Opcode.Pong ~content:fr.content ())
@@ -11,7 +11,10 @@ let ws_react f pong rsend fr =
       let content = String.sub fr.content 0 2 in
       !rsend @@ Some (create ~opcode:Opcode.Close ~content ())
     else
-      !rsend @@ Some (close 1000)
+      !rsend @@ Some (close 1000);
+    (match onclose with
+     | None -> ()
+     | Some f -> Lwt.async f)
   | Opcode.Pong -> pong fr.content
   | Opcode.Text | Opcode.Binary ->
     Lwt.async (fun () ->
@@ -52,7 +55,7 @@ let check_ping ?(step=30.) id key =
       false)
     else true
 
-let ping_pong ?(step=30.) rsend =
+let ping_pong ?(step=30.) ?onclose rsend =
   let id = string_of_int @@ Random.int 1_000_000_000 in
   let content = string_of_int @@ Random.int 1_000_000_000 in
   let rec loop () =
@@ -60,7 +63,11 @@ let ping_pong ?(step=30.) rsend =
     EzLwtSys.sleep (step /. 2.) >>= fun () ->
     if check_ping ~step id content then
       EzLwtSys.sleep (step /. 2.) >>= fun () -> loop ()
-    else Lwt.return_unit in
+    else (
+      !rsend (Some (close 1000));
+      match onclose with
+      | None -> Lwt.return_unit
+      | Some f -> f ()) in
   let fill content =
     let now = CalendarLib.Fcalendar.Precise.now () in
     Hashtbl.replace ping_table (id ^ content) now in
