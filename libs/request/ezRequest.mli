@@ -1,7 +1,3 @@
-
-(* Note that `?content_type` in post can be overriden by a content-type
-   header in `?headers` *)
-
 (* If the code is > 0, it is an HTTP reply code. Otherwise, it is an
   internal error (-1 connection, -2 decoding) *)
 
