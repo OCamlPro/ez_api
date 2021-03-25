@@ -15,13 +15,16 @@ let catch f =
 let send_frame socket content =
   catch (fun () -> socket##send (Js.string content))
 
-let connect ?msg ~react url =
+let connect ?msg ?protocols ~react url =
   let url = match String.get url 0 with
     | 'h' -> "ws" ^ String.sub url 4 (String.length url - 4)
     | _ -> url in
+  let protocols = match protocols with
+    | None -> new%js Js.array_empty
+    | Some l -> Js.array @@ Array.of_list @@ List.map Js.string l in
   log ~action:"connect" url msg;
   Lwt.return @@ catch @@ fun () ->
-  let socket = new%js WebSockets.webSocket (Js.string url) in
+  let socket = new%js WebSockets.webSocket_withProtocols (Js.string url) protocols in
   let conn, n = Lwt.wait () in
   socket##.onmessage := Dom.handler @@ (fun e ->
       log url msg;
@@ -43,7 +46,7 @@ let connect ?msg ~react url =
   let close () = Lwt.return @@ catch (fun () -> socket##close) in
   {send; conn; close}
 
-let connect0 ?msg ~react base service =
+let connect0 ?msg ?protocols ~react base service =
   let EzAPI.TYPES.URL url = EzAPI.forge0 base service [] in
   let input = EzAPI.Service.input service.EzAPI.s in
   let output = EzAPI.Service.output service.EzAPI.s in
@@ -53,7 +56,7 @@ let connect0 ?msg ~react base service =
     match EzAPI.IO.res_from_string output (res_encoding errors) (react f) s with
     | Ok r -> r
     | Error e -> Lwt.return_error (EzEncoding.error_to_string e) in
-  connect ?msg ~react url >|= function
+  connect ?msg ?protocols ~react url >|= function
   | Error e -> Error e
   | Ok r ->
     let send i = r.send (EzAPI.IO.to_string input i) in

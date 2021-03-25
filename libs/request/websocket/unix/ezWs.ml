@@ -44,17 +44,20 @@ let aux_react =
       send @@ Frame.close 1002 >>= fun _ ->
       Lwt.return_error "protocol error"
 
-let connect ?msg ~react url =
+let connect ?msg ?protocols ~react url =
   let url = match String.get url 0 with
     | 'w' -> "http" ^ String.sub url 2 (String.length url - 2)
     | _ -> url in
   log ~action:"connect" url msg;
   let uri = Uri.of_string url in
   let ctx = Conduit_lwt_unix.default_ctx in
+  let extra_headers = match protocols with
+    | None -> None
+    | Some l -> Some (Cohttp.Header.of_list [ "Sec-WebSocket-Protocol", String.concat "," l ]) in
   catch @@ fun () ->
   Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system >>=
   Conduit_lwt_unix.endp_to_client ~ctx >>= fun client ->
-  with_connection ~ctx client uri >>= fun (recv, send) ->
+  with_connection ?extra_headers ~ctx client uri >>= fun (recv, send) ->
   let rec conn () =
     catch (fun () ->
         recv () >>= fun fr ->
@@ -67,7 +70,7 @@ let connect ?msg ~react url =
   let send content = catch (fun () -> send_frame ~content send) in
   Lwt.return_ok { send; close; conn = conn () }
 
-let connect0 ?msg ~react base service =
+let connect0 ?msg ?protocols ~react base service =
   let EzAPI.URL url = EzAPI.forge0 base service [] in
   let input = EzAPI.Service.input service.EzAPI.s in
   let output = EzAPI.Service.output service.EzAPI.s in
@@ -77,7 +80,7 @@ let connect0 ?msg ~react base service =
     match EzAPI.IO.res_from_string output (res_encoding errors) (react f) s with
     | Ok r -> r
     | Error e -> Lwt.return_error (EzEncoding.error_to_string e) in
-  connect ?msg ~react url >|= function
+  connect ?msg ?protocols ~react url >|= function
   | Error e -> Error e
   | Ok r ->
     let send i = r.send (EzAPI.IO.to_string input i) in

@@ -4,4 +4,4 @@
  (optional)
  (modules ezWs)
  (implements ezWs)
- (libraries websocket-lwt-unix ezDebug))
+ (libraries websocket-lwt-unix))

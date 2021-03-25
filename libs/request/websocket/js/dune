@@ -5,4 +5,4 @@
  (modules ezWs)
  (preprocess (pps js_of_ocaml-ppx))
  (implements ezWs)
- (libraries ezDebug_js))
+ (libraries ezAPIJS))
