@@ -6,7 +6,7 @@ let () =
   EzWs.connect ~msg:"test" ~react:(fun _send s ->
       EzDebug.printf "message received %s" s; Lwt.return_ok ())
     "ws://localhost:9000" >>= function
-  | Ok {EzWs.send; conn; _} ->
+  | Ok {EzWs.action = {EzWs.send; _}; conn; _} ->
     EzLwtSys.sleep 10. >>= fun () ->
     send "message" >>= begin function
       | Ok _ ->

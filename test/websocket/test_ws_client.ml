@@ -12,11 +12,11 @@ let react _send = function
 let error content =
   Lwt.return @@ EzDebug.printf "client error %s" content
 
-let handle {conn; send; close} =
+let handle {conn; action = {send; close}} =
   let rec loop i =
     EzDebug.printf "client loop step %d" i;
     send @@ "client send " ^ string_of_int i >>= function
-    | Error _ -> close ()
+    | Error _ -> close None
     | Ok () -> Lwt.bind (EzLwtSys.sleep 11.) (fun () -> loop (i+1)) in
   Lwt.choose [ conn; loop 0 ]
 

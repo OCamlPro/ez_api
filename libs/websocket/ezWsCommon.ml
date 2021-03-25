@@ -1,20 +1,28 @@
 module type S = sig
   type 'a rp = ('a, string) result Lwt.t
 
-  type 'a ws = {
+  type 'a action = {
     send : 'a -> unit rp;
-    close : unit -> unit rp;
-    conn : unit rp;
+    close : int option -> unit rp
+  }
+
+  type 'a ws = {
+    action : 'a action;
+    conn : unit rp
   }
 end
 
 module Types = struct
   type 'a rp = ('a, string) result Lwt.t
 
-  type 'a ws = {
+  type 'a action = {
     send : 'a -> unit rp;
-    close : unit -> unit rp;
-    conn : unit rp;
+    close : int option -> unit rp
+  }
+
+  type 'a ws = {
+    action : 'a action;
+    conn : unit rp
   }
 end
 
