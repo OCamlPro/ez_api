@@ -24,7 +24,7 @@
   (js_of_ocaml-lwt (>= 3.4.0))
   (calendar (>= 2.03))
   cohttp-lwt-unix
-  cohttp-lwt-jsoo
+  (cohttp-lwt-jsoo (>= 4.0.0))
   lwt_log
   tls
   (httpaf-lwt-unix (>= 0.6.0))
@@ -32,4 +32,6 @@
   (ezjs_fetch (> 0.2.0))
   websocket-lwt-unix
   websocket-httpaf-lwt
-  (ppxlib (and :build (>= 0.16.0)))))
+  (ppxlib (and :build (>= 0.16.0))))
+ (conflicts
+  (cohttp-lwt-jsoo (< 4.0.0))))

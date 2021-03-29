@@ -1,4 +1,4 @@
-module Base = EzCohttp_base.Make(Cohttp_lwt_xhr.Client)
+module Base = EzCohttp_base.Make(Cohttp_lwt_jsoo.Client)
 
 module Interface = struct
   let get ?meth ?headers ?msg url =

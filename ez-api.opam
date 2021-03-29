@@ -24,7 +24,7 @@ depopts: [
   "js_of_ocaml-lwt" {>= "3.4.0"}
   "calendar" {>= "2.03"}
   "cohttp-lwt-unix"
-  "cohttp-lwt-jsoo"
+  "cohttp-lwt-jsoo" {>= "4.0.0"}
   "lwt_log"
   "tls"
   "httpaf-lwt-unix" {>= "0.6.0"}
@@ -33,6 +33,9 @@ depopts: [
   "websocket-lwt-unix"
   "websocket-httpaf-lwt"
   "ppxlib" {build & >= "0.16.0"}
+]
+conflicts: [
+  "cohttp-lwt-jsoo" {< "4.0.0"}
 ]
 build: [
   ["dune" "subst"] {pinned}
