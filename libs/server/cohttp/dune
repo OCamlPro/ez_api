@@ -1,13 +1,13 @@
 (library
  (name ezAPIServerCohttp)
- (public_name ez-api.server-cohttp)
+ (public_name ez_api.server-cohttp)
  (optional)
  (modules ezAPIServerCohttp)
  (libraries cohttp-lwt-unix wsCohttp))
 
 (library
  (name ezServerCohttp)
- (public_name ez-api.iserver-cohttp)
+ (public_name ez_api.iserver-cohttp)
  (optional)
  (implements ezServer)
  (modules ezServer)

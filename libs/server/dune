@@ -1,19 +1,19 @@
 (library
  (name ezAPIServerUtils)
- (public_name ez-api.server-utils)
+ (public_name ez_api.server-utils)
  (optional)
  (modules answer directory gMTime timings file ip ezAPIServerUtils)
  (libraries ezAPI geoip))
 
 (library
  (name ezOpenAPI)
- (public_name ez-api.openAPI)
+ (public_name ez_api.openAPI)
  (modules ezOpenAPI)
  (libraries ezAPI ezjsonm))
 
 (library
  (name ezAPIServer)
- (public_name ez-api.server)
+ (public_name ez_api.server)
  (optional)
  (modules ezAPIServer)
  (libraries ezServer))

@@ -1,13 +1,13 @@
 (library
  (name ppx_common)
  (modules ppx_common)
- (public_name ez-api.ppx-common)
+ (public_name ez_api.ppx-common)
  (optional)
  (libraries ppx_compat))
 
 (library
  (name ppx_client)
- (public_name ez-api.ppx-client)
+ (public_name ez_api.ppx-client)
  (optional)
  (modules ppx_client)
  (kind ppx_rewriter)
@@ -16,7 +16,7 @@
 
 (library
  (name ppx)
- (public_name ez-api.ppx)
+ (public_name ez_api.ppx)
  (optional)
  (modules ppx)
  (kind ppx_rewriter)
@@ -25,7 +25,7 @@
 
 (library
  (name ppx_server)
- (public_name ez-api.ppx-server)
+ (public_name ez_api.ppx-server)
  (optional)
  (modules ppx_server)
  (kind ppx_rewriter)

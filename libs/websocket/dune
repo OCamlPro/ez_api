@@ -1,5 +1,5 @@
 (library
  (name ezWsCommon)
- (public_name ez-api.ws-types)
+ (public_name ez_api.ws-types)
  (modules ezWsCommon)
  (libraries lwt ezDebug ezEncoding))

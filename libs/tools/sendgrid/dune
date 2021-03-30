@@ -1,6 +1,6 @@
 (library
  (name ezSendgrid_encoding)
- (public_name ez-api.sendgrid-encoding)
+ (public_name ez_api.sendgrid-encoding)
  (wrapped false)
  (optional)
  (modules ezSendgrid_types ezSendgrid_encoding)
@@ -8,14 +8,14 @@
 
 (library
  (name ezSendgrid_services)
- (public_name ez-api.sendgrid-services)
+ (public_name ez_api.sendgrid-services)
  (optional)
  (modules ezSendgrid_services)
  (libraries ezAPI ezSendgrid_encoding))
 
 (library
  (name ezSendgrid)
- (public_name ez-api.sendgrid)
+ (public_name ez_api.sendgrid)
  (optional)
  (modules ezSendgrid)
  (libraries ezReq_lwt calendar ezSendgrid_services))

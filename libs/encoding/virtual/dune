@@ -1,5 +1,5 @@
 (library
- (public_name ez-api.ezjsonm)
+ (public_name ez_api.ezjsonm)
  (name ezjsonm_interface)
  (virtual_modules ezjsonm_interface)
  (libraries json-data-encoding)

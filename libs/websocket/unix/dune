@@ -1,6 +1,6 @@
 (library
  (name ezWs_cohttp)
- (public_name ez-api.ws-cohttp)
+ (public_name ez_api.ws-cohttp)
  (optional)
  (modules ezWs)
  (implements ezWs)

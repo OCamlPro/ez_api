@@ -1,7 +1,7 @@
 (lang dune 2.6)
-(name ez-api)
+(name ez_api)
 
-(source (github ocamlpro/ez-api))
+(source (github ocamlpro/ez_api))
 (authors
  "Cagdas Bozman <cagdas.bozman@ocamlpro.com>"
  "Michael Laporte <michael.laporte@ocamlpro.com>"
@@ -11,9 +11,9 @@
 (maintainers "Fabrice Le Fessant <fabrice.le_fessant@ocamlpro.com>")
 
 (package
- (name ez-api)
+ (name ez_api)
  (synopsis "Easy API library and tools")
- (documentation "https://ocpmax.github.io/ez-api/ez-api/index.html")
+ (documentation "https://ocpmax.github.io/ez_api/ez_api/index.html")
  (depends
   (json-data-encoding (>= 0.7.0))
   (lwt (>= 4.0.0))

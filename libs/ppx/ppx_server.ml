@@ -1,2 +1,2 @@
 let () =
-  Ppxlib.Driver.register_transformation "ez-api-server" ~impl:(Ppx_common.impl ~kind:`server)
+  Ppxlib.Driver.register_transformation "ez_api_server" ~impl:(Ppx_common.impl ~kind:`server)

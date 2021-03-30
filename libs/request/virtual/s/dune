@@ -1,13 +1,13 @@
 (library
  (name ezReq_S)
- (public_name ez-api.req_s)
+ (public_name ez_api.req_s)
  (modules_without_implementation ezReq_S)
  (modules ezReq_S)
  (libraries ezAPI))
 
 (library
  (name ezReq_lwt_S)
- (public_name ez-api.req_lwt_s)
+ (public_name ez_api.req_lwt_s)
  (modules_without_implementation ezReq_lwt_S)
  (modules ezReq_lwt_S)
  (libraries ezAPI))

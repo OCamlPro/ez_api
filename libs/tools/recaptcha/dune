@@ -1,6 +1,6 @@
 (library
  (name ezRecaptcha)
- (public_name ez-api.recaptcha)
+ (public_name ez_api.recaptcha)
  (optional)
  (modules ezRecaptcha)
  (libraries ezReq_lwt calendar))

@@ -1,5 +1,5 @@
 (library
- (public_name ez-api.ezjsonm-unix)
+ (public_name ez_api.ezjsonm-unix)
  (name ezjsonm_unix)
  (implements ezjsonm_interface)
  (modules ezjsonm_interface)
