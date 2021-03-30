@@ -76,11 +76,13 @@ module Encoding = struct
 end
 
 module Services = struct
-  let id_token_param = EzAPI.Param.string ~descr:"ID token" "id_token"
+  open EzAPI
 
-  let google_auth = EzAPI.TYPES.BASE "https://www.googleapis.com/"
+  let id_token_param = Param.string ~descr:"ID token" "id_token"
 
-  let token_info : (Types.all, exn, EzAPI.no_security) EzAPI.service0 =
+  let google_auth = BASE "https://www.googleapis.com/"
+
+  let token_info : (Types.all, exn, Security.none) EzAPI.service0 =
     EzAPI.service
       ~register:false
       ~name:"token_info"
@@ -98,7 +100,7 @@ let handle_error e =
   Error (handle_error (fun exn -> Some (Printexc.to_string exn)) e)
 
 let check_token ~client_id id_token =
-  let params = [id_token_param, EzAPI.TYPES.S id_token] in
+  let params = [id_token_param, EzAPI.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok token ->
@@ -106,7 +108,7 @@ let check_token ~client_id id_token =
     else Error (400, Some "this google id_token is not valid for this app")
 
 let get_info ~client_id id_token =
-  let params = [id_token_param, EzAPI.TYPES.S id_token] in
+  let params = [id_token_param, EzAPI.S id_token] in
   ANY.get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok r ->

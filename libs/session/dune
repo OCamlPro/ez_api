@@ -17,4 +17,4 @@
  (wrapped false)
  (optional)
  (modules ezCookieServer ezSessionServer)
- (libraries ezAPIServerUtils cohttp))
+ (libraries ezSession ezAPIServerUtils cohttp))

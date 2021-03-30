@@ -1,24 +1,25 @@
 open EzSendgrid_types
 open EzSendgrid_encoding
+open EzAPI
 
-let sendgrid_section = EzAPI.section "Sendgrid Requests"
-let sendgrid_host = EzAPI.TYPES.BASE "https://api.sendgrid.com/v3"
+let sendgrid_section = Doc.section "Sendgrid Requests"
+let sendgrid_host = BASE "https://api.sendgrid.com/v3"
 
-let arg_id = EzAPI.arg_string "id" "base64_hash"
+let arg_id = Arg.string ~example:"base64_hash" "id"
 
-let ids_param = EzAPI.Param.string ~descr:"Sendgrid contact ids" ~name:"ids" "ids"
-let contact_ids_param = EzAPI.Param.string ~descr:"Sendgrid contact ids" ~name:"contact_ids" "contact_ids"
-let delete_all_param = EzAPI.Param.bool ~descr:"Sendgrid delete all contacts" ~name:"delete_all_contacts" "delete_all_contacts"
+let ids_param = Param.string ~descr:"Sendgrid contact ids" ~name:"ids" "ids"
+let contact_ids_param = Param.string ~descr:"Sendgrid contact ids" ~name:"contact_ids" "contact_ids"
+let delete_all_param = Param.bool ~descr:"Sendgrid delete all contacts" ~name:"delete_all_contacts" "delete_all_contacts"
 
-let send encoding : ('a mail, unit, string option, EzAPI.bearer_security) EzAPI.post_service0 =
-  EzAPI.post_service
+let send encoding : ('a mail, unit, string option, Security.bearer) post_service0 =
+  post_service
     ~section:sendgrid_section
     ~name:"sendgrid_send"
     ~input:(mail encoding)
     ~output:Json_encoding.empty
     EzAPI.Path.(root // "mail" // "send")
 
-let add_contacts : (string list option * contact list, string, string option, EzAPI.bearer_security) EzAPI.post_service0 =
+let add_contacts : (string list option * contact list, string, string option, EzAPI.Security.bearer) EzAPI.post_service0 =
   EzAPI.post_service
     ~register:false
     ~section:sendgrid_section
@@ -28,18 +29,18 @@ let add_contacts : (string list option * contact list, string, string option, Ez
     ~meth:`PUT
     EzAPI.Path.(root // "marketing" // "contacts")
 
-let delete_contacts : (unit, string, string option, EzAPI.bearer_security) EzAPI.post_service0 =
-  EzAPI.post_service
+let delete_contacts : (unit, string, string option, Security.bearer) EzAPI.post_service0 =
+  EzAPI.raw_service
     ~register:false
     ~section:sendgrid_section
     ~name:"sendgrid_delete_contacts"
-    ~input:Json_encoding.empty
-    ~output:job_output
+    ~input:Empty
+    ~output:(Json job_output)
     ~meth:`DELETE
     ~params:[ids_param; delete_all_param]
     EzAPI.Path.(root // "marketing" // "contacts")
 
-let contacts_count : (int, string option, EzAPI.bearer_security) EzAPI.service0 =
+let contacts_count : (int, string option, Security.bearer) EzAPI.service0 =
   EzAPI.service
     ~register:false
     ~section:sendgrid_section
@@ -47,7 +48,7 @@ let contacts_count : (int, string option, EzAPI.bearer_security) EzAPI.service0 
     ~output:contacts_count
     EzAPI.Path.(root // "marketing" // "contacts" // "count")
 
-let get_contact : (string, contact * contact_more, string option, EzAPI.bearer_security) EzAPI.service1 =
+let get_contact : (string, contact * contact_more, string option, Security.bearer) EzAPI.service1 =
   EzAPI.service
     ~register:false
     ~section:sendgrid_section
@@ -55,7 +56,7 @@ let get_contact : (string, contact * contact_more, string option, EzAPI.bearer_s
     ~output:get_contact
     EzAPI.Path.(root // "marketing" // "contacts" /: arg_id)
 
-let search_contacts : (string, int * (contact * contact_more) list, string option, EzAPI.bearer_security) EzAPI.post_service0 =
+let search_contacts : (string, int * (contact * contact_more) list, string option, Security.bearer) EzAPI.post_service0 =
   EzAPI.post_service
     ~register:false
     ~section:sendgrid_section
@@ -64,7 +65,7 @@ let search_contacts : (string, int * (contact * contact_more) list, string optio
     ~output:(search_output EzSendgrid_encoding.get_contact)
     EzAPI.Path.(root // "marketing" // "contacts" // "search")
 
-let remove_contact_list : (string, string, string option, EzAPI.bearer_security) EzAPI.service1 =
+let remove_contact_list : (string, string, string option, Security.bearer) EzAPI.service1 =
   EzAPI.service
     ~register:false
     ~section:sendgrid_section

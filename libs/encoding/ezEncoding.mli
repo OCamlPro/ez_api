@@ -1,8 +1,14 @@
 
 exception DestructError
 
+type destruct_error = [
+  | `cannot_destruct of string * string
+  | `unexpected_field of string ]
+
 val destruct :  'a Json_encoding.encoding -> string -> 'a
+val destruct_res :  'a Json_encoding.encoding -> string -> ('a, [> destruct_error]) result
 val construct : ?compact:bool -> 'a Json_encoding.encoding -> 'a -> string
+val error_to_string : ?from:string -> [< destruct_error ] -> string
 
 module Ezjsonm : sig
   val from_string : string -> Json_repr.ezjsonm
@@ -345,3 +351,5 @@ val result : 'a Json_encoding.encoding -> 'b Json_encoding.encoding ->
   ('a, 'b) result Json_encoding.encoding
 
 val ignore_enc : 'a Json_encoding.encoding -> 'a Json_encoding.encoding
+
+val enc_constant : 'a Json_encoding.encoding -> 'a -> unit Json_encoding.encoding

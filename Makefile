@@ -2,6 +2,9 @@
 all: build
 
 build:
+	dune build libs
+
+dev:
 	dune build
 
 install:
@@ -12,3 +15,4 @@ clean:
 
 doc:
 	dune build @doc
+	rsync -ru _build/default/_doc/_html/* docs/

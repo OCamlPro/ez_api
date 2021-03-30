@@ -1,8 +1,6 @@
 _opam
-_obuild/
-*~
 _build
-autoconf
-ocp-autoconf.d
-configure
+_local
+*~
 *.merlin
+*.install

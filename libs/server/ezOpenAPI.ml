@@ -40,7 +40,7 @@ module Types = struct
     opm_allow_empty : bool option;
     opm_style : string option;
     opm_example : Json_repr.any option;
-    opm_type : EzAPI.TYPES.param_type option;
+    opm_type : EzAPI.Param.kind option;
   }
 
   type encoding_object = {
@@ -94,7 +94,7 @@ module Types = struct
     opt_request : request_object option;
     opt_responses : (string * response_object) list;
     opt_deprecated : bool option;
-    opt_security : EzAPI.security_scheme list option;
+    opt_security : EzAPI.Security.scheme list option;
     (* opt_security : (string * string list) list option; *)
     opt_servers : server_object list option;
   }
@@ -134,7 +134,7 @@ module Types = struct
     ocm_examples : (string * example_object) list option;
     ocm_requests : (string * request_object) list option;
     ocm_headers : (string * param_object) list option;
-    ocm_security : EzAPI.security_scheme list option;
+    ocm_security : EzAPI.Security.scheme list option;
     ocm_links : (string * link_object) list option;
   }
 
@@ -144,7 +144,7 @@ module Types = struct
     oa_servers : server_object list option;
     oa_paths : (string * path_item) list;
     oa_components : components_object option;
-    oa_security : EzAPI.security_scheme list option;
+    oa_security : EzAPI.Security.scheme list option;
     oa_tags : string list option;
     oa_external : external_doc_object option;
   }
@@ -260,16 +260,10 @@ module Encoding = struct
       (opt "description" string)
       (opt "variables" (assoc server_variable_object))
 
-  let param_type = conv
-      (function
-        | EzAPI.TYPES.PARAM_STRING -> "string"
-        | EzAPI.TYPES.PARAM_INT -> "integer"
-        | EzAPI.TYPES.PARAM_BOOL -> "boolean")
-      (function
-        | "integer" -> EzAPI.TYPES.PARAM_INT
-        | "boolean" -> EzAPI.TYPES.PARAM_BOOL
-        | _ -> EzAPI.TYPES.PARAM_STRING)
-      string
+  let param_type = string_enum [
+      "string", EzAPI.Param.PARAM_STRING;
+      "integer", EzAPI.Param.PARAM_INT;
+      "boolean", EzAPI.Param.PARAM_BOOL ]
 
   let param_object = conv
       (fun {opm_name; opm_in; opm_description; opm_required; opm_deprecated;
@@ -360,7 +354,7 @@ module Encoding = struct
             opt_security; opt_servers}
         -> (opt_tags, opt_summary, opt_description, opt_external, opt_id,
             opt_params, opt_request, opt_responses, opt_deprecated,
-            Option.map (List.map (fun s -> [EzAPI.security_ref_name s, []])) opt_security,
+            Option.map (List.map (fun s -> [EzAPI.Security.ref_name s, []])) opt_security,
             opt_servers))
       (fun (opt_tags, opt_summary, opt_description, opt_external, opt_id,
             opt_params, opt_request, opt_responses, opt_deprecated,
@@ -461,16 +455,16 @@ module Encoding = struct
 
   let make_security_scheme = function
     | `Nosecurity _ -> None
-    | `Basic { EzAPI.basic_name } ->
+    | `Basic { EzAPI.Security.basic_name } ->
       Some (basic_name, Makers.mk_security_scheme ~scheme:"basic" "http")
-    | `Bearer { EzAPI.bearer_name; format } ->
+    | `Bearer { EzAPI.Security.bearer_name; format } ->
       Some (bearer_name, Makers.mk_security_scheme ?format ~scheme:"bearer" "http")
-    | `Header { EzAPI.ref_name; name } ->
+    | `Header { EzAPI.Security.ref_name; name } ->
       Some (ref_name, Makers.mk_security_scheme ~loc:"header" ~name "apiKey")
-    | `Cookie { EzAPI.ref_name; name } ->
+    | `Cookie { EzAPI.Security.ref_name; name } ->
       Some (ref_name, Makers.mk_security_scheme ~loc:"cookie" ~name "apiKey")
-    | `Query { EzAPI.ref_name; name } ->
-      Some (ref_name, Makers.mk_security_scheme ~loc:"query" ~name:name.EzAPI.param_value "apiKey")
+    | `Query { EzAPI.Security.ref_name; name } ->
+      Some (ref_name, Makers.mk_security_scheme ~loc:"query" ~name:name.EzAPI.Param.param_id "apiKey")
 
   let components_object = conv
       (fun {ocm_schemas; ocm_responses; ocm_parameters; ocm_examples; ocm_requests;
@@ -496,7 +490,7 @@ module Encoding = struct
       (fun {oa_version; oa_info; oa_servers; oa_paths; oa_components;
             oa_security; oa_tags; oa_external}
         -> (oa_version, oa_info, oa_servers, oa_paths, oa_components,
-            Option.map (List.map (fun s -> [EzAPI.security_ref_name s, []])) oa_security,
+            Option.map (List.map (fun s -> [EzAPI.Security.ref_name s, []])) oa_security,
             oa_tags, oa_external))
       (fun (oa_version, oa_info, oa_servers, oa_paths, oa_components,
             _oa_security, oa_tags, oa_external)
@@ -518,17 +512,14 @@ end
 open EzAPI
 
 let make_query_param p =
-  Makers.mk_param ?descr:p.param_descr ~required:p.param_required ~loc:"query"
-    ~typ:p.param_type (Option.value ~default:p.param_value p.param_name)
+  Makers.mk_param ?descr:p.Param.param_descr ~required:p.Param.param_required ~loc:"query"
+    ~typ:p.Param.param_type (Option.value ~default:p.Param.param_id p.Param.param_name)
 
-let rec make_path_params = function
-  | ROOT -> []
-  | CONCAT (p, _) -> make_path_params p
-  | ENDARG (p, arg) ->
-    Makers.mk_param
-      ?example:(Option.map (fun s -> Json_repr.to_any (`String s)) arg.Resto.Arg.example)
-      ?descr:arg.Resto.Arg.descr ~typ:TYPES.PARAM_STRING arg.Resto.Arg.name
-    :: make_path_params p
+let make_path_params args =
+  List.map (fun arg ->
+      Makers.mk_param
+        ?example:(Option.map (fun s -> Json_repr.to_any (`String s)) arg.Arg.example)
+        ?descr:arg.Arg.descr ~typ:Param.PARAM_STRING arg.Arg.name) args
 
 let empty_schema ~none schema f = match Json_schema.root schema with
   | {Json_schema.kind = Json_schema.Object {Json_schema.additional_properties = None; properties = []; _}; _}
@@ -547,22 +538,26 @@ let make_request ?example mime schema = match schema, mime with
         Some Makers.(mk_request ["application/json", mk_media ?example ~schema () ]))
 
 let merge_definitions ?(definitions=Json_schema.any) sd =
-  let input_schema, definitions = match sd.doc_input with
+  let input_schema, definitions = match sd.Doc.doc_input with
     | None -> None, definitions
     | Some sc ->
       let sc, def =
         Json_schema.merge_definitions (Lazy.force sc, definitions) in
       Some (Json_schema.simplify sc), def in
-  let output_schema, definitions =
-    Json_schema.merge_definitions (Lazy.force sd.doc_output, definitions) in
+  let output_schema, definitions = match sd.Doc.doc_output with
+    | None -> [], definitions
+    | Some sc ->
+      let sc, def = Json_schema.merge_definitions (Lazy.force sc, definitions) in
+      [200, Json_schema.simplify sc], def in
   let output_schemas, definitions = List.fold_left (fun (acc, definitions) (code, sch) ->
       let sch, definitions = Json_schema.merge_definitions (Lazy.force sch, definitions) in
       (code, Json_schema.simplify sch) :: acc, definitions)
-      ([200, Json_schema.simplify output_schema], definitions) sd.doc_error_outputs in
+      (output_schema, definitions) sd.Doc.doc_errors in
   input_schema, output_schemas, definitions
 
 let make_path ?(docs=[]) ?definitions sd =
-  let path = string_of_path sd.doc_path in
+  let open Doc in
+  let path = sd.doc_path in
   let summary, descr, input_ex, output_ex = match sd.doc_name with
     | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
     | Some name -> match List.assoc_opt name docs with
@@ -573,12 +568,12 @@ let make_path ?(docs=[]) ?definitions sd =
         (match output with None -> sd.doc_output_example | Some x -> Some x) in
   let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
   (path,
-   Makers.mk_path ?summary ?descr ~meth:sd.doc_meth (
+   Makers.mk_path ?summary ?descr ~meth:(Meth.to_string sd.doc_meth) (
      Makers.mk_operation ?summary ?descr
        ~tags:[sd.doc_section.section_name] ~id:(string_of_int sd.doc_id)
-       ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_path)
+       ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_args)
        ~security:sd.doc_security
-       ?request:(make_request ?example:input_ex sd.doc_mime input_schema) @@
+       ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
      List.map (fun (code, schema) ->
          let example = if code = 200 then output_ex else None in
          let code_str = string_of_int code in
@@ -586,7 +581,7 @@ let make_path ?(docs=[]) ?definitions sd =
            empty_schema ~none:[ "application/json", Makers.mk_media ?example ()] schema (fun schema ->
                [ "application/json", Makers.mk_media ?example ~schema () ]) in
          code_str, Makers.mk_response ~content
-           (Option.value ~default:code_str @@ EzErrorCodes.error code)) output_schemas)),
+           (Option.value ~default:code_str @@ Error_codes.error code)) output_schemas)),
   definitions
 
 let definitions_schemas definitions =
@@ -636,8 +631,8 @@ let fix_descr_ref json =
 
 let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~sections title =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
-  let sds = List.concat @@ List.map (fun s -> s.section_docs) sections in
-  let security = List.concat @@ List.map (fun sd -> sd.doc_security) sds in
+  let sds = List.concat @@ List.map (fun s -> s.Doc.section_docs) sections in
+  let security = List.concat @@ List.map (fun sd -> sd.Doc.doc_security) sds in
   let paths, definitions = List.fold_left (fun (paths, definitions) sd ->
       let path, definitions = make_path ~definitions ~docs sd in
       path :: paths, definitions) ([], Json_schema.any) sds in
@@ -659,34 +654,34 @@ let write ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections ~tit
   close_out oc
 
 let executable ~sections ~docs =
-  let str_opt s = Arg.String (fun x -> s := Some x) in
+  let str_opt s = Stdlib.Arg.String (fun x -> s := Some x) in
   let output_file, title, descr, version, terms, contact, license, servers =
     ref "openapi.json", ref "API Documentation", ref None, ref None, ref None,
     ref None, ref None, ref None in
   let speclist =
-    [ "-o", Arg.Set_string output_file, "Optional name (path) of output file";
+    [ "-o", Stdlib.Arg.Set_string output_file, "Optional name (path) of output file";
       "--descr", str_opt descr, "Optional API description";
       "--version", str_opt version, "Optional API version";
-      "--title", Arg.Set_string title, "Optional API title";
+      "--title", Stdlib.Arg.Set_string title, "Optional API title";
       "--terms", str_opt terms, "Optional API terms";
-      "--contact", Arg.String (fun s ->
+      "--contact", Stdlib.Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ email ] -> contact := Some (Makers.mk_contact ~email ())
           | [ email; name ] -> contact := Some (Makers.mk_contact ~email ~name ())
           | _ -> ()), "Optional API contact";
-      "--license", Arg.String (fun s ->
+      "--license", Stdlib.Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ name ] -> license := Some (Makers.mk_licence name)
           | [ name; url ] -> license := Some (Makers.mk_licence ~url name)
           | _ -> ()), "Optional API license";
-      "--servers", Arg.String (fun s ->
+      "--servers", Stdlib.Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ url ] -> servers := Some [Makers.mk_server url]
           | [ url; descr ] -> servers := Some [Makers.mk_server ~descr url]
           | _ -> ()), "Optional API servers";
     ] in
   let usage_msg = "Create a OpenAPI json file with the services of the API" in
-  Arg.parse speclist (fun _ -> ()) usage_msg;
+  Stdlib.Arg.parse speclist (fun _ -> ()) usage_msg;
   write ?descr:!descr ?version:!version ~title:!title ?terms:!terms
     ?license:!license ?servers:!servers ?contact:!contact
     ~docs ~sections !output_file

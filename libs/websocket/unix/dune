@@ -1,0 +1,7 @@
+(library
+ (name ezWs_cohttp)
+ (public_name ez-api.ws-cohttp)
+ (optional)
+ (modules ezWs)
+ (implements ezWs)
+ (libraries websocket-lwt-unix))

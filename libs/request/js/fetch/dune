@@ -1,19 +1,28 @@
 (library
- (name ezFetch_i)
- (public_name ez-api.ifetch)
+ (name ezFetch)
+ (public_name ez-api.fetch)
  (optional)
- (modules ezReq)
- (implements ezReq)
+ (modules ezFetch)
  (preprocess (pps js_of_ocaml-ppx))
  (libraries ezRequest ezjs_fetch ezAPIJS)
  (modes byte))
 
 (library
- (name ezFetch)
- (public_name ez-api.fetch)
+ (name ezFetch_i)
+ (public_name ez-api.ifetch)
  (optional)
- (modules ezFetch)
- (libraries ezFetch_i)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezFetch)
+ (modes byte))
+
+(library
+ (name ezFetch_lwt)
+ (public_name ez-api.fetch-lwt)
+ (optional)
+ (modules ezFetch_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries ezRequest_lwt ezjs_fetch.lwt ezAPIJS)
  (modes byte))
 
 (library
@@ -22,14 +31,5 @@
  (optional)
  (modules ezReq_lwt)
  (implements ezReq_lwt)
- (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest_lwt ezjs_fetch.lwt ezAPIJS)
- (modes byte))
-
-(library
- (name ezFetch_lwt)
- (public_name ez-api.fetch-lwt)
- (optional)
- (modules ezFetch_lwt)
- (libraries ezFetch_lwt_i)
+ (libraries ezFetch_lwt)
  (modes byte))

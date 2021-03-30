@@ -1,0 +1,7 @@
+(library
+ (name ezServer)
+ (public_name ez-api.server-s)
+ (optional)
+ (virtual_modules ezServer)
+ (default_implementation ezServerDefault)
+ (libraries ezAPIServerUtils))

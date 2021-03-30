@@ -20,15 +20,29 @@ let destruct encoding buf =
       field buf ;
     raise DestructError
 
-let construct ?(compact=true) encoding data =
-  let ezjson =
-    (module Json_repr.Ezjsonm : Json_repr.Repr with type value = Json_repr.ezjsonm ) in
-  Json_repr.pp
-    ~compact
-    ezjson
-    Format.str_formatter
-    (Json_encoding.construct encoding data) ;
-  Format.flush_str_formatter ()
+type destruct_error = [
+  | `cannot_destruct of string * string
+  | `unexpected_field of string ]
+
+let destruct_res encoding s =
+  try Ok (Json_encoding.destruct encoding (Ezjsonm.from_string s))
+  with
+  | Cannot_destruct (path, exn)  ->
+    Json_query.print_path_as_json_path ~wildcards:true Format.str_formatter path;
+    Error (`cannot_destruct ((Format.flush_str_formatter ()), Printexc.to_string exn))
+  | Unexpected_field field ->
+    Error (`unexpected_field field)
+
+let error_to_string ?from e =
+  let from = match from with None -> "" | Some s -> " in\n" ^s in
+  match e with
+  | `cannot_destruct (path, exn) ->
+    Printf.sprintf "Cannot destruct: %s from %s%s" path exn from
+  | `unexpected_field field ->
+    Printf.sprintf "Unexpected_field: %s%s" field from
+
+let construct ?compact encoding data =
+  Ezjsonm.to_string ?minify:compact (Json_encoding.construct encoding data)
 
 let unexpected_error ~kind ~expected =
   raise @@ Cannot_destruct ([], Unexpected (kind, expected))
@@ -435,7 +449,7 @@ let merge_objs ?name ?descr o1 o2 =
 let result ok_enc err_enc =
   union [
     case
-      (obj1 (req "ok" ok_enc))
+      ok_enc
       (function Ok s -> Some s | Error _ -> None)
       (fun s -> Ok s);
     case
@@ -447,3 +461,6 @@ let result ok_enc err_enc =
 let ignore_enc encoding =
   conv (fun x -> x, ()) (fun (x, _) -> x) @@
   merge_objs encoding unit
+
+let enc_constant enc v =
+  conv (fun () -> v) (fun v2 -> if v2 = v then () else assert false) enc

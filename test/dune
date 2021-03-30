@@ -20,4 +20,4 @@
  (name test_ws)
  (modules test_ws)
  (optional)
- (libraries ezLwtSys ezWs))
+ (libraries ez-api.ws-cohttp))

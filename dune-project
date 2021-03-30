@@ -1,8 +1,6 @@
 (lang dune 2.6)
 (name ez-api)
 
-(generate_opam_files true)
-
 (source (github ocamlpro/ez-api))
 (license GPL-3.0-or-later)
 (authors
@@ -19,16 +17,21 @@
  (depends
   (json-data-encoding (>= 0.7.0))
   (lwt (>= 4.0.0))
-  (ezjsonm (>= 1.0.0)))
+  (ezjsonm (>= 1.0.0))
+  uuidm)
  (depopts
+  (geoip (>= 0.0.3))
   (js_of_ocaml-lwt (>= 3.4.0))
   (calendar (>= 2.03))
-  (geoip (>= 0.0.3))
   cohttp-lwt-unix
-  cohttp-lwt-jsoo
+  (cohttp-lwt-jsoo (>= 4.0.0))
   lwt_log
   tls
   (httpaf-lwt-unix (>= 0.6.0))
   (ocurl (>= 0.8.0))
   (ezjs_fetch (> 0.2.0))
-  websocket-lwt-unix))
+  websocket-lwt-unix
+  websocket-httpaf-lwt
+  (ppxlib (and :build (>= 0.16.0))))
+ (conflicts
+  (cohttp-lwt-jsoo (< 4.0.0))))

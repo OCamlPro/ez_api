@@ -53,8 +53,8 @@ let add_contacts ~api_key ?list_ids contacts =
 
 let delete_contacts ~api_key ?(all=false) ids =
   let params =
-    if all then [delete_all_param, EzAPI.TYPES.S "true"]
-    else [ids_param, EzAPI.TYPES.S (String.concat "," ids)] in
+    if all then [delete_all_param, EzAPI.S "true"]
+    else [ids_param, EzAPI.S (String.concat "," ids)] in
   EzReq_lwt.post0
     ~headers:(headers api_key)
     ~input:()
@@ -63,7 +63,7 @@ let delete_contacts ~api_key ?(all=false) ids =
     delete_contacts
 
 let remove_contact_list ~api_key list_id contact_ids =
-  let params = [contact_ids_param, EzAPI.TYPES.S (String.concat "," contact_ids)] in
+  let params = [contact_ids_param, EzAPI.S (String.concat "," contact_ids)] in
   EzReq_lwt.get1
     ~headers:(headers api_key)
     ~params

@@ -40,7 +40,7 @@ end
 let recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
 
 let verify secret_key token =
-  let url = EzAPI.TYPES.URL (
+  let url = EzAPI.URL (
       recaptcha_url ^ "?secret=" ^ secret_key ^ "&response=" ^ token) in
   Lwt.map
     (function Error e -> Error e | Ok x -> Ok (EzEncoding.destruct Encoding.captcha x))

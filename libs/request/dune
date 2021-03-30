@@ -20,13 +20,13 @@
 (library
  (name ezReq_default)
  (public_name ez-api.req-default)
- (modules ezReq)
  (implements ezReq)
+ (modules ezReq)
  (libraries ezRequest))
 
 (library
  (name ezReq_lwt_default)
  (public_name ez-api.req-lwt-default)
- (modules ezReq_lwt)
  (implements ezReq_lwt)
+ (modules ezReq_lwt)
  (libraries ezRequest_lwt))

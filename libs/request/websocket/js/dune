@@ -1,8 +1,0 @@
-(library
- (name ezWs_js)
- (public_name ez-api.ws-js)
- (optional)
- (modules ezWs)
- (preprocess (pps js_of_ocaml-ppx))
- (implements ezWs)
- (libraries ezDebug_js))

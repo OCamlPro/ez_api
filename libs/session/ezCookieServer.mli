@@ -1,8 +1,8 @@
-open StringCompat
+open EzAPIServerUtils
 
-val get : EzAPI.request -> string StringMap.t
-val clear : EzAPI.request -> name:string -> unit
+val get : Req.t -> string StringMap.t
+val clear : Req.t -> name:string -> (string * string)
 val set :
   ?secure:bool ->
   ?http_only:bool ->
-  EzAPI.request -> name:string -> value:string -> unit
+  Req.t -> name:string -> value:string -> (string * string)

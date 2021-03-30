@@ -1,4 +1,4 @@
-open EzAPI.TYPES
+open EzAPI
 
 module type S = EzReq_lwt_S.S
 module type Interface = EzReq_lwt_S.Interface
@@ -28,28 +28,26 @@ let request_reply_hook = ref (fun () -> ())
 
 let before_hook = ref (fun () -> ())
 
-let decode_result encoding err_encodings = function
+let decode_result io err_encodings = function
   | Error (code, None) -> Error (UnknownError { code ; msg = None })
   | Error (code, Some msg) ->
     (match err_encodings ~code with
-      | None -> Error (UnknownError { code ; msg = Some msg })
-      | Some encoding ->
-        try Error (
-            KnownError { code ; error = EzEncoding.destruct encoding msg })
-        with _ -> Error (UnknownError { code ; msg = Some msg })
+     | None -> Error (UnknownError { code ; msg = Some msg })
+     | Some encoding ->
+       try Error (
+           KnownError { code ; error = EzEncoding.destruct encoding msg })
+       with _ -> Error (UnknownError { code ; msg = Some msg })
     )
   | Ok res ->
-    let res = match res with "" -> "{}" | res -> res in
-    match EzEncoding.destruct encoding res with
-    | res -> (Ok res)
-    | exception exn ->
-      let msg = Printf.sprintf "Decoding error: %s in\n%s"
-          (Printexc.to_string exn) res in
-      Error (UnknownError { code = -3; msg = Some msg })
+    match IO.from_string io (fun x -> x) res with
+    | Ok s -> Ok s
+    | Error e -> Error (UnknownError {
+        code = -3;
+        msg = Some (EzEncoding.error_to_string ~from:res e) })
 
 let handle_result service res =
-  let err_encodings = EzAPI.service_errors service in
-  let encoding = EzAPI.service_output service in
+  let err_encodings = Service.error service.s in
+  let encoding = Service.output service.s in
   decode_result encoding err_encodings res
 
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url ->
@@ -71,7 +69,7 @@ module Make(S : Interface) : S = struct
   let internal_get ?meth ?headers ?msg (URL url) =
     EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
-        String.uppercase_ascii @@ EzAPI.str_of_method m) in
+        String.uppercase_ascii @@ Meth.to_string m) in
     S.get ?meth ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
@@ -79,7 +77,7 @@ module Make(S : Interface) : S = struct
   let internal_post ?meth ?content_type ?content ?headers ?msg (URL url) =
     EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
-        String.uppercase_ascii @@ EzAPI.str_of_method m) in
+        String.uppercase_ascii @@ Meth.to_string m) in
     S.post ?meth ?content_type ?content ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
@@ -100,11 +98,11 @@ module Make(S : Interface) : S = struct
     let get0 ?(post=false) ?headers ?(params=[]) ?msg
         api (service: ('output, 'error, 'security) EzAPI.service0) =
       !before_hook ();
-      let meth = EzAPI.service_meth service in
+      let meth = Service.meth service.s in
       if post then
-        let url = EzAPI.forge0 api service [] in
-        let content = EzAPI.encode_args service url params in
-        let content_type = EzUrl.content_type in
+        let url = forge0 api service [] in
+        let content = encode_params service.s params in
+        let content_type = Url.content_type in
         internal_post ~meth ~content ~content_type ?headers ?msg url >|=
         handle_result service
       else
@@ -114,11 +112,11 @@ module Make(S : Interface) : S = struct
     let get1 ?(post=false) ?headers ?(params=[]) ?msg
         api (service : ('arg,'output, 'error, 'security) EzAPI.service1) (arg : 'arg) =
       !before_hook ();
-      let meth = EzAPI.service_meth service in
+      let meth = Service.meth service.s in
       if post then
-        let url = EzAPI.forge1 api service arg []  in
-        let content = EzAPI.encode_args service url params in
-        let content_type = EzUrl.content_type in
+        let url = forge1 api service arg []  in
+        let content = encode_params service.s params in
+        let content_type = Url.content_type in
         internal_post ~meth ~content ~content_type ?headers ?msg url >|=
         handle_result service
       else
@@ -129,11 +127,11 @@ module Make(S : Interface) : S = struct
         api (service : ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2)
         (arg1 : 'arg1) (arg2 : 'arg2) =
       !before_hook ();
-      let meth = EzAPI.service_meth service in
+      let meth = Service.meth service.s in
       if post then
-        let url = EzAPI.forge2 api service arg1 arg2 []  in
-        let content = EzAPI.encode_args service url params in
-        let content_type = EzUrl.content_type in
+        let url = forge2 api service arg1 arg2 []  in
+        let content = encode_params service.s params in
+        let content_type = Url.content_type in
         internal_post ~meth ~content ~content_type ?headers ?msg url >|=
         handle_result service
       else
@@ -143,7 +141,7 @@ module Make(S : Interface) : S = struct
     let post0 :
       type i.
       ?headers:(string * string) list ->
-      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?params:(Param.t * param_value) list ->
       ?msg:string ->
       ?url_encode:bool ->
       input:i ->
@@ -152,25 +150,25 @@ module Make(S : Interface) : S = struct
       ('output, 'error) api_result Lwt.t =
       fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service ->
       !before_hook ();
-      let meth = EzAPI.service_meth service in
-      let input_encoding = EzAPI.service_input service in
-      let url = EzAPI.forge0 api service params in
+      let meth = Service.meth service.s in
+      let input_encoding = Service.input service.s in
+      let url = forge0 api service params in
       let content, content_type = match input_encoding with
-        | EzAPI.Empty -> "", "application/json"
-        | EzAPI.Binary [] -> input, "multipart/form-data"
-        | EzAPI.Binary (h :: _) -> input, h
-        | EzAPI.Json enc ->
+        | Empty -> "", "application/json"
+        | Raw [] -> input, "application/octet-stream"
+        | Raw (h :: _) -> input, Mime.to_string h
+        | Json enc ->
           if not url_encode then
             EzEncoding.construct enc input, "application/json"
           else
-            EzUrl.encode_obj enc input, EzUrl.content_type in
+            Url.encode_obj enc input, Url.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
     let post1 :
       type i.
       ?headers:(string * string) list ->
-      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?params:(Param.t * param_value) list ->
       ?msg:string ->
       ?url_encode:bool ->
       input:i ->
@@ -179,25 +177,25 @@ module Make(S : Interface) : S = struct
       ('output, 'error) api_result Lwt.t =
       fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg ->
       !before_hook ();
-      let meth = EzAPI.service_meth service in
-      let input_encoding = EzAPI.service_input service in
-      let url = EzAPI.forge1 api service arg params in
+      let meth = Service.meth service.s in
+      let input_encoding = Service.input service.s in
+      let url = forge1 api service arg params in
       let content, content_type = match input_encoding with
-        | EzAPI.Empty -> "", "application/json"
-        | EzAPI.Binary [] -> input, "multipart/form-data"
-        | EzAPI.Binary (h :: _) -> input, h
-        | EzAPI.Json enc ->
+        | Empty -> "", "application/json"
+        | Raw [] -> input, "application/octet-stream"
+        | Raw (h :: _) -> input, Mime.to_string h
+        | Json enc ->
           if not url_encode then
             EzEncoding.construct enc input, "application/json"
           else
-            EzUrl.encode_obj enc input, EzUrl.content_type in
+            Url.encode_obj enc input, Url.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 
     let post2 :
       type i.
       ?headers:(string * string) list ->
-      ?params:(EzAPI.param * EzAPI.arg_value) list ->
+      ?params:(Param.t * param_value) list ->
       ?msg:string ->
       ?url_encode:bool ->
       input:i ->
@@ -206,18 +204,18 @@ module Make(S : Interface) : S = struct
       ('output, 'error) api_result Lwt.t =
       fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg1 arg2 ->
       !before_hook ();
-      let meth = EzAPI.service_meth service in
-      let input_encoding = EzAPI.service_input service in
-      let url = EzAPI.forge2 api service arg1 arg2 params in
+      let meth = Service.meth service.s in
+      let input_encoding = Service.input service.s in
+      let url = forge2 api service arg1 arg2 params in
       let content, content_type = match input_encoding with
-        | EzAPI.Empty -> "", "application/json"
-        | EzAPI.Binary [] -> input, "multipart/form-data"
-        | EzAPI.Binary (h :: _) -> input, h
-        | EzAPI.Json enc ->
+        | Empty -> "", "application/json"
+        | Raw [] -> input, "application/octet-stream"
+        | Raw (h :: _) -> input, Mime.to_string h
+        | Json enc ->
           if not url_encode then
             EzEncoding.construct enc input, "application/json"
           else
-            EzUrl.encode_obj enc input, EzUrl.content_type in
+            Url.encode_obj enc input, Url.content_type in
       internal_post ~meth ~content ~content_type ?headers ?msg url >|=
       handle_result service
 end
@@ -228,36 +226,35 @@ end
   module Legacy = struct
 
     type ('output, 'error, 'security) service0 =
-      ('output) EzAPI.Legacy.service0
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('output) Legacy.service0
+      constraint 'security = [< Security.scheme ]
 
     type ('arg, 'output, 'error, 'security) service1 =
-      ('arg, 'output) EzAPI.Legacy.service1
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('arg, 'output) Legacy.service1
+      constraint 'security = [< Security.scheme ]
 
     type ('arg1, 'arg2, 'output, 'error, 'security) service2 =
-      ('arg1, 'arg2, 'output) EzAPI.Legacy.service2
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('arg1, 'arg2, 'output) Legacy.service2
+      constraint 'security = [< Security.scheme ]
 
     type ('input, 'output, 'error, 'security) post_service0 =
-      ('input, 'output) EzAPI.Legacy.post_service0
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('input, 'output) Legacy.post_service0
+      constraint 'security = [< Security.scheme ]
 
     type ('arg, 'input, 'output, 'error, 'security) post_service1 =
-      ('arg, 'input, 'output) EzAPI.Legacy.post_service1
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('arg, 'input, 'output) Legacy.post_service1
+      constraint 'security = [< Security.scheme ]
 
     type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
-      ('arg1, 'arg2, 'input, 'output) EzAPI.Legacy.post_service2
-      constraint 'security = [< EzAPI.security_scheme ]
+      ('arg1, 'arg2, 'input, 'output) Legacy.post_service2
+      constraint 'security = [< Security.scheme ]
 
     open EzAPI.Legacy
 
     let unresultize = function
       | Ok res -> Ok res
       | Error UnknownError { code ; msg } -> Error (code, msg)
-      | Error KnownError { error ; _ } -> EzAPI.unreachable error
-
+      | Error KnownError _ -> assert false (* Security.unreachable error *)
 
     let get0 ?post ?headers ?params ?msg
         api (service: 'output EzAPI.Legacy.service0) =
