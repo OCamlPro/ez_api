@@ -4,7 +4,7 @@ let echo (_, s) () =
 
 let echo_input s =
   EzAPIServer.return_ok @@ "echo input: " ^ s
-[@@service Test_ppx_lib.echo_input]
+[@@service {service=Test_ppx_lib.echo_input} ]
 
 let rec react s =
   Lwt.return_ok @@ "ws echo: " ^ s

@@ -32,6 +32,8 @@ type options = {
   error_type : core_type;
   security_type : core_type;
   debug : bool;
+  directory : string option;
+  service : expression option;
 }
 
 let empty ~loc  = pexp_construct ~loc (llid ~loc "EzAPI.Empty") None
@@ -54,7 +56,7 @@ let options ?register loc =
   security = enone ~loc; register; input_example = enone ~loc;
   output_example = enone ~loc; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
   security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
-  debug = false
+  debug = false; directory = None; service = None
 }
 
 let methods = [ "get"; "post"; "put"; "patch"; "delete" ]
@@ -120,6 +122,15 @@ let get_options ~loc ?name ?(client=false) a =
         | "input_example" -> name, { acc with input_example = esome e }
         | "output_example" -> name, { acc with input_example = esome e }
         | "debug" -> name, { acc with debug = true }
+        | "dir" -> begin match e.pexp_desc with
+            | Pexp_constant cst ->
+              begin match Ppx_compat.string_literal cst with
+                | Some s -> name, { acc with directory = Some s }
+                | _ -> Format.eprintf "directory should be a string literal"; name, acc
+              end
+            | _ -> Format.eprintf "directory should be a literal"; name, acc
+          end
+        | "service" -> name, { acc with service = Some e }
         | _ -> name, acc) (name, options ?register loc) l
   | _ -> name, options ?register loc
 
@@ -134,6 +145,7 @@ let service_value ?name ?client a =
         Optional "section", options.section;
         Optional "name", options.name;
         Optional "descr", options.descr;
+        Optional "params", options.params;
         Labelled "meth", meth;
         Labelled "input", options.input;
         Labelled "output", options.output;
@@ -149,14 +161,14 @@ let service_value ?name ?client a =
         options.security_type ] in
     let str = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
     if options.debug then Format.printf "%s@." @@ str_of_structure [ str ];
-    str, name, options.debug
+    str, name, options
 
 (** register service/handler *)
 
 let first = ref true
 
-let ppx_dir ~loc =
-  if !first then (
+let ppx_dir ~loc dir =
+  if !first && dir = None then (
     first := false;
     [ pstr_value ~loc Nonrecursive [
           value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
@@ -165,69 +177,79 @@ let ppx_dir ~loc =
 
 let register name a =
   let loc = a.attr_loc in
-  let ppx_dir = ppx_dir ~loc in
-  match a.attr_payload with
-  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
+  let _, options = get_options ~loc a in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  match options.service with
+  | None -> Location.raise_errorf ~loc "service not defined"
+  | Some e ->
     let register =
-      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
         ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            e; evar ~loc name; evar ~loc "ppx_dir" ]) in
-    ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ]
-  | _ -> Location.raise_errorf ~loc "service name not understood"
+            e; evar ~loc name; evar ~loc ppx_dir_name ]) in
+    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+    if options.debug then Format.printf "%s@." @@ str_of_structure str;
+    str
 
 let register_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
-  let ppx_dir = ppx_dir ~loc in
+  let _, options = get_options ~loc a in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
     | [] -> enone ~loc
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
     | _ -> Location.raise_errorf ~loc "too many value bindings" in
-  match a.attr_payload with
-  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
+  match options.service with
+  | None -> Location.raise_errorf ~loc "service not defined"
+  | Some  e ->
     let register =
-      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, e;
             Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc "ppx_dir" ]) in
-    ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ]
-  | _ -> Location.raise_errorf ~loc "service name not understood"
+            Nolabel, evar ~loc ppx_dir_name ]) in
+    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+    if options.debug then Format.printf "%s@." @@ str_of_structure str;
+    str
 
 let process name a =
   let loc = a.attr_loc in
   let service_name = if name = "handler" then "service" else name ^ "_s" in
-  let service, service_name, debug = service_value ~name:service_name a in
-  let ppx_dir = ppx_dir ~loc in
+  let service, service_name, options = service_value ~name:service_name a in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let register =
     pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
         ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            evar ~loc service_name; evar ~loc name; evar ~loc "ppx_dir" ]) ] in
-  if debug then Format.printf "%s@." @@ str_of_structure [ register ];
+            evar ~loc service_name; evar ~loc name; evar ~loc ppx_dir_name ]) ] in
+  if options.debug then Format.printf "%s@." @@ str_of_structure [ register ];
   ppx_dir @ [ service; register ]
 
 let process_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let service_name =  react_name ^ "_s" in
-  let service, service_name, debug =
+  let service, service_name, options =
     service_value ~name:service_name { a with attr_name = { a.attr_name with txt = "get" } } in
-  let ppx_dir = ppx_dir ~loc in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
     | [] -> enone ~loc
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
     | _ -> Location.raise_errorf ~loc "too many value bindings" in
   let register =
     pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc "ppx_dir")
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, evar ~loc service_name;
             Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc "ppx_dir" ]) ] in
-  if debug then Format.printf "%s@." @@ str_of_structure [ register ];
+            Nolabel, evar ~loc ppx_dir_name ]) ] in
+  if options.debug then Format.printf "%s@." @@ str_of_structure [ register ];
   ppx_dir @ [ service; register ]
 
 let handler_args e =

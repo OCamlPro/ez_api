@@ -1,0 +1,14 @@
+(library
+ (name ezLoads)
+ (public_name ez_api.loads)
+ (optional)
+ (modules ezLoads)
+ (preprocess (pps ppx_deriving_encoding))
+ (libraries ez_api.req_lwt str))
+
+(library
+ (name ezLoads_offset)
+ (public_name ez_api.loads_offset)
+ (optional)
+ (modules ezLoads_offset)
+ (preprocess (pps ppx)))

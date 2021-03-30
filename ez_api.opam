@@ -35,6 +35,7 @@ depopts: [
   "websocket-lwt-unix"
   "websocket-httpaf-lwt"
   "ppxlib"
+  "ppx_deriving_encoding"
 ]
 conflicts: [
   "calendar" {< "2.03"}

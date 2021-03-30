@@ -1,0 +1,16 @@
+(library
+ (name test_loads_lib)
+ (modules test_loads_lib)
+ (preprocess (pps ez_api.ppx))
+ (libraries ez_api.loads_offset))
+
+(executable
+ (name test_loads_server)
+ (modules test_loads_server)
+ (preprocess (pps ez_api.ppx_server))
+ (libraries test_loads_lib))
+
+(executable
+ (name test_loads)
+ (modules test_loads)
+ (libraries test_loads_lib ez_api.loads ez_api.icurl_lwt))
