@@ -89,9 +89,12 @@ let get_options ~loc ?name ?(client=false) a =
     let l = List.filter_map (function ({txt=Lident s; loc}, e) -> Some (s, loc, e) | _ -> None) l in
     List.fold_left (fun (name, acc) (s, loc, e) -> match s with
         | "path" -> begin match e.pexp_desc with
-            | Pexp_constant (Pconst_string (s, _, _)) ->
-              name, { acc with path = parse_path ~loc:e.pexp_loc s }
-            | _ -> name, acc
+            | Pexp_constant cst ->
+              begin match Ppx_compat.string_literal cst with
+                | Some s -> name, { acc with path = parse_path ~loc:e.pexp_loc s }
+                | _ -> Format.eprintf "path should be a string literal"; name, acc
+              end
+            | _ -> Format.eprintf "path should be a literal"; name, acc
           end
         | "input" -> name, { acc with input = json e }
         | "raw_input" -> name, { acc with input = raw e }
@@ -102,7 +105,11 @@ let get_options ~loc ?name ?(client=false) a =
         | "section" -> name, { acc with section = esome e }
         | "name" ->
           begin match e.pexp_desc with
-            | Pexp_constant (Pconst_string (s, _, _)) -> Some s,  { acc with name = esome e }
+            | Pexp_constant cst ->
+              begin match Ppx_compat.string_literal cst with
+                | Some s -> Some s,  { acc with name = esome e }
+                | _ -> Format.eprintf "name should be a string literal"; name, acc
+              end
             | _ ->
               Format.eprintf "name should be a literal";
               name, acc
