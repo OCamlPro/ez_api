@@ -1,6 +1,6 @@
 (library
  (name wsHttpaf)
- (public_name ez_api.ws-server-httpaf)
+ (public_name ez_api.ws_server_httpaf)
  (optional)
  (modules wsHttpaf)
  (libraries wsCommon

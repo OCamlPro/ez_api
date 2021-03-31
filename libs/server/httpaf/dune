@@ -1,6 +1,6 @@
 (library
  (name ezAPIServerHttpAf)
- (public_name ez_api.server-httpaf)
+ (public_name ez_api.server_httpaf)
  (optional)
  (modules ezAPIServerHttpAf)
  (libraries httpaf-lwt-unix wsHttpaf)
@@ -8,7 +8,7 @@
 
 (library
  (name ezServerHttpaf)
- (public_name ez_api.iserver-httpaf)
+ (public_name ez_api.iserver_httpaf)
  (optional)
  (implements ezServer)
  (modules ezServer)

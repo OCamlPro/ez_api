@@ -6,14 +6,14 @@
 
 (library
  (name ezSessionClient)
- (public_name ez_api.session-client)
+ (public_name ez_api.session_client)
  (optional)
  (modules ezSessionClient)
  (libraries ezReq ezSession))
 
 (library
  (name ezSessionServer)
- (public_name ez_api.server-session)
+ (public_name ez_api.server_session)
  (wrapped false)
  (optional)
  (modules ezCookieServer ezSessionServer)

@@ -15,14 +15,14 @@
 
 (library
  (name ezCohttp_lwt)
- (public_name ez_api.cohttp-lwt)
+ (public_name ez_api.cohttp_lwt)
  (optional)
  (modules ezCohttp_lwt)
  (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))
 
 (library
  (name ezCohttp_lwt_i)
- (public_name ez_api.icohttp-lwt)
+ (public_name ez_api.icohttp_lwt)
  (optional)
  (modules EzReq_lwt)
  (implements ezReq_lwt)

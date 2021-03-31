@@ -1,6 +1,6 @@
 (library
  (name ezCurl_common)
- (public_name ez_api.curl-common)
+ (public_name ez_api.curl_common)
  (optional)
  (modules ezCurl_common)
  (libraries curl))
@@ -22,14 +22,14 @@
 
 (library
  (name ezCurl_lwt)
- (public_name ez_api.curl-lwt)
+ (public_name ez_api.curl_lwt)
  (optional)
  (modules ezCurl_lwt)
  (libraries curl.lwt ezCurl_common ezRequest_lwt))
 
 (library
  (name ezCurl_lwt_i)
- (public_name ez_api.icurl-lwt)
+ (public_name ez_api.icurl_lwt)
  (optional)
  (modules ezReq_lwt)
  (implements ezReq_lwt)

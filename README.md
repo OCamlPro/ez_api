@@ -13,32 +13,32 @@ Around this `ez_api` provides a multitude of sub-package, sometimes depending on
 
 ## Encoding
 
-ez_api proposes a small addition to `json-data-encoding` for easier coding (`ez_api.encoding`) and to avoid overflow when using js_of_ocaml (`ez_api.encoding-js`).
+ez_api proposes a small addition to `json-data-encoding` for easier coding (`ez_api.encoding`) and to avoid overflow when using js_of_ocaml (`ez_api.encoding_js`).
 
 ## Client
 
 ez_api implements client side requests for unix and web using different libraries.
-The main sub-package `ez_api.req` (or `ez_api.req-lwt` if you're using lwt) is a virtual implemetation that needs to be complemented with a implementation of your choice:
+The main sub-package `ez_api.req` (or `ez_api.req_lwt` if you're using lwt) is a virtual implemetation that needs to be complemented with a implementation of your choice:
 
 For unix:
-- curl implementation `ez_api.icurl` or `ez_api.icurl-lwt` that requires curl library:
+- curl implementation `ez_api.icurl` or `ez_api.icurl_lwt` that requires curl library:
 ```
 opam depext ocurl
 opam install ocurl
 ```
-- cohttp implementation `ez_api.icohttp` or `ez_api.icohttp-lwt` that requires tls and cohttp-lwt-unix libraries:
+- cohttp implementation `ez_api.icohttp` or `ez_api.icohttp_lwt` that requires tls and cohttp-lwt-unix libraries:
 ```
 opam depext tls
 opam install tls cohttp-lwt-unix
 ```
 
 For web:
-- javascript XHR implemenation `ez_api.ixhr` or `ez_api.ixhr-lwt`
-- cohttp web `ez_api.icoxhr` or `ez_api.icoxhr-lwt` that requires cohttp-lwt-jsoo:
+- javascript XHR implemenation `ez_api.ixhr` or `ez_api.ixhr_lwt`
+- cohttp web `ez_api.icoxhr` or `ez_api.icoxhr_lwt` that requires cohttp-lwt-jsoo:
 ```
 opem install cohttp-lwt-jsoo
 ```
-- fetch implemetation `ez_api.ifetch` or `ez_api.ifetch-lwt` requiring `ezjs_fetch`
+- fetch implemetation `ez_api.ifetch` or `ez_api.ifetch_lwt` requiring `ezjs_fetch`
 ```
 opam install ezjs_fetch
 ```
@@ -49,11 +49,11 @@ All these implementation can also be used directly by removing the `i` preceding
 
 As for the traditional client, ez_api provides a virtual implementation of a websocket client: `ez_api.ws`
 It can be complemented with:
-- For unix the implementation `ez_api.ws-cohttp` requires cohttp-lwt-unix and websocket-lwt-unix:
+- For unix the implementation `ez_api.ws_cohttp` requires cohttp-lwt-unix and websocket-lwt-unix:
 ```
 opam install cohttp-lwt-unix websocket-lwt-unix
 ```
-- For javascript `ez_api.ws-js` that uses the native implementation of the browsers
+- For javascript `ez_api.ws_js` that uses the native implementation of the browsers
 
 
 ## Server
@@ -65,11 +65,11 @@ opam install calendar geoip
 ```
 As for the client, the server has a virtual implementation (`ez_api.server`) that can be complemented with either cohttp or httpaf:
 
-- for cohttp (`ez_api.iserver-cohttp`), you will need cohttp-lwt-unix:
+- for cohttp (`ez_api.iserver_cohttp`), you will need cohttp-lwt-unix:
 ```
 opam install cohttp-lwt-unix
 ```
-- for httpaf (`ez_api.iserver-httpaf`), you will need httpaf-lwt-unix:
+- for httpaf (`ez_api.iserver_httpaf`), you will need httpaf-lwt-unix:
 ```
 opam install httpaf-lwt-unix
 ```
@@ -90,7 +90,7 @@ opam pin add websocket-httpaf-lwt.~dev git+https://github.com/anmonteiro/websock
 ## More Tools
 
 ez_api provides useful tools for server and client:
-- server side sessions with different kind of authentication. (`ez_api.session`, `ez_api.session-client`, `ez_api.server-session`)
+- server side sessions with different kind of authentication. (`ez_api.session`, `ez_api.session_client`, `ez_api.server_session`)
 - recaptcha verification (`ez_api.recaptcha`)
 - sending email via sendgrid (`ez_api.sendgrid`)
 - exporting the documentation of your API to openapi-specs JSON (`ez_api.openAPI`)

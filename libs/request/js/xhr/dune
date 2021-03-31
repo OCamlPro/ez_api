@@ -18,7 +18,7 @@
 
 (library
  (name ezXhr_lwt)
- (public_name ez_api.xhr-lwt)
+ (public_name ez_api.xhr_lwt)
  (optional)
  (modules ezXhr_lwt)
  (preprocess (pps js_of_ocaml-ppx))
@@ -27,7 +27,7 @@
 
 (library
  (name ezXhr_lwt_i)
- (public_name ez_api.ixhr-lwt)
+ (public_name ez_api.ixhr_lwt)
  (optional)
  (modules ezReq_lwt)
  (implements ezReq_lwt)

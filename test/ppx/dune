@@ -6,11 +6,11 @@
 (executable
  (name test_ppx_server)
  (modules test_ppx_server)
- (preprocess (pps ez_api.ppx-server))
+ (preprocess (pps ez_api.ppx_server))
  (libraries test_ppx_lib))
 
 (executable
  (name test_ppx_client)
  (modules test_ppx_client)
- (libraries test_ppx_lib ez_api.ixhr-lwt)
+ (libraries test_ppx_lib ez_api.ixhr_lwt)
  (modes js))

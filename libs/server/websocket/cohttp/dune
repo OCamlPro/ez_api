@@ -1,6 +1,6 @@
 (library
  (name wsCohttp)
- (public_name ez_api.ws-server-cohttp)
+ (public_name ez_api.ws_server_cohttp)
  (optional)
  (modules wsCohttp)
  (libraries wsCommon

@@ -15,7 +15,7 @@ let () =
   Printf.kprintf
     Jbuild_plugin.V1.send
     "(library
-     (public_name ez_api.ppx-compat)
+     (public_name ez_api.ppx_compat)
      (name ppx_compat)
      (optional)
      (modules ppx_compat)

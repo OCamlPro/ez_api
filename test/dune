@@ -2,7 +2,7 @@
  (name test)
  (modules test)
  (optional)
- (libraries ez_api.request ez_api.server ez_api.server-session ez_api.session-client))
+ (libraries ez_api.request ez_api.server ez_api.server_session ez_api.session_client))
 
 (executable
  (name main_cohttp)
@@ -20,4 +20,4 @@
  (name test_ws)
  (modules test_ws)
  (optional)
- (libraries ez_api.ws-cohttp))
+ (libraries ez_api.ws_cohttp))

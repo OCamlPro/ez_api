@@ -6,9 +6,9 @@
 (executable
  (name test_ws_server)
  (modules test_ws_server)
- (libraries test_ws_lib ez_api.server ez_api.iserver-cohttp))
+ (libraries test_ws_lib ez_api.server ez_api.iserver_cohttp))
 
 (executable
  (name test_ws_client)
  (modules test_ws_client)
- (libraries test_ws_lib ez_api.ws-cohttp))
+ (libraries test_ws_lib ez_api.ws_cohttp))

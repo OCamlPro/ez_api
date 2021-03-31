@@ -18,7 +18,7 @@
 
 (library
  (name ezFetch_lwt)
- (public_name ez_api.fetch-lwt)
+ (public_name ez_api.fetch_lwt)
  (optional)
  (modules ezFetch_lwt)
  (preprocess (pps js_of_ocaml-ppx))
@@ -27,7 +27,7 @@
 
 (library
  (name ezFetch_lwt_i)
- (public_name ez_api.ifetch-lwt)
+ (public_name ez_api.ifetch_lwt)
  (optional)
  (modules ezReq_lwt)
  (implements ezReq_lwt)

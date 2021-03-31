@@ -6,27 +6,27 @@
 
 (library
  (name ezRequest_lwt)
- (public_name ez_api.request-lwt)
+ (public_name ez_api.request_lwt)
  (modules ezRequest_lwt)
  (libraries ezReq_lwt_S))
 
 (library
  (name ezCohttp_base)
- (public_name ez_api.cohttp-base)
+ (public_name ez_api.cohttp_base)
  (optional)
  (modules ezCohttp_base)
  (libraries cohttp-lwt))
 
 (library
  (name ezReq_default)
- (public_name ez_api.req-default)
+ (public_name ez_api.req_default)
  (implements ezReq)
  (modules ezReq)
  (libraries ezRequest))
 
 (library
  (name ezReq_lwt_default)
- (public_name ez_api.req-lwt-default)
+ (public_name ez_api.req_lwt_default)
  (implements ezReq_lwt)
  (modules ezReq_lwt)
  (libraries ezRequest_lwt))
