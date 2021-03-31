@@ -1,2 +1,2 @@
-let ws ?step:_ _req ?onclose:_ ~react:_ ~bg:_ () =
+let ws _req ?onclose:_ ?step:_ ~react:_ ~bg:_ _id =
   Lwt.return_error `no_ws_library
