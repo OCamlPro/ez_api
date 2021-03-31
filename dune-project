@@ -15,6 +15,7 @@
  (synopsis "Easy API library and tools")
  (documentation "https://ocpmax.github.io/ez_api/ez_api/index.html")
  (depends
+  (ocaml (>= 4.08))
   (json-data-encoding (>= 0.7.0))
   (lwt (>= 4.0.0))
   (ezjsonm (>= 1.0.0))
