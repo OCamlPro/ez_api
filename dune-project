@@ -33,7 +33,8 @@
   (ezjs_fetch (>= 0.2))
   websocket-lwt-unix
   websocket-httpaf-lwt
-  ppxlib)
+  ppxlib
+  ppx_deriving_encoding)
  (conflicts
   (cohttp-lwt-jsoo (< 4.0.0))
   (calendar (< 2.03.0))
