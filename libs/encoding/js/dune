@@ -2,6 +2,7 @@
  (public_name ez_api.js_json)
  (name js_json)
  (optional)
+ (preprocess (pps js_of_ocaml-ppx))
  (modules js_json)
  (libraries json-data-encoding js_of_ocaml))
 

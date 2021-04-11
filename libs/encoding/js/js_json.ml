@@ -39,16 +39,15 @@ module Js_to_JSON_Converter : Converter with type _ _from = Js.Unsafe.any
     else
       match Js.to_string (Js.typeof j) with
       | "object" ->
-        begin
-          try Arr
-                (Array.to_list
-                   (Js.to_array (Js.Unsafe.coerce j : 'a Js.js_array Js.t)))
-          with _ ->
-            let keys = Array.to_list (Js.to_array (Js.object_keys j)) in
-            let l =
-              List.map (fun k -> Js.to_string k, Js.Unsafe.get j k) keys in
-            Obj l
-        end
+        if Js.to_bool (Js.Unsafe.global##._Array##isArray j) then (
+          Arr
+            (Array.to_list
+               (Js.to_array (Js.Unsafe.coerce j : 'a Js.js_array Js.t))))
+        else (
+          let keys = Array.to_list (Js.to_array (Js.object_keys j)) in
+          let l =
+            List.map (fun k -> Js.to_string k, Js.Unsafe.get j k) keys in
+          Obj l)
       | "string" ->
         Leaf (`String
                 (Js.to_string (Js.Unsafe.coerce j : Js.js_string Js.t)))
