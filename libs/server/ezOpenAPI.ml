@@ -632,7 +632,9 @@ let fix_descr_ref json =
 let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~sections title =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
   let sds = List.concat @@ List.map (fun s -> s.Doc.section_docs) sections in
-  let security = List.concat @@ List.map (fun sd -> sd.Doc.doc_security) sds in
+  let security = List.rev @@ List.fold_left (fun acc sd ->
+      List.fold_left (fun acc s -> if List.mem s acc then acc else s :: acc) acc sd.Doc.doc_security)
+      [] sds in
   let paths, definitions = List.fold_left (fun (paths, definitions) sd ->
       let path, definitions = make_path ~definitions ~docs sd in
       path :: paths, definitions) ([], Json_schema.any) sds in
