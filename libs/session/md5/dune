@@ -1,0 +1,5 @@
+(library
+ (name ezHash_md5)
+ (public_name ez_api.md5)
+ (modules ezHash)
+ (implements ezHash))

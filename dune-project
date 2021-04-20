@@ -34,11 +34,13 @@
   websocket-lwt-unix
   websocket-httpaf-lwt
   ppxlib
-  ppx_deriving_encoding)
+  ppx_deriving_encoding
+  (digestif (>= 1.0.0)))
  (conflicts
   (cohttp-lwt-jsoo (< 4.0.0))
   (calendar (< 2.03.0))
   (httpaf-lwt-unix (< 0.6.0))
   (ezjs_fetch (< 0.2))
   (ocurl (< 0.8.0))
+  (digestif (< 1.0.0))
 ))

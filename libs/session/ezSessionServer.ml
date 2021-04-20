@@ -26,11 +26,7 @@ let randomCharsLen = String.length randomChars
 (* challenges should be printable to enforce that they can be directly
   written in URLs*)
 let random_challenge () =
-  let b = Bytes.create challenge_size in
-  for i = 0 to Bytes.length b - 1 do
-    Bytes.set b i (randomChars.[Random.int randomCharsLen])
-  done;
-  Bytes.to_string b
+  String.init challenge_size (fun _ -> randomChars.[Random.int randomCharsLen])
 
 module type SessionStore = sig
   type user_id

@@ -2,12 +2,11 @@
  (name ezSession)
  (public_name ez_api.session)
  (modules ezSession)
- (libraries ezAPI))
+ (libraries ezAPI ezHash))
 
 (library
  (name ezSessionClient)
  (public_name ez_api.session_client)
- (optional)
  (modules ezSessionClient)
  (libraries ezReq ezSession))
 

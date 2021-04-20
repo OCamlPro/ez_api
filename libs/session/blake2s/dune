@@ -1,0 +1,7 @@
+(library
+ (name ezHash_blake2s)
+ (public_name ez_api.blake2s)
+ (optional)
+ (modules ezHash)
+ (implements ezHash)
+ (libraries digestif.ocaml))

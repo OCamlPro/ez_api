@@ -1,0 +1,7 @@
+(library
+ (name ezHash_sha3)
+ (public_name ez_api.sha3)
+ (optional)
+ (modules ezHash)
+ (implements ezHash)
+ (libraries digestif.ocaml))

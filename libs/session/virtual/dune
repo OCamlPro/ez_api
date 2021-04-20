@@ -1,0 +1,6 @@
+(library
+ (name ezHash)
+ (public_name ez_api.hash)
+ (virtual_modules ezHash)
+ (modules ezHash)
+ (default_implementation ezHash_md5))

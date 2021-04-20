@@ -88,8 +88,7 @@ open TYPES
 
 module Hash = struct
 
-  let hash_fun = ref Digest.string
-  let hash s = !hash_fun s
+  include EzHash
 
   let password ~login ~password =
     let s = hash (login ^ password) in
