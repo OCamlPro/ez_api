@@ -2,7 +2,7 @@
 all: build
 
 build:
-	dune build libs
+	dune build src
 
 dev:
 	dune build
