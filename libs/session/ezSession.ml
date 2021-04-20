@@ -13,7 +13,7 @@ module TYPES = struct
   }
 
   type 'user_id session = {
-    session_cookie : string;
+    session_token : string;
     session_login : string;
     session_user_id : 'user_id;
     session_last : float;

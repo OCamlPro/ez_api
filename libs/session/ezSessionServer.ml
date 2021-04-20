@@ -37,7 +37,7 @@ module type SessionStore = sig
   val create_session : ?foreign:foreign_info ->
     login:string -> req:Req.t -> user_id -> user_id session Lwt.t
   val get_session : ?req:Req.t -> string -> user_id session option Lwt.t
-  val remove_session : user_id -> cookie:string -> unit Lwt.t
+  val remove_session : user_id -> token:string -> unit Lwt.t
 end
 
 module type Arg = sig
@@ -126,13 +126,13 @@ end = struct
         Queue.add challenge_id challenge_queue;
         { challenge_id; challenge }
 
-    let add_auth_header ?cookie req =
+    let add_auth_header ?token req =
       match S.token_kind with
       | `Cookie name ->
-        begin match cookie with
+        begin match token with
           | None -> []
-          | Some cookie ->
-            [ EzCookieServer.set req ~name ~value:cookie ]
+          | Some value ->
+            [ EzCookieServer.set req ~name ~value ]
         end
       | `CSRF header ->
         [ "access-control-allow-headers", header ]
@@ -151,26 +151,26 @@ end = struct
       let headers = add_auth_header req in
       return ~code ~headers (Error msg)
 
-    let return_auth_base req ?cookie ?foreign ~login user_id user_info f =
-      begin match cookie with
-        | Some cookie -> Lwt.return cookie
+    let return_auth_base req ?token ?foreign ~login user_id user_info f =
+      begin match token with
+        | Some token -> Lwt.return token
         | None ->
           create_session ?foreign ~login ~req user_id >>= function s ->
-            Lwt.return s.session_cookie
+            Lwt.return s.session_token
       end
-      >>= function cookie ->
-        let headers = add_auth_header ~cookie req in
+      >>= function token ->
+        let headers = add_auth_header ~token req in
         let auth = {
           auth_login = login;
           auth_user_id = user_id;
-          auth_token = cookie;
+          auth_token = token;
           auth_user_info = user_info } in
         return ~headers (f auth)
 
-    let return_auth req ?cookie ?foreign ~login user_id user_info =
+    let return_auth req ?token ?foreign ~login user_id user_info =
       match user_info with
       | Some user_info ->
-        return_auth_base req ?cookie ?foreign ~login user_id user_info
+        return_auth_base req ?token ?foreign ~login user_id user_info
           (fun auth -> Ok (LoginOk auth))
       | None ->
         return (Ok (LoginWait user_id))
@@ -178,19 +178,19 @@ end = struct
     let connect req security () =
       get_request_session security req >>= function
       | None -> request_auth req
-      | Some { session_cookie = cookie; session_login = login; session_foreign = foreign; _ } ->
+      | Some { session_token = token; session_login = login; session_foreign = foreign; _ } ->
         find_user ~login >>= function
         | None -> request_error req ~code:440 `Session_expired
         | Some (pwhash, user_id, user_info) ->
           match pwhash, foreign with
           | Some _pwhash, None ->
-            return_auth_base req ~cookie ~login user_id user_info (fun a -> Ok (AuthOk a))
+            return_auth_base req ~token ~login user_id user_info (fun a -> Ok (AuthOk a))
           | None, Some {foreign_origin = origin; foreign_token = token} ->
             check_foreign ~origin ~token >>= (function
                 | Error _e -> request_error req ~code:440 `Session_expired
                 | Ok foreign_id ->
                   if login = foreign_id then
-                    return_auth_base req ~cookie ~login ?foreign user_id user_info
+                    return_auth_base req ~token ~login ?foreign user_id user_info
                       (fun a -> Ok (AuthOk a))
                   else
                     request_error req ~code:400 (`Invalid_session_connect "wrong user"))
@@ -241,8 +241,8 @@ end = struct
     let logout req security () =
        get_request_session security req >>= function
       | None -> return ~code:400 (Error (`Invalid_session_logout "session doesn't exist"))
-      | Some { session_user_id ; session_cookie = cookie; _ } ->
-         remove_session session_user_id ~cookie >>= fun () ->
+      | Some { session_user_id ; session_token = token; _ } ->
+         remove_session session_user_id ~token >>= fun () ->
          request_auth_base req (fun auth_needed -> Ok auth_needed, None)
   end
 
@@ -271,39 +271,39 @@ module SessionStoreInMemory :
 
   type user_id = string
 
-  let (session_by_cookie : (string, user_id session) Hashtbl.t) =
+  let (session_by_token : (string, user_id session) Hashtbl.t) =
     Hashtbl.create initial_hashtbl_size
 
   let rec create_session ?foreign ~login ~req user_id =
-    let cookie = random_challenge () in
-    if Hashtbl.mem session_by_cookie cookie then
+    let token = random_challenge () in
+    if Hashtbl.mem session_by_token token then
       create_session ~login ~req user_id
     else begin
       let s = {
         session_login = login;
         session_user_id = user_id;
-        session_cookie = cookie;
+        session_token = token;
         session_foreign = foreign;
         session_last = req.Req.req_time;
       } in
-      Hashtbl.add session_by_cookie cookie s;
+      Hashtbl.add session_by_token token s;
       Lwt.return s
     end
 
-  let get_session ?req cookie =
-    match Hashtbl.find session_by_cookie cookie with
+  let get_session ?req token =
+    match Hashtbl.find session_by_token token with
     | exception Not_found ->
        Lwt.return None
     | s ->
       let s = match req with None -> s | Some req -> { s with session_last = req.Req.req_time } in
       Lwt.return (Some s)
 
-  let remove_session user_id ~cookie =
-    get_session cookie >>= function
+  let remove_session user_id ~token =
+    get_session token >>= function
     | None -> Lwt.return ()
     | Some s ->
       if s.session_user_id = user_id then
-        Hashtbl.remove session_by_cookie cookie;
+        Hashtbl.remove session_by_token token;
       Lwt.return ()
 
 end
