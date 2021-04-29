@@ -130,7 +130,8 @@ let get_options ~loc ?name ?(client=false) a =
               end
             | _ -> Format.eprintf "directory should be a literal"; name, acc
           end
-        | "service" -> name, { acc with service = Some e }
+        | "service" ->
+          name, { acc with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
         | _ -> name, acc) (name, options ?register loc) l
   | _ -> name, options ?register loc
 
