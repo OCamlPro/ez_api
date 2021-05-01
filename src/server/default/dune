@@ -1,7 +1,6 @@
 (library
  (name ezServerDefault)
  (public_name ez_api.iserver_default)
- (optional)
  (implements ezServer)
  (modules ezServer)
  (libraries
