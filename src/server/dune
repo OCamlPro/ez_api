@@ -1,9 +1,11 @@
 (library
  (name ezAPIServerUtils)
  (public_name ez_api.server_utils)
- (optional)
  (modules answer directory gMTime timings file ip ezAPIServerUtils)
- (libraries ezAPI geoip))
+ (libraries ezAPI
+  (select ip.ml from
+   (geoip -> ip.geoip.ml)
+   (-> ip.dummy.ml))))
 
 (library
  (name ezOpenAPI)
@@ -14,6 +16,5 @@
 (library
  (name ezAPIServer)
  (public_name ez_api.server)
- (optional)
  (modules ezAPIServer)
  (libraries ezServer))
