@@ -1,4 +1,4 @@
-let req_ips = Hashtbl.create 1111
+let req_ips : (string, EzAPI.ip_info) Hashtbl.t = Hashtbl.create 1111
 
 let register =
   let first = ref true in
