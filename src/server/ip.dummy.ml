@@ -1,6 +1,6 @@
 let req_ips : (string, EzAPI.ip_info) Hashtbl.t = Hashtbl.create 1111
 
-let register =
+let register : float -> string -> unit =
   let first = ref true in
   fun _ _ ->
     if !first then (
