@@ -306,8 +306,15 @@ let server a =
         ])
   ]
 
-let impl ?kind str =
-  List.rev @@ List.fold_left (fun acc str ->
+let rec impl ?kind str =
+  let rec pmod_impl pmod = match pmod.pmod_desc with
+    | Pmod_structure str -> {pmod with pmod_desc = Pmod_structure (impl ?kind str)}
+    | Pmod_functor (f, m) -> {pmod with pmod_desc = Pmod_functor (f, pmod_impl m)}
+    | Pmod_apply (m1, m2) -> {pmod with pmod_desc = Pmod_apply (pmod_impl m1, pmod_impl m2)}
+    | Pmod_constraint (m, mt) -> {pmod with pmod_desc = Pmod_constraint (pmod_impl m, mt)}
+    | _ -> pmod in
+  List.rev @@
+  List.fold_left (fun acc str ->
       match str.pstr_desc with
       | Pstr_value (rflag, [ v ]) when kind <> Some `client ->
         begin match List.partition (fun a -> List.mem a.attr_name.txt methods) v.pvb_attributes with
@@ -388,5 +395,7 @@ let impl ?kind str =
       | Pstr_attribute a when List.mem a.attr_name.txt methods ->
         let service, _, _ = service_value ~client:true a in
         service :: acc
+      | Pstr_module ({pmb_expr; _} as m) ->
+        {str with pstr_desc = Pstr_module {m with pmb_expr = pmod_impl pmb_expr}} :: acc
       | _ -> str :: acc
     ) [] str
