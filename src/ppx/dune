@@ -31,3 +31,11 @@
  (kind ppx_rewriter)
  (libraries ppx_common)
  (ppx_runtime_libraries ezAPIServer))
+
+(library
+ (name ppx_deriving_err_case)
+ (public_name ez_api.ppx_err_case)
+ (optional)
+ (modules ppx_deriving_err_case)
+ (kind ppx_deriver)
+ (libraries ppx_deriving_encoding.lib))
