@@ -3,7 +3,7 @@
  (public_name ez_api.ws_server_cohttp)
  (optional)
  (modules wsCohttp)
- (libraries wsCommon
+ (libraries
   (select wsCohttp.ml from
-   (websocket-lwt-unix.cohttp -> wsCohttp.real.ml)
-   (-> wsCohttp.dummy.ml))))
+   (websocket-lwt-unix.cohttp & wsCommon -> wsCohttp.real.ml)
+   (ezAPIServerUtils -> wsCohttp.dummy.ml))))

@@ -3,7 +3,7 @@
  (public_name ez_api.ws_server_httpaf)
  (optional)
  (modules wsHttpaf)
- (libraries wsCommon
+ (libraries
   (select wsHttpaf.ml from
-   (websocket-httpaf-lwt -> wsHttpaf.real.ml)
-   (-> wsHttpaf.dummy.ml))))
+   (wsCommon & websocket-httpaf-lwt -> wsHttpaf.real.ml)
+   (ezAPIServerUtils -> wsHttpaf.dummy.ml))))
