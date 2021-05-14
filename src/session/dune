@@ -14,6 +14,8 @@
  (name ezSessionServer)
  (public_name ez_api.server_session)
  (wrapped false)
- (optional)
  (modules ezCookieServer ezSessionServer)
- (libraries ezSession ezAPIServerUtils cohttp))
+ (libraries ezSession ezAPIServerUtils
+  (select ezCookieServer.ml from
+   (cohttp -> ezCookieServer.cohttp.ml)
+   (-> ezCookieServer.dummy.ml))))
