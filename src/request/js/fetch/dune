@@ -4,7 +4,7 @@
  (optional)
  (modules ezFetch)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest ezjs_fetch ezAPIJS)
+ (libraries ezRequest ezjs_fetch ezjsonm_js ezDebug_js)
  (modes byte))
 
 (library
