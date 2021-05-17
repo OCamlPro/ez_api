@@ -2,6 +2,9 @@ let verbose = match Sys.getenv_opt "EZAPICLIENT" with
   | Some "true" | Some "1" -> true
   | _ -> false
 
+let timeout = ref (Some 30)
+let set_timeout t = timeout := t
+
 let log ?(meth="GET") url = function
   | None -> ()
   | Some msg -> Printf.printf "[>%s %s %s ]\n%!" msg meth url
@@ -16,7 +19,7 @@ let init ?(meth="GET") ?content ?content_type ?(headers=[]) url =
     | Some ct -> ("content-type", ct) :: headers in
   let r = Buffer.create 16384
   and c = Curl.init () in
-  Curl.set_timeout c 30;      (* Timeout *)
+  (match !timeout with None -> () | Some t -> Curl.set_timeout c t);
   Curl.set_sslverifypeer c false;
   Curl.set_sslverifyhost c Curl.SSLVERIFYHOST_EXISTENCE;
   Curl.set_writefunction c (writer_callback r);
