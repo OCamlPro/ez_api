@@ -67,13 +67,13 @@ let decode s =
   iter 0;
   Buffer.contents r
 
-let encode_args ?(url=false) l =
+let encode_args ?(url=true) l =
   String.concat "&" (List.map (fun (name, arg) ->
       Printf.sprintf "%s=%s" name
         (String.concat ","
            (if url then List.map encode arg else arg))) l)
 
-let decode_args ?(url=false) s =
+let decode_args ?(url=true) s =
   let args = String.split_on_char '&' s in
   List.map (fun s ->
       let s, v = cut_at s '=' in

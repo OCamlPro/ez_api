@@ -83,136 +83,68 @@ module Make(S : Interface) : S = struct
 
   module Raw = struct
 
-    let get0 ?(post=false) ?headers ?(params=[]) ?msg ?error api service f =
-      !before_hook ();
-      let ok, error = handlers ?error service.s f in
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge0 api service [] in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        let meth = if meth = `GET then `POST else meth in
-        internal_post ~meth ?msg url ~content ~content_type ?headers ~error ok
-      else
-        let url = forge0 api service params in
-        internal_get ~meth ?msg url ?headers ~error ok
-
-    let get1 ?(post=false) ?headers ?(params=[]) ?msg ?error api service arg f =
-      !before_hook ();
-      let ok, error = handlers ?error service.s f in
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge1 api service arg []  in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        let meth = if meth = `GET then `POST else meth in
-        internal_post ~meth ?msg url ~content ~content_type ?headers ~error ok
-      else
-        let url = forge1 api service arg params in
-        internal_get ~meth ?msg url ?headers ~error ok
-
-    let get2 ?(post=false) ?headers ?(params=[]) ?msg ?error api service arg1 arg2 f =
-      !before_hook ();
-      let ok, error = handlers ?error service.s f in
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge2 api service arg1 arg2 []  in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        let meth = if meth = `GET then `POST else meth in
-        internal_post ~meth ?msg url ~content ~content_type ?headers ~error ok
-      else
-        let url = forge2 api service arg1 arg2 params in
-        internal_get ~meth ?msg url ?headers ~error ok
-
-    let post0 :
+    let request :
       type i.
       ?headers:(string * string) list ->
       ?params:(Param.t * param_value) list ->
       ?msg:string ->
+      ?post:bool ->
       ?url_encode:bool ->
       ?error:error_handler ->
       input:i ->
       EzAPI.base_url ->
-      (i, 'output, 'error, 'security) post_service0 ->
-      (('output, 'error) Result.result -> unit) ->
-      unit =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ?error ~input api service f ->
-      !before_hook ();
-      let ok, error = handlers ?error service.s f in
-      let meth = Service.meth service.s in
-      let input_encoding = Service.input service.s in
-      let url = forge0 api service params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
-          else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ~meth ?msg url ~content ~content_type ?headers ~error ok
-
-    let post1 :
-      type i.
-      ?headers:(string * string) list ->
-      ?params:(Param.t * param_value) list ->
-      ?msg:string ->
-      ?url_encode:bool ->
-      ?error:error_handler ->
-      input:i ->
-      EzAPI.base_url ->
-      ('arg, i, 'output, 'error, 'security) post_service1 ->
+      ('arg, i, 'output, 'error, 'security) service ->
       'arg ->
       (('output, 'error) Result.result -> unit) ->
       unit =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ?error ~input api service arg f ->
+      fun ?headers ?(params=[]) ?msg ?(post=false) ?(url_encode=false) ?error ~input api service arg f ->
       !before_hook ();
       let ok, error = handlers ?error service.s f in
       let meth = Service.meth service.s in
       let input_encoding = Service.input service.s in
-      let url = forge1 api service arg params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
-          else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+      let url = forge api service arg params in
+      match input_encoding with
+      | Empty ->
+        if post then
+          let url = forge api service arg [] in
+          let content, content_type = encode_params service.s params, Mime.(to_string url_encoded) in
+          internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+        else
+          internal_get ~meth ?msg url ?headers ~error ok
+      | Raw [] ->
+        let content, content_type = input, Mime.(to_string octet_stream) in
+        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+      | Raw [ h ] when h = Mime.url_encoded && input = "" ->
+        let url = forge api service arg [] in
+        let content, content_type = encode_params service.s params, Mime.to_string h in
+        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+      | Raw (h :: _) ->
+        let content, content_type = input, Mime.to_string h in
+        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+      | Json enc ->
+        let content, content_type =
+          if url_encode then Url.encode_obj enc input, Mime.(to_string url_encoded)
+          else EzEncoding.construct enc input, Mime.(to_string json) in
+        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
 
-    let post2 :
-      type i.
-      ?headers:(string * string) list ->
-      ?params:(Param.t * param_value) list ->
-      ?msg:string ->
-      ?url_encode:bool ->
-      ?error:error_handler ->
-      input:i ->
-      EzAPI.base_url ->
-      ('arg1, 'arg2, i, 'output, 'error, 'security) post_service2 ->
-      'arg1 -> 'arg2 ->
-      (('output, 'error) Result.result -> unit) ->
-      unit =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ?error ~input api service arg1 arg2 f ->
-      !before_hook ();
-      let ok, error = handlers ?error service.s f in
-      let meth = Service.meth service.s in
-      let input_encoding = Service.input service.s in
-      let url = forge2 api service arg1 arg2 params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
-          else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+    let get0 ?post ?headers ?params ?msg ?error api service f =
+      request ?headers ?params ?msg ?post ?error ~input:() api service Req.dummy f
+
+    let get1 ?post ?headers ?params ?msg ?error api service arg f =
+      request ?headers ?params ?msg ?post ?error ~input:() api service (Req.dummy, arg) f
+
+    let get2 ?post ?headers ?params ?msg ?error api service arg1 arg2 f =
+      request ?headers ?params ?msg ?post ?error ~input:() api service ((Req.dummy, arg1), arg2) f
+
+    let post0 ?headers ?params ?msg ?url_encode ?error ~input api service f =
+      request ?headers ?params ?msg ?url_encode ?error ~input api service Req.dummy f
+
+    let post1 ?headers ?params ?msg ?url_encode ?error ~input api service arg f =
+      request ?headers ?params ?msg ?url_encode ?error ~input api service (Req.dummy, arg) f
+
+    let post2 ?headers ?params ?msg ?url_encode ?error ~input api service arg1 arg2 f =
+      request ?headers ?params ?msg ?url_encode ?error ~input api service ((Req.dummy, arg1), arg2) f
+
   end
 
   include Raw

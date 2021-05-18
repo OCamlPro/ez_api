@@ -1,14 +1,15 @@
 open EzAPI
 
-type 'a api_error =
-  | KnownError of { code : int ; error : 'a }
+type 'e api_error =
+  | KnownError of { code : int ; error : 'e }
   | UnknownError of { code : int ; msg : string option }
-type ('output, 'error) api_result = ('output, 'error api_error) result
 
 (* Note that `?content_type` in post can be overriden by a content-type
    header in `?headers` *)
 module type RAWGEN = sig
 
+  type ('arg, 'input, 'output, 'error, 'security) service
+    constraint 'security = [< Security.scheme ]
   type ('output, 'error, 'security) service0
     constraint 'security = [< Security.scheme ]
   type ('arg, 'output, 'error, 'security) service1
@@ -21,7 +22,7 @@ module type RAWGEN = sig
     constraint 'security = [< Security.scheme ]
   type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2
     constraint 'security = [< Security.scheme ]
-  type ('output, 'error) api_result
+  type 'a api_error
 
   val get0 :
     ?post:bool ->
@@ -30,7 +31,7 @@ module type RAWGEN = sig
     ?msg:string ->                    (* debug msg *)
     base_url ->                 (* API url *)
     ('output, 'error, 'security) service0 ->         (* GET service *)
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
   val get1 :
     ?post:bool ->
@@ -40,7 +41,7 @@ module type RAWGEN = sig
     base_url ->
     ('arg, 'output, 'error, 'security) service1 ->
     'arg ->
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
   val get2 :
     ?post:bool ->
@@ -50,7 +51,7 @@ module type RAWGEN = sig
     base_url ->
     ('arg1, 'arg2, 'output, 'error, 'security) service2 ->
     'arg1 -> 'arg2 ->
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
   val post0 :
     ?headers:(string * string) list ->
@@ -60,7 +61,7 @@ module type RAWGEN = sig
     input:'input ->                           (* input *)
     base_url ->                 (* API url *)
     ('input,'output, 'error, 'security) post_service0 -> (* POST service *)
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
   val post1 :
     ?headers:(string * string) list ->
@@ -71,7 +72,7 @@ module type RAWGEN = sig
     base_url ->                 (* API url *)
     ('arg, 'input,'output, 'error, 'security) post_service1 -> (* POST service *)
     'arg ->
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
   val post2 :
     ?headers:(string * string) list ->
@@ -82,8 +83,22 @@ module type RAWGEN = sig
     base_url ->                 (* API url *)
     ('arg1, 'arg2, 'input,'output, 'error, 'security) post_service2 -> (* POST service *)
     'arg1 -> 'arg2 ->
-    ('output, 'error) api_result Lwt.t
+    ('output, 'error api_error) result Lwt.t
 
+  val request :
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?post:bool ->
+    ?url_encode:bool ->
+    input:'input ->
+    base_url ->
+    ('arg, 'input,'output, 'error, 'security) service ->
+    'arg ->
+    ('output, 'error api_error) result Lwt.t
+
+  val handle_error : ('a -> string option) -> 'a api_error -> int * string option
+  val string_of_error : ('a -> string option) -> 'a api_error -> string
 end
 
 module type RAW = RAWGEN
@@ -99,7 +114,9 @@ module type RAW = RAWGEN
      ('arg, 'input, 'output, 'error, 'security) post_service1
    and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 :=
      ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2
-   and type ('output, 'error) api_result := ('output, 'error) api_result
+   and type ('arg, 'input, 'output, 'error, 'security) service :=
+     ('arg, 'input, 'output, 'error, 'security) service
+   and type 'error api_error := 'error api_error
 
 module type LEGACY = RAWGEN
   with type ('output, 'error, 'security) service0 =
@@ -114,8 +131,9 @@ module type LEGACY = RAWGEN
      ('arg, 'input, 'output) Legacy.post_service1
    and type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
      ('arg1, 'arg2, 'input, 'output) Legacy.post_service2
-   and type ('output, 'error) api_result :=
-     ('output, (int * string option)) result
+   and type ('arg, 'input, 'output, 'error, 'security) service =
+     (unit, 'arg, 'input, 'output) Legacy.service
+   and type _ api_error = int * string option
 
 (* This interface is exported by all engines, so that you can directly
 use them from there. *)

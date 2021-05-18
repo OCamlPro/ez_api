@@ -96,6 +96,19 @@ module type CURRENT = sig
     url ->
     (string -> unit) -> unit
 
+  val request :
+    ?headers:(string * string) list ->
+    ?params:(Param.t * param_value) list ->
+    ?msg:string ->
+    ?post:bool ->
+    ?url_encode:bool ->
+    ?error: error_handler ->
+    input:'input ->
+    base_url ->
+    ('args, 'input, 'output, 'error, [< Security.scheme ]) service ->
+    'args ->
+    (('output, 'error) result -> unit) ->
+    unit
 end
 
 

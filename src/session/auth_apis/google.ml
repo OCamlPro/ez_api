@@ -93,7 +93,7 @@ end
 
 open Types
 open Services
-open EzRequest_lwt
+open EzReq_lwt
 open Lwt.Infix
 
 let handle_error e =
@@ -101,7 +101,7 @@ let handle_error e =
 
 let check_token ~client_id id_token =
   let params = [id_token_param, EzAPI.S id_token] in
-  ANY.get0 ~params google_auth token_info >|= function
+  get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok token ->
     if token.token_info.idt_aud = client_id then Ok token.token_info.idt_sub
@@ -109,7 +109,7 @@ let check_token ~client_id id_token =
 
 let get_info ~client_id id_token =
   let params = [id_token_param, EzAPI.S id_token] in
-  ANY.get0 ~params google_auth token_info >|= function
+  get0 ~params google_auth token_info >|= function
   | Error e -> handle_error e
   | Ok r ->
     if r.token_info.idt_aud = client_id then

@@ -101,7 +101,7 @@ end
 
 open Types
 open Services
-open EzRequest_lwt
+open EzReq_lwt
 open Lwt.Infix
 
 let handle_error e = Error (handle_error (fun exn -> Some (Printexc.to_string exn)) e)
@@ -110,7 +110,7 @@ let check_token ~app_secret ~app_id input_token =
   let params = [
     access_token_param, EzAPI.S (app_id ^ "|" ^ app_secret);
     input_token_param, EzAPI.S input_token] in
-  ANY.get0 ~params facebook_auth debug_token >|= function
+  get0 ~params facebook_auth debug_token >|= function
   | Error e -> handle_error e
   | Ok token ->
     if token.app_id = app_id && token.token_valid then Ok token.user_id
@@ -123,6 +123,6 @@ let get_info ~user_id user_access_token : (profile, int * string option) result 
     access_token_param, EzAPI.S user_access_token;
     fields_param, EzAPI.S fields
   ] in
-  ANY.get1 ~params facebook_auth (nodes ~name:"facebook_profile" Encoding.profile) user_id >|= function
+  get1 ~params facebook_auth (nodes ~name:"facebook_profile" Encoding.profile) user_id >|= function
   | Error e -> handle_error e
   | Ok pr -> Ok pr

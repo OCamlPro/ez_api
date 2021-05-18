@@ -6,49 +6,9 @@ module type Interface = EzReq_lwt_S.Interface
 let (>|=) = Lwt.(>|=)
 let return = Lwt.return
 
-type 'a api_error = 'a EzReq_lwt_S.api_error =
-  | KnownError of { code : int ; error : 'a }
-  | UnknownError of { code : int ; msg : string option }
-
-type ('output, 'error) api_result = ('output, 'error) EzReq_lwt_S.api_result
-
-let handle_error kn = function
-  | KnownError {code; error} -> code, kn error
-  | UnknownError {code; msg} -> code, msg
-
-let string_of_error kn = function
-  | KnownError {code; error} ->
-    let content = match kn error with None -> "" | Some s -> ": " ^ s in
-    Printf.sprintf "Error %d%s" code content
-  | UnknownError {code; msg} ->
-    let content = match msg with None -> "" | Some s -> ": " ^ s in
-    Printf.sprintf "Unknown Error %d%s" code content
-
 let request_reply_hook = ref (fun () -> ())
 
 let before_hook = ref (fun () -> ())
-
-let decode_result io err_encodings = function
-  | Error (code, None) -> Error (UnknownError { code ; msg = None })
-  | Error (code, Some msg) ->
-    (match err_encodings ~code with
-     | None -> Error (UnknownError { code ; msg = Some msg })
-     | Some encoding ->
-       try Error (
-           KnownError { code ; error = EzEncoding.destruct encoding msg })
-       with _ -> Error (UnknownError { code ; msg = Some msg })
-    )
-  | Ok res ->
-    match IO.from_string io (fun x -> x) res with
-    | Ok s -> Ok s
-    | Error e -> Error (UnknownError {
-        code = -3;
-        msg = Some (EzEncoding.error_to_string ~from:res e) })
-
-let handle_result service res =
-  let err_encodings = Service.error service.s in
-  let encoding = Service.output service.s in
-  decode_result encoding err_encodings res
 
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url ->
     return (Error (-2, Some "No http client loaded"))
@@ -94,136 +54,110 @@ module Make(S : Interface) : S = struct
   let post = internal_post
 
   module Raw = struct
+    type nonrec 'e api_error = 'e EzReq_lwt_S.api_error =
+      | KnownError of { code : int ; error : 'e }
+      | UnknownError of { code : int ; msg : string option }
 
-    let get0 ?(post=false) ?headers ?(params=[]) ?msg
-        api (service: ('output, 'error, 'security) EzAPI.service0) =
-      !before_hook ();
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge0 api service [] in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-        handle_result service
-      else
-        let url = EzAPI.forge0 api service params in
-        internal_get ~meth ?headers ?msg url >|= handle_result service
+    let decode_result io err_encodings = function
+      | Error (code, None) -> Error (UnknownError { code ; msg = None })
+      | Error (code, Some msg) ->
+        (match err_encodings ~code with
+         | None -> Error (UnknownError { code ; msg = Some msg })
+         | Some encoding ->
+           try Error (
+               KnownError { code ; error = EzEncoding.destruct encoding msg })
+           with _ -> Error (UnknownError { code ; msg = Some msg })
+        )
+      | Ok res ->
+        match IO.from_string io (fun x -> x) res with
+        | Ok s -> Ok s
+        | Error e -> Error (UnknownError {
+            code = -3;
+            msg = Some (EzEncoding.error_to_string ~from:res e) })
 
-    let get1 ?(post=false) ?headers ?(params=[]) ?msg
-        api (service : ('arg,'output, 'error, 'security) EzAPI.service1) (arg : 'arg) =
-      !before_hook ();
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge1 api service arg []  in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-        handle_result service
-      else
-        let url = EzAPI.forge1 api service arg params in
-        internal_get ~meth ?headers ?msg url >|= handle_result service
+    let handle_result service res =
+      let err_encodings = Service.error service.s in
+      let encoding = Service.output service.s in
+      decode_result encoding err_encodings res
 
-    let get2 ?(post=false) ?headers ?(params=[]) ?msg
-        api (service : ('arg1, 'arg2, 'output, 'error, 'security) EzAPI.service2)
-        (arg1 : 'arg1) (arg2 : 'arg2) =
-      !before_hook ();
-      let meth = Service.meth service.s in
-      if post then
-        let url = forge2 api service arg1 arg2 []  in
-        let content = encode_params service.s params in
-        let content_type = Url.content_type in
-        internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-        handle_result service
-      else
-        let url = EzAPI.forge2 api service arg1 arg2 params in
-        internal_get ~meth ?headers ?msg url >|= handle_result service
-
-    let post0 :
+    let request :
       type i.
       ?headers:(string * string) list ->
       ?params:(Param.t * param_value) list ->
       ?msg:string ->
+      ?post:bool ->
       ?url_encode:bool ->
       input:i ->
       EzAPI.base_url ->
-      (i, 'output, 'error, 'security) EzAPI.post_service0 ->
-      ('output, 'error) api_result Lwt.t =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service ->
+      ('arg, i, 'output, 'error, 'security) service ->
+      'arg ->
+      ('output, 'error api_error) result Lwt.t =
+      fun ?headers ?(params=[]) ?msg ?(post=false) ?(url_encode=false) ~input api service arg ->
       !before_hook ();
       let meth = Service.meth service.s in
       let input_encoding = Service.input service.s in
-      let url = forge0 api service params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
+      let url = forge api service arg params in
+      begin match input_encoding with
+        | Empty ->
+          if post then
+            let url = forge api service arg [] in
+            let content, content_type = encode_params service.s params, Mime.(to_string url_encoded) in
+            internal_post ?msg ~meth ~content ~content_type ?headers url
           else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-      handle_result service
+            internal_get ~meth ?msg ?headers url
+        | Raw [] ->
+          let content, content_type = input, "application/octet-stream" in
+          internal_post ?msg ~meth ~content ~content_type ?headers url
+        | Raw [ h ] when h = Mime.url_encoded && input = "" ->
+          let url = forge api service arg [] in
+          let content, content_type = encode_params service.s params, Mime.to_string h in
+          internal_post ?msg ~meth ~content ~content_type ?headers url
+        | Raw (h :: _) ->
+          let content, content_type = input, Mime.to_string h in
+          internal_post ?msg ~meth ~content ~content_type ?headers url
+        | Json enc ->
+          let content, content_type =
+            if url_encode then Url.encode_obj enc input, Mime.(to_string url_encoded)
+            else EzEncoding.construct enc input, Mime.(to_string json) in
+          internal_post ?msg ~meth ~content ~content_type ?headers url
+      end >|= handle_result service
 
-    let post1 :
-      type i.
-      ?headers:(string * string) list ->
-      ?params:(Param.t * param_value) list ->
-      ?msg:string ->
-      ?url_encode:bool ->
-      input:i ->
-      EzAPI.base_url ->
-      ('arg, i, 'output, 'error, 'security) EzAPI.post_service1 -> 'arg ->
-      ('output, 'error) api_result Lwt.t =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg ->
-      !before_hook ();
-      let meth = Service.meth service.s in
-      let input_encoding = Service.input service.s in
-      let url = forge1 api service arg params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
-          else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-      handle_result service
+    let get0 ?post ?headers ?params ?msg api service =
+      request ?headers ?params ?msg ?post ~input:() api service Req.dummy
 
-    let post2 :
-      type i.
-      ?headers:(string * string) list ->
-      ?params:(Param.t * param_value) list ->
-      ?msg:string ->
-      ?url_encode:bool ->
-      input:i ->
-      EzAPI.base_url ->
-      ('arg1, 'arg2, i, 'output, 'error, 'security) EzAPI.post_service2 -> 'arg1 -> 'arg2 ->
-      ('output, 'error) api_result Lwt.t =
-      fun ?headers ?(params=[]) ?msg ?(url_encode=false) ~input api service arg1 arg2 ->
-      !before_hook ();
-      let meth = Service.meth service.s in
-      let input_encoding = Service.input service.s in
-      let url = forge2 api service arg1 arg2 params in
-      let content, content_type = match input_encoding with
-        | Empty -> "", "application/json"
-        | Raw [] -> input, "application/octet-stream"
-        | Raw (h :: _) -> input, Mime.to_string h
-        | Json enc ->
-          if not url_encode then
-            EzEncoding.construct enc input, "application/json"
-          else
-            Url.encode_obj enc input, Url.content_type in
-      internal_post ~meth ~content ~content_type ?headers ?msg url >|=
-      handle_result service
-end
+    let get1 ?post ?headers ?params ?msg api service arg =
+      request ?headers ?params ?msg ?post ~input:() api service (Req.dummy, arg)
+
+    let get2 ?post ?headers ?params ?msg api service arg1 arg2 =
+      request ?headers ?params ?msg ?post ~input:() api service ((Req.dummy, arg1), arg2)
+
+    let post0 ?headers ?params ?msg ?url_encode ~input api service =
+      request ?headers ?params ?msg ?url_encode ~input api service Req.dummy
+
+    let post1 ?headers ?params ?msg ?url_encode ~input api service arg =
+      request ?headers ?params ?msg ?url_encode ~input api service (Req.dummy, arg)
+
+    let post2 ?headers ?params ?msg ?url_encode ~input api service arg1 arg2 =
+      request ?headers ?params ?msg ?url_encode ~input api service ((Req.dummy, arg1), arg2)
+
+    let handle_error kn = function
+      | KnownError {code; error} -> code, kn error
+      | UnknownError {code; msg} -> code, msg
+
+    let string_of_error kn = function
+      | KnownError {code; error} ->
+        let content = match kn error with None -> "" | Some s -> ": " ^ s in
+        Printf.sprintf "Error %d%s" code content
+      | UnknownError {code; msg} ->
+        let content = match msg with None -> "" | Some s -> ": " ^ s in
+        Printf.sprintf "Unknown Error %d%s" code content
+  end
 
   include Raw
 
-
   module Legacy = struct
+
+    type _ api_error = int * string option
 
     type ('output, 'error, 'security) service0 =
       ('output) Legacy.service0
@@ -247,6 +181,10 @@ end
 
     type ('arg1, 'arg2, 'input, 'output, 'error, 'security) post_service2 =
       ('arg1, 'arg2, 'input, 'output) Legacy.post_service2
+      constraint 'security = [< Security.scheme ]
+
+    type ('arg, 'input, 'output, 'error, 'security) service =
+      (unit, 'arg, 'input, 'output) Legacy.service
       constraint 'security = [< Security.scheme ]
 
     open EzAPI.Legacy
@@ -287,6 +225,17 @@ end
       post2 ?headers ?params ?msg ?url_encode ~input api service arg1 arg2
       >|= unresultize
 
+    let request ?headers ?params ?msg ?post ?url_encode ~(input: 'input)
+        api (service : (unit, 'arg, 'input, 'output) service)
+        (arg : 'arg) =
+      request ?headers ?params ?msg ?post ?url_encode ~input api service arg
+      >|= unresultize
+
+    let handle_error _ x = x
+
+    let string_of_error _ (code, content) =
+        let content = match content with None -> "" | Some s -> ": " ^ s in
+        Printf.sprintf "Error %d%s" code content
   end
 
 end

@@ -3,11 +3,11 @@
  (public_name ez_api.google_auth)
  (optional)
  (modules google)
- (libraries ezRequest_lwt))
+ (libraries ezReq_lwt))
 
 (library
  (name facebook)
  (public_name ez_api.facebook_auth)
  (optional)
  (modules facebook)
- (libraries ezRequest_lwt))
+ (libraries ezReq_lwt))

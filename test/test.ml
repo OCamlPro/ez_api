@@ -83,10 +83,28 @@ module MakeService(_ : sig end) = struct
       ~output:Encoding.output
       Path.(root // "test1")
 
+  let test11 : (Types.output, exn, no_security) service0  =
+    service
+      ~section:section_test
+      ~name:"test11"
+      ~meth:`POST
+      ~params:[param_arg]
+      ~output:Encoding.output
+      Path.(root // "test1")
+
   let test2 : (string, Types.output, exn, no_security) service1  =
     service
       ~section:section_test
       ~name:"test2"
+      ~params:[param_arg]
+      ~output:Encoding.output
+      Path.(root // "test2" /: arg_test)
+
+  let test22 : (string, Types.output, exn, no_security) service1  =
+    service
+      ~section:section_test
+      ~name:"test2"
+      ~meth:`POST
       ~params:[param_arg]
       ~output:Encoding.output
       Path.(root // "test2" /: arg_test)
@@ -152,7 +170,9 @@ module MakeServer(S : sig end) = struct
   let dir =
     EzAPIServer.empty
     |> EzAPIServer.register Service.test1 Handler.test1
+    |> EzAPIServer.register Service.test11 Handler.test1
     |> EzAPIServer.register Service.test2 Handler.test2
+    |> EzAPIServer.register Service.test22 Handler.test2
     |> EzAPIServer.register Service.test3 Handler.test3
     |> EzAPIServer.register Service.test4 Handler.test4
     |> Session.register_handlers
@@ -219,7 +239,7 @@ module MakeClient(S : sig end) = struct
   let test1' api =
     begin_request ();
     EzRequest.ANY.get0 ~msg:"test1" api
-      Service.test1
+      Service.test11
       ~post:true
       ~error:(error "test1'")
       ~params:[ Service.param_arg, S "example-of-arg"]
@@ -256,7 +276,7 @@ module MakeClient(S : sig end) = struct
   let test2' api =
     begin_request ();
     EzRequest.ANY.get1 ~msg:"test2" api
-      Service.test2
+      Service.test22
       ~post:true
       ~error:(error "test2'")
       ~params: [Service.param_arg, S " -- arg" ]

@@ -98,6 +98,10 @@ module Legacy = struct
 end
 
 let handle ?meth ?content_type ?ws s r path body =
+  let r, body =
+    if content_type = Some Url.content_type then
+      Req.add_params r (Url.decode_args body), ""
+    else r, body in
   match s with
   | Root (root, default) -> File.reply ?meth root ?default path >|= fun a -> `http a
   | API dir ->

@@ -48,9 +48,12 @@ let allowed l c =
             aux t in
         aux l
 
-let json = {typ = `str "application"; subtyp = `str "json"; param = None }
-let multipart = {typ = `str "multipart"; subtyp = `str "form-data"; param = None }
-
+let json = {typ = `str "application"; subtyp = `str "json"; param = None}
+let multipart = {typ = `str "multipart"; subtyp = `str "form-data"; param = None}
+let url_encoded =
+  {typ = `str "application"; subtyp = `str "x-www-form-urlencoded"; param = None}
+let octet_stream =
+  {typ = `str "application"; subtyp = `str "octet-stream"; param = None}
 
 let content_type_of_file file =
   let exts =
