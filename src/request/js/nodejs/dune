@@ -1,0 +1,42 @@
+(library
+ (name nodejs_common)
+ (package ez_api)
+ (optional)
+ (modules nodejs_common)
+ (preprocess (pps ppx_deriving_jsoo))
+ (libraries ezAPIJS)
+ (modes byte))
+
+(library
+ (name ezNodeJS)
+ (public_name ez_api.node_js)
+ (optional)
+ (modules ezNodeJS)
+ (libraries ezRequest nodejs_common)
+ (modes byte))
+
+(library
+ (name ezNodeJS_i)
+ (public_name ez_api.inode_js)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezNodeJS)
+ (modes byte))
+
+(library
+ (name ezNodeJS_lwt)
+ (public_name ez_api.node_js_lwt)
+ (optional)
+ (modules ezNodeJS_lwt)
+ (libraries ezRequest_lwt nodejs_common)
+ (modes byte))
+
+(library
+ (name ezNodeJS_lwt_i)
+ (public_name ez_api.inode_js_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezNodeJS_lwt)
+ (modes byte))

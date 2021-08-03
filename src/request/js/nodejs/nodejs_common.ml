@@ -1,0 +1,72 @@
+open Ezjs_min
+
+type options = {
+  meth : string option; [@key "method"]
+  headers : ((string * string) list [@assoc]) option;
+} [@@deriving jsoo]
+
+class type message = object
+  method headers : js_string t Table.t readonly_prop
+  method httpVersion : js_string t readonly_prop
+  method method_ : js_string t opt readonly_prop
+  method statusCode : int readonly_prop
+  method statusMessage : js_string t readonly_prop
+  method url : js_string t readonly_prop
+  method on_data : js_string t -> (js_string t -> unit) callback -> unit meth
+  method on_end : js_string t -> (unit -> unit) callback -> unit meth
+end
+
+class type err = object
+  inherit error
+  method code : int readonly_prop
+end
+
+class type request = object
+  method end_ : js_string t optdef -> unit meth
+  method on_error : js_string t -> (err t -> unit) callback -> unit meth
+end
+
+class type http = object
+  method request : js_string t -> options_jsoo t optdef ->
+    (message t -> unit) callback optdef -> request t meth
+  method get : js_string t -> options_jsoo t optdef ->
+    (message t -> unit) callback optdef -> request t meth
+end
+
+let log ?(meth="GET") url = function
+  | None -> ()
+  | Some msg -> log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
+
+let require s = Unsafe.(fun_call (variable "require") [|inject @@ string s|])
+
+let http : http t = require "http"
+let https : http t = require "https"
+
+let handle f (m : message t) =
+  if m##.statusCode >= 200 && m##.statusCode < 300 then
+    let s = ref "" in
+    m##on_data (string "data") (wrap_callback (fun chunk ->
+        s := !s ^ (to_string chunk)));
+    m##on_end (string "end") (wrap_callback (fun () -> f (Ok !s)))
+  else
+    f (Error (m##.statusCode, Some (to_string m##.statusMessage)))
+
+let get ?(protocol=http) ?options url f =
+  let o = optdef options_to_jsoo options in
+  let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
+  req##on_error (string "error") (wrap_callback (fun (e : err t) ->
+      f (Error (e##.code, Some (to_string e##.message)))));
+  req##end_ undefined
+
+let post ?(protocol=http) ?options url ~content f =
+  let o = optdef options_to_jsoo options in
+  let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
+  req##on_error (string "error") (wrap_callback (fun (e : err t) ->
+      f (Error (e##.code, Some (to_string e##.message)))));
+  req##end_ (def (string content))
+
+let get_protocol url =
+  try if String.sub url 0 5 = "https" then Some https else Some http
+  with _ -> None
+
+let () = EzDebug.log "ezNodeJs Loaded"
