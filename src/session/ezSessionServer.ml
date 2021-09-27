@@ -332,8 +332,8 @@ end = struct
   type user = {
     login : string;
     user_id : S.user_id;
-    mutable pwhash : string; (* hash of password *)
-    mutable user_info : S.user_info;
+    pwhash : string; (* hash of password *)
+    user_info : S.user_info;
     kind : string option;
   }
 
