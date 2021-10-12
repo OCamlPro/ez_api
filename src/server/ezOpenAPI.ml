@@ -40,7 +40,7 @@ module Types = struct
     opm_allow_empty : bool option;
     opm_style : string option;
     opm_example : Json_repr.any option;
-    opm_schema : Json_schema.schema option;
+    opm_schema : Json_repr.ezjsonm option;
   }
 
   type encoding_object = {
@@ -52,7 +52,7 @@ module Types = struct
   }
 
   type media_type_object = {
-    omt_schema : Json_schema.schema option;
+    omt_schema : Json_repr.ezjsonm option;
     omt_example : Json_repr.any option;
     omt_encoding : encoding_object option;
   }
@@ -168,14 +168,23 @@ module Makers = struct
   let mk_server ?descr ?variables osr_url =
     { osr_url; osr_description = descr; osr_variables = variables }
 
+  let mk_schema schema =
+    let json = Json_schema.to_json schema in
+    match json with
+    | `O l -> `O (List.filter_map (fun (k, v) ->
+        if k = "components" || k = "$schema" then None else Some (k, v)) l)
+    | json -> json
+
   let mk_param ?descr ?(required=true) ?deprecated ?allow_empty ?style ?example
-      ?schema ?(loc="path") opm_name = {
+      ?schema ?(loc="path") opm_name =
+    let opm_schema = Option.map mk_schema schema in {
     opm_name; opm_in = loc; opm_description = descr; opm_required = required;
     opm_deprecated = deprecated; opm_allow_empty = allow_empty; opm_style = style;
-    opm_example = example; opm_schema = schema }
+    opm_example = example; opm_schema }
 
   let mk_media ?schema ?example ?encoding () =
-    { omt_schema = schema; omt_example = example; omt_encoding = encoding }
+    let omt_schema = Option.map mk_schema schema in
+    { omt_schema; omt_example = example; omt_encoding = encoding }
 
   let mk_response ?headers ?content ?links ors_description =
     { ors_description; ors_headers = headers; ors_content = content; ors_links = links }
@@ -283,7 +292,7 @@ module Encoding = struct
       (opt "allowEmptyValue" bool)
       (opt "style" string)
       (opt "example" any_value)
-      (opt "schema" any_schema)
+      (opt "schema" any_ezjson_value)
 
   let encoding_object = conv
       (fun {oenc_content_type; oenc_headers; oenc_style; oenc_explode; oenc_allow_reserved}
@@ -301,7 +310,7 @@ module Encoding = struct
       (fun {omt_schema; omt_example; omt_encoding} -> (omt_schema, omt_example, omt_encoding))
       (fun (omt_schema, omt_example, omt_encoding) -> {omt_schema; omt_example; omt_encoding}) @@
     obj3
-      (opt "schema" any_schema)
+      (opt "schema" any_ezjson_value)
       (opt "example" any_value)
       (opt "encoding" encoding_object)
 
