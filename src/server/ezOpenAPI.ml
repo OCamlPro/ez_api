@@ -40,7 +40,7 @@ module Types = struct
     opm_allow_empty : bool option;
     opm_style : string option;
     opm_example : Json_repr.any option;
-    opm_type : EzAPI.Param.kind option;
+    opm_schema : Json_schema.schema option;
   }
 
   type encoding_object = {
@@ -169,10 +169,10 @@ module Makers = struct
     { osr_url; osr_description = descr; osr_variables = variables }
 
   let mk_param ?descr ?(required=true) ?deprecated ?allow_empty ?style ?example
-      ?typ ?(loc="path") opm_name = {
+      ?schema ?(loc="path") opm_name = {
     opm_name; opm_in = loc; opm_description = descr; opm_required = required;
     opm_deprecated = deprecated; opm_allow_empty = allow_empty; opm_style = style;
-    opm_example = example; opm_type = typ }
+    opm_example = example; opm_schema = schema }
 
   let mk_media ?schema ?example ?encoding () =
     { omt_schema = schema; omt_example = example; omt_encoding = encoding }
@@ -267,13 +267,13 @@ module Encoding = struct
 
   let param_object = conv
       (fun {opm_name; opm_in; opm_description; opm_required; opm_deprecated;
-            opm_allow_empty; opm_style; opm_example; opm_type}
+            opm_allow_empty; opm_style; opm_example; opm_schema}
         -> (opm_name, opm_in, opm_description, opm_required, opm_deprecated,
-            opm_allow_empty, opm_style, opm_example, opm_type))
+            opm_allow_empty, opm_style, opm_example, opm_schema))
       (fun (opm_name, opm_in, opm_description, opm_required, opm_deprecated,
-            opm_allow_empty, opm_style, opm_example, opm_type)
+            opm_allow_empty, opm_style, opm_example, opm_schema)
         -> {opm_name; opm_in; opm_description; opm_required; opm_deprecated;
-            opm_allow_empty; opm_style; opm_example; opm_type}) @@
+            opm_allow_empty; opm_style; opm_example; opm_schema}) @@
     obj9
       (req "name" string)
       (req "in" string)
@@ -283,7 +283,7 @@ module Encoding = struct
       (opt "allowEmptyValue" bool)
       (opt "style" string)
       (opt "example" any_value)
-      (opt "schema" (obj1 (req "type" param_type)))
+      (opt "schema" any_schema)
 
   let encoding_object = conv
       (fun {oenc_content_type; oenc_headers; oenc_style; oenc_explode; oenc_allow_reserved}
@@ -512,14 +512,21 @@ end
 open EzAPI
 
 let make_query_param p =
+  let schema = match p.Param.param_schema with
+    | Some schema -> schema
+    | None -> match p.Param.param_type with
+      | Param.PARAM_INT -> Json_schema.(create @@ element @@ Number numeric_specs)
+      | Param.PARAM_STRING -> Json_schema.(create @@ element @@ String string_specs)
+      | Param.PARAM_BOOL -> Json_schema.(create @@ element Boolean) in
   Makers.mk_param ?descr:p.Param.param_descr ~required:p.Param.param_required ~loc:"query"
-    ~typ:p.Param.param_type (Option.value ~default:p.Param.param_id p.Param.param_name)
+    ~schema (Option.value ~default:p.Param.param_id p.Param.param_name)
 
 let make_path_params args =
+  let schema = Json_schema.(create @@ element @@ String string_specs) in
   List.map (fun arg ->
       Makers.mk_param
         ?example:(Option.map (fun s -> Json_repr.to_any (`String s)) arg.Arg.example)
-        ?descr:arg.Arg.descr ~typ:Param.PARAM_STRING arg.Arg.name) args
+        ?descr:arg.Arg.descr ~schema arg.Arg.name) args
 
 let empty_schema ~none schema f = match Json_schema.root schema with
   | {Json_schema.kind = Json_schema.Object {Json_schema.additional_properties = None; properties = []; _}; _}
