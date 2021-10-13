@@ -574,19 +574,23 @@ let merge_definitions ?(definitions=Json_schema.any) sd =
 let make_path ?(docs=[]) ?definitions sd =
   let open Doc in
   let path = sd.doc_path in
-  let summary, descr, input_ex, output_ex = match sd.doc_name with
-    | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
+  let id, summary, descr, input_ex, output_ex = match sd.doc_name with
+    | None ->
+      string_of_int sd.doc_id, sd.doc_name,
+      sd.doc_descr, sd.doc_input_example, sd.doc_output_example
     | Some name -> match List.assoc_opt name docs with
-      | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
+      | None ->
+        name, sd.doc_name, sd.doc_descr,
+        sd.doc_input_example, sd.doc_output_example
       | Some (summary, descr, input, output) ->
-        Some summary, Some descr,
+        summary, None, Some descr,
         (match input with None -> sd.doc_input_example | Some x -> Some x),
         (match output with None -> sd.doc_output_example | Some x -> Some x) in
   let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
   (path,
    Makers.mk_path ?summary ?descr ~meth:(Meth.to_string sd.doc_meth) (
      Makers.mk_operation ?summary ?descr
-       ~tags:[sd.doc_section.section_name] ~id:(string_of_int sd.doc_id)
+       ~tags:[sd.doc_section.section_name] ~id
        ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_args)
        ~security:sd.doc_security
        ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
