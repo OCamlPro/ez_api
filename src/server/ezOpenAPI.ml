@@ -649,7 +649,8 @@ let fix_descr_ref json =
       with Not_found -> j
     ) json
 
-let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~sections title =
+let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
+    ?(yaml=false) ?(pretty=false) ~sections ~title filename =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
   let sds = List.concat @@ List.map (fun s -> s.Doc.section_docs) sections in
   let security = List.rev @@ List.fold_left (fun acc sd ->
@@ -663,47 +664,56 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~s
       ~components:(Makers.mk_components ~security ?schemas ())
       (List.rev paths) in
   let openapi_json =
-    Json_encoding.construct Encoding.openapi_object oa
-    |> fix_descr_ref
-  in
-  EzEncoding.Ezjsonm.to_string ~minify:true openapi_json
+    fix_descr_ref @@ Json_encoding.construct Encoding.openapi_object oa in
+  if yaml then
+    match EzYaml.to_string openapi_json with
+    | Error (`Msg msg) ->
+      Format.eprintf "%s@." msg;
+      filename ^ ".json", EzEncoding.Ezjsonm.to_string ~minify:false openapi_json
+    | Ok s -> filename ^ ".yaml", s
+  else
+    filename ^ ".json", EzEncoding.Ezjsonm.to_string ~minify:(not pretty) openapi_json
 
 
-let write ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections ~title filename =
-  let s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections title in
+let write ?descr ?terms ?contact ?license ?version ?servers ?docs ?(yaml=false)
+    ?pretty ~sections ~title filename =
+  let filename, s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~yaml ?pretty ~sections ~title filename in
   let oc = open_out filename in
   output_string oc s;
   close_out oc
 
 let executable ~sections ~docs =
-  let str_opt s = Stdlib.Arg.String (fun x -> s := Some x) in
-  let output_file, title, descr, version, terms, contact, license, servers =
-    ref "openapi.json", ref "API Documentation", ref None, ref None, ref None,
-    ref None, ref None, ref None in
+  let open Stdlib in
+  let str_opt s = Arg.String (fun x -> s := Some x) in
+  let output_file, title, descr, version, terms, contact, license, servers, yaml, pretty =
+    ref "openapi", ref "API Documentation", ref None, ref None, ref None,
+    ref None, ref None, ref None, ref false, ref false in
   let speclist =
-    [ "-o", Stdlib.Arg.Set_string output_file, "Optional name (path) of output file";
+    [ "-o", Arg.Set_string output_file, "Optional name (path) of output file";
       "--descr", str_opt descr, "Optional API description";
       "--version", str_opt version, "Optional API version";
-      "--title", Stdlib.Arg.Set_string title, "Optional API title";
+      "--title", Arg.Set_string title, "Optional API title";
       "--terms", str_opt terms, "Optional API terms";
-      "--contact", Stdlib.Arg.String (fun s ->
+      "--contact", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ email ] -> contact := Some (Makers.mk_contact ~email ())
           | [ email; name ] -> contact := Some (Makers.mk_contact ~email ~name ())
           | _ -> ()), "Optional API contact";
-      "--license", Stdlib.Arg.String (fun s ->
+      "--license", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ name ] -> license := Some (Makers.mk_licence name)
           | [ name; url ] -> license := Some (Makers.mk_licence ~url name)
           | _ -> ()), "Optional API license";
-      "--servers", Stdlib.Arg.String (fun s ->
+      "--servers", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ url ] -> servers := Some [Makers.mk_server url]
           | [ url; descr ] -> servers := Some [Makers.mk_server ~descr url]
           | _ -> ()), "Optional API servers";
+      "--pretty", Arg.Set pretty, "Output pretty json";
+      "--yaml", Arg.Set yaml, "Output in yaml format";
     ] in
   let usage_msg = "Create a OpenAPI json file with the services of the API" in
   Stdlib.Arg.parse speclist (fun _ -> ()) usage_msg;
   write ?descr:!descr ?version:!version ~title:!title ?terms:!terms
-    ?license:!license ?servers:!servers ?contact:!contact
+    ?license:!license ?servers:!servers ?contact:!contact ~yaml:!yaml ~pretty:!pretty
     ~docs ~sections !output_file

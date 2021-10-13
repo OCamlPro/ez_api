@@ -1,0 +1,8 @@
+(library
+ (name ezYaml)
+ (package ez_api)
+ (modules ezYaml)
+ (libraries
+  (select ezYaml.ml from
+   (yaml -> ezYaml.yaml.ml)
+   (-> ezYaml.dummy.ml))))
