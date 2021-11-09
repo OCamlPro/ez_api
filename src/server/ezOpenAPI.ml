@@ -520,15 +520,16 @@ end
 
 open EzAPI
 
-let make_query_param p =
+let make_query_param ?(definitions=Json_schema.any) p =
   let schema = match p.Param.param_schema with
     | Some schema -> schema
     | None -> match p.Param.param_type with
       | Param.PARAM_INT -> Json_schema.(create @@ element @@ Number numeric_specs)
       | Param.PARAM_STRING -> Json_schema.(create @@ element @@ String string_specs)
       | Param.PARAM_BOOL -> Json_schema.(create @@ element Boolean) in
+  let schema, definitions = Json_schema.merge_definitions (schema, definitions) in
   Makers.mk_param ?descr:p.Param.param_descr ~required:p.Param.param_required ~loc:"query"
-    ~schema (Option.value ~default:p.Param.param_id p.Param.param_name)
+    ~schema (Option.value ~default:p.Param.param_id p.Param.param_name), definitions
 
 let make_path_params args =
   let schema = Json_schema.(create @@ element @@ String string_specs) in
@@ -587,11 +588,14 @@ let make_path ?(docs=[]) ?definitions sd =
         (match input with None -> sd.doc_input_example | Some x -> Some x),
         (match output with None -> sd.doc_output_example | Some x -> Some x) in
   let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
+  let params, definitions = List.fold_left (fun (acc, definitions) p ->
+      let p, definitions = make_query_param ~definitions p in
+      acc @ [ p ], definitions) ([], definitions) sd.doc_params in
   (path,
    Makers.mk_path ?summary ?descr ~meth:(Meth.to_string sd.doc_meth) (
      Makers.mk_operation ?summary ?descr
        ~tags:[sd.doc_section.section_name] ~id
-       ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_args)
+       ~params:(params @ make_path_params sd.doc_args)
        ~security:sd.doc_security
        ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
      List.map (fun (code, schema) ->
