@@ -1,6 +1,6 @@
 open Ezjs_min
 
-type options = {
+type nonrec options = {
   meth : string option; [@key "method"]
   headers : ((string * string) list [@assoc]) option;
 } [@@deriving jsoo]
