@@ -37,7 +37,7 @@ let log ?(meth="GET") url = function
   | None -> ()
   | Some msg -> log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
-let require s = Unsafe.(fun_call (variable "require") [|inject @@ string s|])
+let require s = Unsafe.(fun_call (pure_js_expr "require") [|inject @@ string s|])
 
 let http : http t = require "http"
 let https : http t = require "https"

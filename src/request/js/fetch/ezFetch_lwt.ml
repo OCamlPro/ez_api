@@ -9,7 +9,7 @@ let log ?(meth="GET") ?msg url = match msg with
 
 let handle_response ?msg url r =
   match r with
-  | Error s -> Error (0, Some (Ezjs_min.string_of_error s))
+  | Error e -> Error (0, Some (Ezjs_min.to_string e##toString))
   | Ok r ->
     log ~meth:("RECV " ^ string_of_int r.status) ?msg url ;
     if r.status >= 200 && r.status < 300 then Ok r.body

@@ -22,7 +22,7 @@
   uuidm)
  (depopts
   geoip
-  js_of_ocaml-lwt
+  (js_of_ocaml-lwt (>= 4.0.0))
   (calendar (>= 2.03))
   (cohttp-lwt-unix (>= 5.0.0))
   (cohttp-lwt-jsoo (>= 5.0.0))
@@ -37,6 +37,7 @@
   ppx_deriving_encoding
   (digestif (>= 1.0.0)))
  (conflicts
+  (js_of_ocaml-lwt (< 4.0.0))
   (cohttp-lwt-unix (< 5.0.0))
   (cohttp-lwt-jsoo (< 5.0.0))
   (calendar (< 2.03.0))
