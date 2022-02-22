@@ -26,7 +26,7 @@ let headers_from_cohttp req =
   let headers = ref StringMap.empty in
   Header.iter (fun s v ->
       headers :=
-        StringMap.add (String.lowercase_ascii s) v !headers)
+        StringMap.add (String.lowercase_ascii s) (String.split_on_char ',' v) !headers)
     (Request.headers req);
   !headers
 
@@ -46,7 +46,8 @@ let debug_cohttp req =
     (req |> Request.uri |> Uri.path_and_query);
   debugf ~v:1 (fun () ->
       Header.iter (fun s v ->
-          List.iter (fun v -> EzDebug.printf "  %s: %s" s v) v)
+          List.iter (fun v -> EzDebug.printf "  %s: %s" s v)
+            (String.split_on_char ',' v))
         (Request.headers req))
 
 let dispatch ?catch s io req body =

@@ -24,8 +24,8 @@
   geoip
   js_of_ocaml-lwt
   (calendar (>= 2.03))
-  cohttp-lwt-unix
-  (cohttp-lwt-jsoo (>= 4.0.0))
+  (cohttp-lwt-unix (>= 5.0.0))
+  (cohttp-lwt-jsoo (>= 5.0.0))
   lwt_log
   tls
   (httpaf-lwt-unix (>= 0.6.0))
@@ -37,7 +37,8 @@
   ppx_deriving_encoding
   (digestif (>= 1.0.0)))
  (conflicts
-  (cohttp-lwt-jsoo (< 4.0.0))
+  (cohttp-lwt-unix (< 5.0.0))
+  (cohttp-lwt-jsoo (< 5.0.0))
   (calendar (< 2.03.0))
   (httpaf-lwt-unix (< 0.6.0))
   (ezjs_fetch (< 0.2))

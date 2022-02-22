@@ -25,8 +25,8 @@ depopts: [
   "geoip"
   "js_of_ocaml-lwt"
   "calendar" {>= "2.03"}
-  "cohttp-lwt-unix"
-  "cohttp-lwt-jsoo" {>= "4.0.0"}
+  "cohttp-lwt-unix" {>= "5.0.0"}
+  "cohttp-lwt-jsoo" {>= "5.0.0"}
   "lwt_log"
   "tls"
   "httpaf-lwt-unix" {>= "0.6.0"}
@@ -40,7 +40,8 @@ depopts: [
 ]
 conflicts: [
   "calendar" {< "2.03"}
-  "cohttp-lwt-jsoo" {< "4.0.0"}
+  "cohttp-lwt-unix" {< "5.0.0"}
+  "cohttp-lwt-jsoo" {< "5.0.0"}
   "httpaf-lwt-unix" {< "0.6.0"}
   "ezjs_fetch" {< "0.2"}
   "ocurl" {< "0.8.0"}
