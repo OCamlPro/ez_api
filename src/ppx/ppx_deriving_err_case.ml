@@ -2,14 +2,17 @@ open Ppxlib
 open Ast_builder.Default
 open Ppx_deriving_encoding_lib
 
-let mk ~loc ?enc name code =
+let mk ~loc ?enc ?(kind_label="kind") ~title name code =
   let kind_enc = Utils.(enc_apply ~loc "obj1" [
       enc_apply ~loc "req" [
-        estring ~loc "kind";
+        estring ~loc kind_label;
         enc_apply ~loc "constant" [ estring ~loc name ] ] ]) in
   let encoding = match enc with
     | None -> kind_enc
     | Some enc -> Utils.enc_apply ~loc "merge_objs" [kind_enc; enc] in
+  let encoding =
+    if title then Utils.enc_apply ~loc "def" [ estring ~loc name; encoding ]
+    else encoding in
   let select = pexp_function ~loc [
       case ~guard:None
         ~lhs:(ppat_variant ~loc name (Option.map (fun _ -> pvar ~loc "x") enc))
@@ -42,30 +45,30 @@ let get_code attrs =
         end
       | _ -> acc) 500 attrs
 
-let row prf =
+let row ?kind_label ~title prf =
   let loc = prf.prf_loc in
   let code = get_code prf.prf_attributes in
   match prf.prf_desc with
-  | Rtag ({txt; loc}, _, []) -> txt, mk ~loc txt code
+  | Rtag ({txt; loc}, _, []) -> txt, mk ~loc ?kind_label ~title txt code
   | Rtag ({txt; loc}, _, (h :: _)) ->
     let enc = Encoding.core h in
-    txt, mk ~loc ~enc txt code
+    txt, mk ~loc ~enc ?kind_label ~title txt code
   | _ ->
     Location.raise_errorf ~loc "inherit not handled"
 
-let expressions t =
+let expressions ?kind_label ~title t =
   let loc = t.ptype_loc in
   match t.ptype_kind, t.ptype_manifest with
   | Ptype_abstract, Some {ptyp_desc=Ptyp_variant (l, _, _); _} ->
-    List.map row l
+    List.map (row ?kind_label ~title) l
   | _ -> Location.raise_errorf ~loc "error cases only from variants"
 
-let str_gen ~loc ~path:_ (rec_flag, l) debug =
+let str_gen ~loc ~path:_ (rec_flag, l) debug title kind_label =
   let l = List.map (fun t ->
       let loc = t.ptype_loc in
-      let cases = expressions t in
+      let cases = expressions ?kind_label ~title t in
       List.map (fun (name, expr) ->
-          let pat = ppat_constraint ~loc (pvar ~loc (name ^ "_case"))
+          let pat = ppat_constraint ~loc (pvar ~loc (String.lowercase_ascii name ^ "_case"))
               (ptyp_constr ~loc (Utils.llid ~loc "EzAPI.Err.case") [
                   ptyp_constr ~loc (Utils.llid ~loc t.ptype_name.txt) [] ]) in
           value_binding ~loc ~pat ~expr) cases) l in
@@ -76,6 +79,11 @@ let str_gen ~loc ~path:_ (rec_flag, l) debug =
   s
 
 let () =
-  let args_str = Deriving.Args.(empty +> flag "debug") in
+  let args_str = Deriving.Args.(
+      empty
+      +> flag "debug"
+      +> flag "title"
+      +> arg "kind_label" (estring __)
+    ) in
   let str_type_decl = Deriving.Generator.make args_str str_gen in
   Deriving.ignore @@ Deriving.add "err_case" ~str_type_decl

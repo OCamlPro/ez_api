@@ -108,8 +108,9 @@ let get_options ~loc ?name ?(client=false) a =
         | "name" ->
           begin match e.pexp_desc with
             | Pexp_constant cst ->
-              begin match Ppx_compat.string_literal cst with
-                | Some s -> Some s,  { acc with name = esome e }
+              begin match name, Ppx_compat.string_literal cst with
+                | None, Some s -> Some s,  { acc with name = esome e }
+                | Some n, _ -> Some n, { acc with name = esome e }
                 | _ -> Format.eprintf "name should be a string literal"; name, acc
               end
             | _ ->

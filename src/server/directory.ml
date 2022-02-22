@@ -8,24 +8,29 @@ module Step = struct
   type t =
     | Static of string
     | Dynamic of Arg.descr
+
+  let to_string = function
+    | Static s -> s
+    | Dynamic a -> Format.sprintf "{%s}" a.Arg.name
+
+  let list_to_string l =
+    Format.sprintf "/%s" @@ String.concat "/" @@ List.map to_string l
+
 end
 
 type conflict =
-  | CService
-  | CDir
-  | CBuilder
-  | CCustom
+  | CService of Meth.t
   | CTypes of Arg.descr * Arg.descr
-  | CType of Arg.descr * string list
 
 and 'a directory = {
   services: 'a registered_service MethMap.t ;
-  subdirs: 'a subdirectories option
+  subdirs: ('a static_subdirectories option * 'a variable_subdirectories option)
 }
 
-and _ subdirectories =
-  | Suffixes: 'a directory StringMap.t -> 'a subdirectories
-  | Arg: 'a1 Arg.t * ('a * 'a1) directory -> 'a subdirectories
+and 'a static_subdirectories = 'a directory StringMap.t
+
+and _ variable_subdirectories =
+  | Arg: 'a1 Arg.t * ('a * 'a1) directory -> 'a variable_subdirectories
 
 and _ registered_service =
   | Http : {
@@ -40,7 +45,7 @@ and _ registered_service =
       step : float option;
     } -> 'a registered_service
 
-let empty = { services = MethMap.empty ; subdirs = None }
+let empty = { services = MethMap.empty ; subdirs = (None, None) }
 
 type t = Req.t directory
 
@@ -67,23 +72,37 @@ type lookup_ok = [
             (((ws_frame, handler_error) result -> unit) -> unit Lwt.t) *
             (unit -> unit Lwt.t) option * float option) ]
 
+let conflict_to_string = function
+  | CService m -> Format.sprintf "Duplicated service (%s)" (Meth.to_string m)
+  | CTypes (arg1, arg2) ->
+    Format.sprintf "Conflicing dynamic arguments: %s <> %s" arg1.Arg.name arg2.Arg.name
+
 let rec resolve :
   type a. string list -> a directory -> a -> string list ->
   (resolved_directory, lookup_error) result Lwt.t =
   fun prefix dir args path ->
   match path, dir with
   | [], dir -> Lwt.return_ok (Dir (dir, args))
-  | _name :: _path, { subdirs = None; _ } -> Lwt.return_error `Not_found
-  | name :: path, { subdirs = Some (Suffixes static); _ } ->
+  | _name :: _path, { subdirs = None, None; _ } -> Lwt.return_error `Not_found
+  | name :: path, { subdirs = Some static, None; _ } ->
     begin match StringMap.find_opt name static with
       | None -> Lwt.return_error `Not_found
       | Some dir -> resolve (name :: prefix) dir args path
     end
-  | name :: path, { subdirs = Some (Arg (arg, dir)); _ } ->
-    match arg.Arg.destruct name with
-    | Ok x -> resolve (name :: prefix) dir (args, x) path
-    | Error msg -> Lwt.return_error @@
-      `Cannot_parse (arg.Arg.description, msg, name :: prefix)
+  | name :: path, { subdirs = None, Some (Arg (arg, dir)); _ } ->
+    begin match arg.Arg.destruct name with
+      | Ok x -> resolve (name :: prefix) dir (args, x) path
+      | Error msg -> Lwt.return_error @@
+        `Cannot_parse (arg.Arg.description, msg, name :: prefix)
+    end
+  | name :: path, { subdirs = Some static, Some (Arg (arg, dir)); _ } ->
+    match StringMap.find_opt name static with
+    | Some dir -> resolve (name :: prefix) dir args path
+    | None ->
+      match arg.Arg.destruct name with
+      | Ok x -> resolve (name :: prefix) dir (args, x) path
+      | Error msg -> Lwt.return_error @@
+        `Cannot_parse (arg.Arg.description, msg, name :: prefix)
 
 let io_to_answer : type a. code:int -> a io -> a -> string Answer.t = fun ~code io body ->
   match io with
@@ -201,43 +220,35 @@ let rec insert
         match insert subpath dir with
         | Error c -> Error c
         | Ok (subdir, rebuild) ->
-          let r = match subdir with
-            | { subdirs = None; services } -> Ok (StringMap.empty, services)
-            | { subdirs = Some (Suffixes m); services } -> Ok (m, services)
-            | { subdirs = Some (Arg (arg, _)); _ } ->
-              conflict path (CType (arg.Arg.description, [name])) in
-          match r with
-          | Error c -> Error c
-          | Ok (dirmap, services) ->
-            let dir = match StringMap.find_opt name dirmap with
-              | None -> empty
-              | Some dir -> dir in
-            let rebuild s =
-              let subdirs = Some (Suffixes (StringMap.add name s dirmap)) in
-              rebuild ({ subdirs ; services }) in
-            Ok (dir, rebuild)
+          let dirmap, dir, services = match subdir with
+            | { subdirs = None, _; services } -> StringMap.empty, empty, services
+            | { subdirs = Some m, _; services } ->
+              let dir = match StringMap.find_opt name m with
+                | None -> empty
+                | Some dir -> dir in
+              m, dir, services in
+          let rebuild s =
+            let subdirs = Some (StringMap.add name s dirmap), snd subdir.subdirs in
+            rebuild { subdirs; services } in
+          Ok (dir, rebuild)
       end
     | Path.Dynamic (subpath, arg) -> begin
         match insert subpath dir with
         | Error c -> Error c
         | Ok (subdir, rebuild) ->
           let r = match subdir with
-            | { subdirs = None ; services } -> Ok (empty, services)
-            | { subdirs = Some (Arg (arg', dir)); services } -> begin
-                try
-                  let Arg.Ty.Eq = Arg.Ty.eq arg.Arg.id arg'.Arg.id in
-                  Ok ((dir :> a directory), services)
-                with Arg.Ty.Not_equal ->
-                  conflict path (CTypes (arg.Arg.description, arg'.Arg.description))
-              end
-            | { subdirs = Some (Suffixes m); _ } ->
-              conflict path
-                (CType (arg.Arg.description, List.map fst (StringMap.bindings m))) in
+            | { subdirs = static, None ; services } -> Ok (static, empty, services)
+            | { subdirs = static, Some (Arg (arg', dir)); services } ->
+              try
+                let Arg.Ty.Eq = Arg.Ty.eq arg.Arg.id arg'.Arg.id in
+                Ok (static, (dir :> a directory), services)
+              with Arg.Ty.Not_equal ->
+                conflict path (CTypes (arg.Arg.description, arg'.Arg.description)) in
           match r with
           | Error c -> Error c
-          | Ok (dir, services) ->
+          | Ok (static, dir, services) ->
             let rebuild s =
-              let subdirs = Some (Arg (arg, s)) in
+              let subdirs = static, Some (Arg (arg, s)) in
               rebuild { subdirs ; services } in
             Ok (dir, rebuild)
       end
@@ -250,14 +261,14 @@ let register :
   fun root service f ->
   let path = Service.path service in
   match insert path root with
-  | Error c-> Error c
+  | Error c -> Error c
   | Ok (dir, insert) ->
     let rs = f service in
     let meth = Service.meth service in
     match dir with
     | { services ; subdirs = _ } as dir when not (MethMap.mem meth services) ->
       Ok (insert { dir with services = MethMap.add meth rs services })
-    | _ -> conflict path CService
+    | _ -> conflict path @@ CService meth
 
 let register_http root service handler =
   register root service (fun service -> Http {service; handler})

@@ -35,7 +35,8 @@
   websocket-httpaf-lwt
   ppxlib
   ppx_deriving_encoding
-  (digestif (>= 1.0.0)))
+  (digestif (>= 1.0.0))
+  yaml)
  (conflicts
   (js_of_ocaml-lwt (< 4.0.0))
   (cohttp-lwt-unix (< 5.0.0))

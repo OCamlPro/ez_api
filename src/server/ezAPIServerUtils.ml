@@ -78,12 +78,20 @@ exception Conflict of (Directory.Step.t list * Directory.conflict)
 let register service handler dir =
   match register_res service handler dir with
   | Ok dir -> dir
-  | Error e -> raise (Conflict e)
+  | Error (steps, conflict) ->
+    Format.eprintf "Conflict for %s: %s@."
+      (Directory.Step.list_to_string steps)
+      (Directory.conflict_to_string conflict);
+    raise (Conflict (steps, conflict))
 
 let register_ws service ?onclose ?step ~react ~bg dir =
   match register_ws_res service ?onclose ?step ~react ~bg dir with
   | Ok dir -> dir
-  | Error e -> raise (Conflict e)
+  | Error (steps, conflict) ->
+    Format.eprintf "Conflict for %s: %s@."
+      (Directory.Step.list_to_string steps)
+      (Directory.conflict_to_string conflict);
+    raise (Conflict (steps, conflict))
 
 module Legacy = struct
 

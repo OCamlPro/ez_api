@@ -11,7 +11,7 @@
  (name ezOpenAPI)
  (public_name ez_api.openAPI)
  (modules ezOpenAPI)
- (libraries ezAPI ezjsonm))
+ (libraries ezAPI ezYaml ezjsonm))
 
 (library
  (name ezAPIServer)

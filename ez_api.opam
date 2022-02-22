@@ -37,6 +37,7 @@ depopts: [
   "ppxlib"
   "ppx_deriving_encoding"
   "digestif" {>= "1.0.0"}
+  "yaml"
 ]
 conflicts: [
   "calendar" {< "2.03"}

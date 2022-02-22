@@ -40,7 +40,7 @@ module Types = struct
     opm_allow_empty : bool option;
     opm_style : string option;
     opm_example : Json_repr.any option;
-    opm_type : EzAPI.Param.kind option;
+    opm_schema : Json_repr.ezjsonm option;
   }
 
   type encoding_object = {
@@ -52,7 +52,7 @@ module Types = struct
   }
 
   type media_type_object = {
-    omt_schema : Json_schema.schema option;
+    omt_schema : Json_repr.ezjsonm option;
     omt_example : Json_repr.any option;
     omt_encoding : encoding_object option;
   }
@@ -168,14 +168,23 @@ module Makers = struct
   let mk_server ?descr ?variables osr_url =
     { osr_url; osr_description = descr; osr_variables = variables }
 
+  let mk_schema schema =
+    let json = Json_schema.to_json schema in
+    match json with
+    | `O l -> `O (List.filter_map (fun (k, v) ->
+        if k = "components" || k = "$schema" then None else Some (k, v)) l)
+    | json -> json
+
   let mk_param ?descr ?(required=true) ?deprecated ?allow_empty ?style ?example
-      ?typ ?(loc="path") opm_name = {
+      ?schema ?(loc="path") opm_name =
+    let opm_schema = Option.map mk_schema schema in {
     opm_name; opm_in = loc; opm_description = descr; opm_required = required;
     opm_deprecated = deprecated; opm_allow_empty = allow_empty; opm_style = style;
-    opm_example = example; opm_type = typ }
+    opm_example = example; opm_schema }
 
   let mk_media ?schema ?example ?encoding () =
-    { omt_schema = schema; omt_example = example; omt_encoding = encoding }
+    let omt_schema = Option.map mk_schema schema in
+    { omt_schema; omt_example = example; omt_encoding = encoding }
 
   let mk_response ?headers ?content ?links ors_description =
     { ors_description; ors_headers = headers; ors_content = content; ors_links = links }
@@ -267,13 +276,13 @@ module Encoding = struct
 
   let param_object = conv
       (fun {opm_name; opm_in; opm_description; opm_required; opm_deprecated;
-            opm_allow_empty; opm_style; opm_example; opm_type}
+            opm_allow_empty; opm_style; opm_example; opm_schema}
         -> (opm_name, opm_in, opm_description, opm_required, opm_deprecated,
-            opm_allow_empty, opm_style, opm_example, opm_type))
+            opm_allow_empty, opm_style, opm_example, opm_schema))
       (fun (opm_name, opm_in, opm_description, opm_required, opm_deprecated,
-            opm_allow_empty, opm_style, opm_example, opm_type)
+            opm_allow_empty, opm_style, opm_example, opm_schema)
         -> {opm_name; opm_in; opm_description; opm_required; opm_deprecated;
-            opm_allow_empty; opm_style; opm_example; opm_type}) @@
+            opm_allow_empty; opm_style; opm_example; opm_schema}) @@
     obj9
       (req "name" string)
       (req "in" string)
@@ -283,7 +292,7 @@ module Encoding = struct
       (opt "allowEmptyValue" bool)
       (opt "style" string)
       (opt "example" any_value)
-      (opt "schema" (obj1 (req "type" param_type)))
+      (opt "schema" any_ezjson_value)
 
   let encoding_object = conv
       (fun {oenc_content_type; oenc_headers; oenc_style; oenc_explode; oenc_allow_reserved}
@@ -301,7 +310,7 @@ module Encoding = struct
       (fun {omt_schema; omt_example; omt_encoding} -> (omt_schema, omt_example, omt_encoding))
       (fun (omt_schema, omt_example, omt_encoding) -> {omt_schema; omt_example; omt_encoding}) @@
     obj3
-      (opt "schema" any_schema)
+      (opt "schema" any_ezjson_value)
       (opt "example" any_value)
       (opt "encoding" encoding_object)
 
@@ -511,15 +520,23 @@ end
 
 open EzAPI
 
-let make_query_param p =
+let make_query_param ?(definitions=Json_schema.any) p =
+  let schema = match p.Param.param_schema with
+    | Some schema -> schema
+    | None -> match p.Param.param_type with
+      | Param.PARAM_INT -> Json_schema.(create @@ element @@ Number numeric_specs)
+      | Param.PARAM_STRING -> Json_schema.(create @@ element @@ String string_specs)
+      | Param.PARAM_BOOL -> Json_schema.(create @@ element Boolean) in
+  let schema, definitions = Json_schema.merge_definitions (schema, definitions) in
   Makers.mk_param ?descr:p.Param.param_descr ~required:p.Param.param_required ~loc:"query"
-    ~typ:p.Param.param_type (Option.value ~default:p.Param.param_id p.Param.param_name)
+    ~schema (Option.value ~default:p.Param.param_id p.Param.param_name), definitions
 
 let make_path_params args =
+  let schema = Json_schema.(create @@ element @@ String string_specs) in
   List.map (fun arg ->
       Makers.mk_param
         ?example:(Option.map (fun s -> Json_repr.to_any (`String s)) arg.Arg.example)
-        ?descr:arg.Arg.descr ~typ:Param.PARAM_STRING arg.Arg.name) args
+        ?descr:arg.Arg.descr ~schema arg.Arg.name) args
 
 let empty_schema ~none schema f = match Json_schema.root schema with
   | {Json_schema.kind = Json_schema.Object {Json_schema.additional_properties = None; properties = []; _}; _}
@@ -558,20 +575,27 @@ let merge_definitions ?(definitions=Json_schema.any) sd =
 let make_path ?(docs=[]) ?definitions sd =
   let open Doc in
   let path = sd.doc_path in
-  let summary, descr, input_ex, output_ex = match sd.doc_name with
-    | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
+  let id, summary, descr, input_ex, output_ex = match sd.doc_name with
+    | None ->
+      string_of_int sd.doc_id, sd.doc_name,
+      sd.doc_descr, sd.doc_input_example, sd.doc_output_example
     | Some name -> match List.assoc_opt name docs with
-      | None -> sd.doc_name, sd.doc_descr, sd.doc_input_example, sd.doc_output_example
+      | None ->
+        name, sd.doc_name, sd.doc_descr,
+        sd.doc_input_example, sd.doc_output_example
       | Some (summary, descr, input, output) ->
-        Some summary, Some descr,
+        summary, None, Some descr,
         (match input with None -> sd.doc_input_example | Some x -> Some x),
         (match output with None -> sd.doc_output_example | Some x -> Some x) in
   let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
+  let params, definitions = List.fold_left (fun (acc, definitions) p ->
+      let p, definitions = make_query_param ~definitions p in
+      acc @ [ p ], definitions) ([], definitions) sd.doc_params in
   (path,
    Makers.mk_path ?summary ?descr ~meth:(Meth.to_string sd.doc_meth) (
      Makers.mk_operation ?summary ?descr
-       ~tags:[sd.doc_section.section_name] ~id:(string_of_int sd.doc_id)
-       ~params:(List.map make_query_param sd.doc_params @ make_path_params sd.doc_args)
+       ~tags:[sd.doc_section.section_name] ~id
+       ~params:(params @ make_path_params sd.doc_args)
        ~security:sd.doc_security
        ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
      List.map (fun (code, schema) ->
@@ -629,7 +653,8 @@ let fix_descr_ref json =
       with Not_found -> j
     ) json
 
-let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~sections title =
+let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
+    ?(yaml=false) ?(pretty=false) ~sections ~title filename =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
   let sds = List.concat @@ List.map (fun s -> s.Doc.section_docs) sections in
   let security = List.rev @@ List.fold_left (fun acc sd ->
@@ -643,47 +668,56 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[]) ~s
       ~components:(Makers.mk_components ~security ?schemas ())
       (List.rev paths) in
   let openapi_json =
-    Json_encoding.construct Encoding.openapi_object oa
-    |> fix_descr_ref
-  in
-  EzEncoding.Ezjsonm.to_string ~minify:true openapi_json
+    fix_descr_ref @@ Json_encoding.construct Encoding.openapi_object oa in
+  if yaml then
+    match EzYaml.to_string openapi_json with
+    | Error (`Msg msg) ->
+      Format.eprintf "%s@." msg;
+      filename ^ ".json", EzEncoding.Ezjsonm.to_string ~minify:false openapi_json
+    | Ok s -> filename ^ ".yaml", s
+  else
+    filename ^ ".json", EzEncoding.Ezjsonm.to_string ~minify:(not pretty) openapi_json
 
 
-let write ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections ~title filename =
-  let s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~sections title in
+let write ?descr ?terms ?contact ?license ?version ?servers ?docs ?(yaml=false)
+    ?pretty ~sections ~title filename =
+  let filename, s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~yaml ?pretty ~sections ~title filename in
   let oc = open_out filename in
   output_string oc s;
   close_out oc
 
 let executable ~sections ~docs =
-  let str_opt s = Stdlib.Arg.String (fun x -> s := Some x) in
-  let output_file, title, descr, version, terms, contact, license, servers =
-    ref "openapi.json", ref "API Documentation", ref None, ref None, ref None,
-    ref None, ref None, ref None in
+  let open Stdlib in
+  let str_opt s = Arg.String (fun x -> s := Some x) in
+  let output_file, title, descr, version, terms, contact, license, servers, yaml, pretty =
+    ref "openapi", ref "API Documentation", ref None, ref None, ref None,
+    ref None, ref None, ref None, ref false, ref false in
   let speclist =
-    [ "-o", Stdlib.Arg.Set_string output_file, "Optional name (path) of output file";
+    [ "-o", Arg.Set_string output_file, "Optional name (path) of output file";
       "--descr", str_opt descr, "Optional API description";
       "--version", str_opt version, "Optional API version";
-      "--title", Stdlib.Arg.Set_string title, "Optional API title";
+      "--title", Arg.Set_string title, "Optional API title";
       "--terms", str_opt terms, "Optional API terms";
-      "--contact", Stdlib.Arg.String (fun s ->
+      "--contact", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ email ] -> contact := Some (Makers.mk_contact ~email ())
           | [ email; name ] -> contact := Some (Makers.mk_contact ~email ~name ())
           | _ -> ()), "Optional API contact";
-      "--license", Stdlib.Arg.String (fun s ->
+      "--license", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ name ] -> license := Some (Makers.mk_licence name)
           | [ name; url ] -> license := Some (Makers.mk_licence ~url name)
           | _ -> ()), "Optional API license";
-      "--servers", Stdlib.Arg.String (fun s ->
+      "--servers", Arg.String (fun s ->
           match String.split_on_char ',' s with
           | [ url ] -> servers := Some [Makers.mk_server url]
           | [ url; descr ] -> servers := Some [Makers.mk_server ~descr url]
           | _ -> ()), "Optional API servers";
+      "--pretty", Arg.Set pretty, "Output pretty json";
+      "--yaml", Arg.Set yaml, "Output in yaml format";
     ] in
   let usage_msg = "Create a OpenAPI json file with the services of the API" in
   Stdlib.Arg.parse speclist (fun _ -> ()) usage_msg;
   write ?descr:!descr ?version:!version ~title:!title ?terms:!terms
-    ?license:!license ?servers:!servers ?contact:!contact
+    ?license:!license ?servers:!servers ?contact:!contact ~yaml:!yaml ~pretty:!pretty
     ~docs ~sections !output_file

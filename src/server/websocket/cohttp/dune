@@ -5,5 +5,5 @@
  (modules wsCohttp)
  (libraries
   (select wsCohttp.ml from
-   (websocket-lwt-unix.cohttp & wsCommon -> wsCohttp.real.ml)
+   (websocket-lwt-unix.cohttp wsCommon -> wsCohttp.real.ml)
    (ezAPIServerUtils -> wsCohttp.dummy.ml))))

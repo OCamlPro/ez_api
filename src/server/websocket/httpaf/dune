@@ -5,5 +5,5 @@
  (modules wsHttpaf)
  (libraries
   (select wsHttpaf.ml from
-   (wsCommon & websocket-httpaf-lwt -> wsHttpaf.real.ml)
+   (wsCommon websocket-httpaf-lwt -> wsHttpaf.real.ml)
    (ezAPIServerUtils -> wsHttpaf.dummy.ml))))
