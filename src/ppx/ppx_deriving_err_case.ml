@@ -24,7 +24,6 @@ let mk ~loc ?enc ?(kind_label="kind") ~title name code =
   let deselect = Utils.pexp_fun
       (Option.fold ~none:(punit ~loc) ~some:(fun _ -> ppat_tuple ~loc [punit ~loc; pvar ~loc "x"]) enc)
       (pexp_variant ~loc name (Option.map (fun _ -> evar ~loc "x") enc)) in
-
   pexp_apply ~loc (evar ~loc "EzAPI.Err.make") [
     Labelled "code", eint ~loc code;
     Labelled "name", estring ~loc name;
@@ -51,7 +50,7 @@ let row ?kind_label ~title prf =
   match prf.prf_desc with
   | Rtag ({txt; loc}, _, []) -> txt, mk ~loc ?kind_label ~title txt code
   | Rtag ({txt; loc}, _, (h :: _)) ->
-    let enc = Encoding.core h in
+    let enc = Encoding.core ~wrap:false h in
     txt, mk ~loc ~enc ?kind_label ~title txt code
   | _ ->
     Location.raise_errorf ~loc "inherit not handled"
