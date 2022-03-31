@@ -25,6 +25,7 @@ let init ?(meth="GET") ?content ?content_type ?(headers=[]) url =
   Curl.set_writefunction c (writer_callback r);
   Curl.set_verbose c verbose;
   Curl.set_customrequest c meth;
+  Curl.set_followlocation c true;
   Curl.set_url c url;
   Curl.set_httpheader c (
     List.map (fun (name, value) -> Printf.sprintf "%s: %s" name value) headers);
