@@ -8,21 +8,21 @@ include Types
 let catch f =
   Lwt.catch f (fun exn -> Lwt.return_error (Printexc.to_string exn))
 
-let send_frame ?content ?opcode send =
-  send (Frame.create ?opcode ?content ())
+let send_frame ?content ?opcode conn =
+  write conn (Frame.create ?opcode ?content ())
 
 let aux_react =
   let b = Buffer.create 1024 in
-  fun f action send fr ->
+  fun f action conn fr ->
     match fr.opcode, fr.final with
     | Opcode.Ping, _ ->
-      send_frame ~opcode:Opcode.Pong ~content:fr.content send >|= fun () ->
+      send_frame ~opcode:Opcode.Pong ~content:fr.content conn >|= fun () ->
       Ok `Open
     | Opcode.Pong, _ -> Lwt.return_ok `Open
     | Opcode.Close, _ ->
       (if String.length fr.content >= 2 then
-         send_frame ~opcode:Opcode.Close ~content:(String.sub fr.content 0 2) send
-       else send (Frame.close 1000)) >|= fun () -> Ok `Closed
+         send_frame ~opcode:Opcode.Close ~content:(String.sub fr.content 0 2) conn
+       else write conn (Frame.close 1000)) >|= fun () -> Ok `Closed
     | Opcode.Text, final | Opcode.Binary, final ->
       if final then f action fr.content >>= function
         | Ok () -> Lwt.return_ok `Open
@@ -38,7 +38,7 @@ let aux_react =
         | Error e -> Lwt.return_error e)
       else (Buffer.add_string b fr.content; Lwt.return_ok `Open)
     | _ ->
-      send (Frame.close 1002) >>= fun _ ->
+      write conn (Frame.close 1002) >>= fun _ ->
       Lwt.return_ok `Closed
 
 let connect ?msg ?protocols ?error ~react url =
@@ -53,18 +53,18 @@ let connect ?msg ?protocols ?error ~react url =
     | Some l -> Some (Cohttp.Header.of_list [ "Sec-WebSocket-Protocol", String.concat "," l ]) in
   catch @@ fun () ->
   Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system >>=
-  Conduit_lwt_unix.endp_to_client ~ctx >>= fun client ->
-  with_connection ?extra_headers ~ctx client uri >>= fun (recv, send0) ->
+  Conduit_lwt_unix.endp_to_client ~ctx:(Lazy.force ctx) >>= fun client ->
+  connect ?extra_headers ~ctx:(Lazy.force ctx) client uri >>= fun con ->
   let close code =
     let code = match code with None -> 1000 | Some code -> code in
-    catch (fun () -> send0 (Frame.close code) >>= Lwt.return_ok) in
-  let send content = catch (fun () -> send_frame ~content send0 >>= Lwt.return_ok) in
+    catch (fun () -> write con (Frame.close code) >>= Lwt.return_ok) in
+  let send content = catch (fun () -> send_frame ~content con >>= Lwt.return_ok) in
   let action = {send; close} in
   let rec conn () =
     catch (fun () ->
-        recv () >>= fun fr ->
+        read con >>= fun fr ->
         log ~action:(Opcode.to_string fr.opcode) url msg;
-        aux_react react action send0 fr) >>= function
+        aux_react react action con fr) >>= function
     | Ok `Open -> conn ()
     | Ok `Closed -> Lwt.return_ok ()
     | Error e -> match error with
