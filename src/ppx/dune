@@ -3,7 +3,7 @@
  (modules ppx_common)
  (public_name ez_api.ppx_common)
  (optional)
- (libraries ppx_compat))
+ (libraries ppxlib))
 
 (library
  (name ppx_client)

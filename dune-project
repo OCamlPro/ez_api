@@ -33,8 +33,8 @@
   (ezjs_fetch (>= 0.2))
   websocket-lwt-unix
   websocket-httpaf-lwt
-  ppxlib
-  ppx_deriving_encoding
+  (ppxlib (>= 0.18.0))
+  (ppx_deriving_encoding (>= 0.3.0))
   (digestif (>= 1.0.0))
   yaml)
  (conflicts
@@ -46,4 +46,6 @@
   (ezjs_fetch (< 0.2))
   (ocurl (< 0.8.0))
   (digestif (< 1.0.0))
+  (ppxlib (< 0.18.0))
+  (ppx_deriving_encoding (< 0.3.0))
 ))

@@ -84,6 +84,10 @@ let parse_path ~loc s =
       | _ -> eapply ~loc (path ~loc "add_suffix") [ acc; estring ~loc s ]
     ) (path ~loc "root") l
 
+let string_literal = function
+  | Ppxlib.Pconst_string (s, _, _) -> Some s
+  | _ -> None
+
 let get_options ~loc ?name ?(client=false) a =
   let register = if not client then None else Some (pexp_construct ~loc (llid ~loc "false") None) in
   match a.attr_payload with
@@ -92,7 +96,7 @@ let get_options ~loc ?name ?(client=false) a =
     List.fold_left (fun (name, acc) (s, loc, e) -> match s with
         | "path" -> begin match e.pexp_desc with
             | Pexp_constant cst ->
-              begin match Ppx_compat.string_literal cst with
+              begin match string_literal cst with
                 | Some s -> name, { acc with path = parse_path ~loc:e.pexp_loc s }
                 | _ -> Format.eprintf "path should be a string literal"; name, acc
               end
@@ -108,7 +112,7 @@ let get_options ~loc ?name ?(client=false) a =
         | "name" ->
           begin match e.pexp_desc with
             | Pexp_constant cst ->
-              begin match name, Ppx_compat.string_literal cst with
+              begin match name, string_literal cst with
                 | None, Some s -> Some s,  { acc with name = esome e }
                 | Some n, _ -> Some n, { acc with name = esome e }
                 | _ -> Format.eprintf "name should be a string literal"; name, acc
@@ -125,7 +129,7 @@ let get_options ~loc ?name ?(client=false) a =
         | "debug" -> name, { acc with debug = true }
         | "dir" -> begin match e.pexp_desc with
             | Pexp_constant cst ->
-              begin match Ppx_compat.string_literal cst with
+              begin match string_literal cst with
                 | Some s -> name, { acc with directory = Some s }
                 | _ -> Format.eprintf "directory should be a string literal"; name, acc
               end
