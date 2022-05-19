@@ -123,8 +123,7 @@ let handle ?meth ?content_type ?ws s r path body =
     | Ok (`http h) ->
       begin
         h body >>= function
-        | Error (`cannot_destruct a) -> Answer.cannot_destruct a
-        | Error (`unexpected_field f) -> Answer.unexpected_field f
+        | Error (`destruct_exn exn) -> Answer.destruct_exception exn
         | Error (`unsupported c) -> Answer.unsupported_media_type c
         | Error (`handler_error s) ->
           EzDebug.printf "In %s: error %s" (String.concat "/" path) s;

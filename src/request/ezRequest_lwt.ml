@@ -71,9 +71,9 @@ module Make(S : Interface) : S = struct
       | Ok res ->
         match IO.from_string io (fun x -> x) res with
         | Ok s -> Ok s
-        | Error e -> Error (UnknownError {
+        | Error (`destruct_exn exn) -> Error (UnknownError {
             code = -3;
-            msg = Some (EzEncoding.error_to_string ~from:res e) })
+            msg = Some (Printexc.to_string exn) })
 
     let handle_result service res =
       let err_encodings = Service.error service.s in

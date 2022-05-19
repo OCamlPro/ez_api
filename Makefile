@@ -2,17 +2,17 @@
 all: build
 
 build:
-	dune build src
+	@dune build src
 
 dev:
-	dune build
+	@dune build
 
 install:
-	dune install
+	@dune install
 
 clean:
-	dune clean
+	@dune clean
 
 doc:
-	dune build @doc
-	rsync -ru _build/default/_doc/_html/* docs/
+	@dune build @doc
+	@rsync -ru _build/default/_doc/_html/* docs/

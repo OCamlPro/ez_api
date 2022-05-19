@@ -19,17 +19,10 @@ let cannot_parse (descr, msg, path) =
 
 let method_not_allowed () = return ~code:405 ""
 
-let cannot_destruct (path, exn) =
+let destruct_exception exn =
   let body = EzEncoding.construct Json_encoding.any_ezjson_value @@
-    `O [ "error", `String "Cannot destruct JSON";
-         "path", `String path;
-         "msg", `String exn ] in
-  return ~code:400 ~headers body
-
-let unexpected_field f =
-  let body = EzEncoding.construct Json_encoding.any_ezjson_value @@
-    `O [ "error", `String "Unexpected field in JSON";
-         "field", `String f ] in
+    `O [ "error", `String "Destruct exception";
+         "exception", `String (Printexc.to_string exn) ] in
   return ~code:400 ~headers body
 
 let unsupported_media_type c =

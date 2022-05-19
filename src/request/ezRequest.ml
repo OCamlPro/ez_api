@@ -12,9 +12,9 @@ let before_hook = ref (fun () -> ())
 let decode_result ?error io f res =
   match IO.from_string io f res with
   | Ok () -> ()
-  | Error e -> match error with
+  | Error (`destruct_exn exn) -> match error with
     | None -> ()
-    | Some error -> error (-3) (Some (EzEncoding.error_to_string ~from:res e))
+    | Some error -> error (-3) (Some (Printexc.to_string exn))
 
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url f ->
     f (Error (-2,Some "No http client loaded")))
