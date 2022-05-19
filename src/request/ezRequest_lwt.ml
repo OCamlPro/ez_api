@@ -64,19 +64,16 @@ module Make(S : Interface) : S = struct
   let post = internal_post
 
   module Raw = struct
-    type nonrec 'e api_error = 'e EzReq_lwt_S.api_error =
-      | KnownError of { code : int ; error : 'e }
-      | UnknownError of { code : int ; msg : string option }
+    type 'e api_error = 'e EzReq_lwt_S.api_error
 
     let decode_result io err_encodings = function
-      | Error (code, None) -> Error (UnknownError { code ; msg = None })
+      | Error (code, None) -> Error (code, `unknown None)
       | Error (code, Some msg) ->
         (match err_encodings ~code with
-         | None -> Error (UnknownError { code ; msg = Some msg })
+         | None -> Error (code, `unknown (Some msg))
          | Some encoding ->
-           try Error (
-               KnownError { code ; error = EzEncoding.destruct encoding msg })
-           with _ -> Error (UnknownError { code ; msg = Some msg })
+           try Error (code, `known (EzEncoding.destruct encoding msg))
+           with _ -> Error (code, `unknown (Some msg))
         )
       | Ok res ->
         match IO.from_string io (fun x -> x) res with
@@ -87,9 +84,7 @@ module Make(S : Interface) : S = struct
               Json_encoding.print_error Format.str_formatter exn;
               Format.flush_str_formatter ()
             | _ -> Printexc.to_string exn in
-          Error (UnknownError {
-            code = -3;
-            msg = Some msg })
+          Error (-3, `unknown (Some msg))
 
     let handle_result service res =
       let err_encodings = Service.error service.s in
@@ -157,14 +152,14 @@ module Make(S : Interface) : S = struct
       request ?headers ?params ?msg ?url_encode ~input api service ((Req.dummy, arg1), arg2)
 
     let handle_error kn = function
-      | KnownError {code; error} -> code, kn error
-      | UnknownError {code; msg} -> code, msg
+      | (code, `known error) -> code, kn error
+      | (code, `unknown msg) -> code, msg
 
     let string_of_error kn = function
-      | KnownError {code; error} ->
+      | (code, `known error) ->
         let content = match kn error with None -> "" | Some s -> ": " ^ s in
         Printf.sprintf "Error %d%s" code content
-      | UnknownError {code; msg} ->
+      | (code, `unknown msg) ->
         let content = match msg with None -> "" | Some s -> ": " ^ s in
         Printf.sprintf "Unknown Error %d%s" code content
   end
@@ -207,8 +202,8 @@ module Make(S : Interface) : S = struct
 
     let unresultize = function
       | Ok res -> Ok res
-      | Error UnknownError { code ; msg } -> Error (code, msg)
-      | Error KnownError _ -> assert false (* Security.unreachable error *)
+      | Error (code, `unknown msg) -> Error (code, msg)
+      | Error (_code, `known _) -> assert false (* Security.unreachable error *)
 
     let get0 ?post ?headers ?params ?msg
         api (service: 'output EzAPI.Legacy.service0) =
