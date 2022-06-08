@@ -1,0 +1,14 @@
+(library
+ (name ezCurl_multi)
+ (public_name ez_api.curl_multi)
+ (optional)
+ (modules ezCurl_multi)
+ (libraries curl.lwt ezCurl_common ezRequest_lwt))
+
+(library
+ (name ezCurl_multi_i)
+ (public_name ez_api.icurl_multi)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezCurl_multi))
