@@ -125,7 +125,7 @@ let get_options ~loc ?name ?(client=false) a =
         | "security" -> name, { acc with security = esome e; security_type = ptyp_any ~loc }
         | "register" -> name, { acc with register = e }
         | "input_example" -> name, { acc with input_example = esome e }
-        | "output_example" -> name, { acc with input_example = esome e }
+        | "output_example" -> name, { acc with output_example = esome e }
         | "debug" -> name, { acc with debug = true }
         | "dir" -> begin match e.pexp_desc with
             | Pexp_constant cst ->
