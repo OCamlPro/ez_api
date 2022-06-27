@@ -95,7 +95,7 @@ module Make(S : Interface) : S = struct
       EzAPI.base_url ->
       ('arg, i, 'output, 'error, 'security) service ->
       'arg ->
-      (('output, 'error) Result.result -> unit) ->
+      (('output, 'error) result -> unit) ->
       unit =
       fun ?headers ?(params=[]) ?msg ?(post=false) ?(url_encode=false) ?error ~input api service arg f ->
       !before_hook ();
