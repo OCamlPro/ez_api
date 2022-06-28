@@ -28,6 +28,9 @@ val default_register_foreign : origin:string -> token:string ->
 
 module Make(S: Arg) : sig
 
+  module Service : EzSession.M with type user_id = S.SessionArg.user_id
+                                and type user_info = S.SessionArg.user_info
+
   (* User `register_handlers` to declare the handlers for the authentification
      services *)
   val register_handlers :

@@ -106,6 +106,20 @@ module Hash = struct
 
 end
 
+module type M = sig
+  type user_id
+  type user_info
+  type nonrec auth = (user_id, user_info) auth
+  type token_security =
+    [ EzAPI.Security.cookie | EzAPI.Security.header | EzAPI.Security.query ]
+  val section_session : EzAPI.Doc.section
+  val param_token : EzAPI.Param.t
+  val security : token_security list
+  val connect : (auth connect_response, connect_error, token_security) EzAPI.service0
+  val login : (login_message, (user_id, user_info) login_response, login_error, EzAPI.Security.none) EzAPI.post_service0
+  val logout : (auth_needed, logout_error, token_security) EzAPI.service0
+end
+
 module Make(S : SessionArg) = struct
 
   type nonrec auth = (S.user_id, S.user_info) auth
@@ -268,6 +282,9 @@ module Make(S : SessionArg) = struct
   end
 
   module Service = struct
+    type user_id = S.user_id
+    type user_info = S.user_info
+    type nonrec auth = auth
 
     let section_session = EzAPI.Doc.section "Session Requests"
 

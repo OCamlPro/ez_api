@@ -5,7 +5,12 @@ module Make(S: EzSession.TYPES.SessionArg) : sig
   an already authenticated user. Otherwise (CSRF protection),
   a token can be provided (saved in local storage).
 *)
+  type user_id = S.user_id
+  type user_info = S.user_info
   type nonrec auth = (S.user_id, S.user_info) EzSession.TYPES.auth
+
+  module Service : EzSession.M with type user_id = user_id
+                                and type user_info = user_info
 
   type login_error = [
     | EzSession.TYPES.login_error
