@@ -59,6 +59,9 @@ let default_register_foreign ~origin ~token =
 
 module Make(S: Arg) : sig
 
+  module Service : EzSession.M with type user_id = S.SessionArg.user_id
+                                and type user_info = S.SessionArg.user_info
+
   val register_handlers :
     Directory.t -> Directory.t
 
@@ -250,7 +253,6 @@ end = struct
 
   let get_request_session req =
     get_request_session Service.security req
-
 
 end
 

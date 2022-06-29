@@ -2,7 +2,11 @@
 open EzSession.TYPES
 
 module type Make_S = sig
+  type user_id
+  type user_info
   type auth
+  module Service : EzSession.M with type user_id = user_id
+                                and type user_info = user_info
 
   type nonrec login_error = [
     | login_error
@@ -40,7 +44,11 @@ module type Make_S = sig
 end
 
 module Make(S: SessionArg) : Make_S with
-  type auth = (S.user_id, S.user_info) auth = struct
+  type user_id = S.user_id and type user_info = S.user_info
+  and type auth = (S.user_id, S.user_info) auth = struct
+
+  type user_id = S.user_id
+  type user_info = S.user_info
 
   type nonrec login_error = [
     | login_error
