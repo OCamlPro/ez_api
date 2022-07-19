@@ -47,11 +47,15 @@ let handle f (m : message t) =
     let s = ref "" in
     m##on_data (string "data") (wrap_callback (fun chunk ->
         s := !s ^ (to_string chunk)));
-    m##on_end (string "end") (wrap_callback (fun () -> f (Ok !s)))
-  else
-    f (Error (m##.statusCode, Some (to_string m##.statusMessage)))
+    m##on_end (string "end") (wrap_callback (fun () ->
+        if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." !s;
+        f (Ok !s)))
+  else (
+    if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." (to_string m##.statusMessage);
+    f (Error (m##.statusCode, Some (to_string m##.statusMessage))))
 
 let get ?(protocol=http) ?options url f =
+  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n@.";
   let o = optdef options_to_jsoo options in
   let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
@@ -59,6 +63,7 @@ let get ?(protocol=http) ?options url f =
   req##end_ undefined
 
 let post ?(protocol=http) ?options url ~content f =
+  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." content;
   let o = optdef options_to_jsoo options in
   let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
@@ -69,4 +74,6 @@ let get_protocol url =
   try if String.sub url 0 5 = "https" then Some https else Some http
   with _ -> None
 
-let () = EzDebug.log "ezNodeJs Loaded"
+let () =
+  (Js_of_ocaml.Js.Unsafe.pure_js_expr "global")##.set_verbose_ := Js_of_ocaml.Js.wrap_callback Verbose.set_verbose;
+  EzDebug.log "ezNodeJs Loaded"

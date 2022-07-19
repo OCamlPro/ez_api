@@ -3,7 +3,7 @@
  (public_name ez_api.curl_common)
  (optional)
  (modules ezCurl_common)
- (libraries curl))
+ (libraries verbose curl))
 
 (library
  (name ezCurl)
