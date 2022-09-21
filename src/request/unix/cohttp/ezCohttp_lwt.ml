@@ -1,8 +1,9 @@
 module Base = EzCohttp_base.Make(Cohttp_lwt_unix.Client)
 
-let () = match Sys.getenv_opt "EZAPICLIENT" with
-  | Some "true" | Some "1" -> Cohttp_lwt_unix.Debug.activate_debug ()
-  | _ -> ()
+let () =
+  let cb v  = if v land 4 <> 0 then Cohttp_lwt_unix.Debug.activate_debug () in
+  Verbose.callback := cb;
+  cb !Verbose.v
 
 module Interface = struct
 

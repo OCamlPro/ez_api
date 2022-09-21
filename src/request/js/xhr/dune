@@ -4,7 +4,7 @@
  (optional)
  (modules ezXhr)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest ezAPIJS)
+ (libraries verbose ezRequest ezAPIJS)
  (modes byte))
 
 (library
@@ -22,7 +22,7 @@
  (optional)
  (modules ezXhr_lwt)
  (preprocess (pps js_of_ocaml-ppx))
- (libraries ezRequest_lwt ezAPIJS js_of_ocaml-lwt)
+ (libraries verbose ezRequest_lwt ezAPIJS js_of_ocaml-lwt)
  (modes byte))
 
 (library

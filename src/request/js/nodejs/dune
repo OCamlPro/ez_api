@@ -4,7 +4,7 @@
  (optional)
  (modules nodejs_common)
  (preprocess (pps ppx_deriving_jsoo))
- (libraries ezAPIJS)
+ (libraries verbose ezAPIJS)
  (modes byte))
 
 (library
