@@ -98,7 +98,7 @@ ez_api provides useful tools for server and client:
 
 ## Documentation
 
-The documentation for the different libraries can be found here: [API Reference](https://ocpmax.github.io/ez_api/ez_api/index.html)
+The documentation for the different libraries can be found here: [API Reference](https://ocamlpro.github.io/ez_api/ez_api/index.html)
 
 ## Usage
 
