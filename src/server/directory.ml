@@ -82,7 +82,8 @@ let rec resolve :
   (resolved_directory, lookup_error) result Lwt.t =
   fun prefix dir args path ->
   match path, dir with
-  | [], dir -> Lwt.return_ok (Dir (dir, args))
+  | [], dir -> 
+    Lwt.return_ok (Dir (dir, args))
   | _name :: _path, { subdirs = None, None; _ } -> Lwt.return_error `Not_found
   | name :: path, { subdirs = Some static, None; _ } ->
     begin match StringMap.find_opt name static with
@@ -104,25 +105,26 @@ let rec resolve :
       | Error msg -> Lwt.return_error @@
         `Cannot_parse (arg.Arg.description, msg, name :: prefix)
 
-let io_to_answer : type a. code:int -> a io -> a -> string Answer.t = fun ~code io body ->
+let io_to_answer : type a. code:int -> headers:(string * string) list -> a io -> a -> string Answer.t = 
+fun ~code ~headers io body ->
   match io with
-  | Empty -> {Answer.code; body=""; headers=[]}
+  | Empty -> {Answer.code; body=""; headers}
   | Raw l ->
     let content_type = match l with
       | [] -> "application/octet-stream"
       | h :: _ -> Mime.to_string h in
-    {Answer.code; body; headers=["content-type", content_type]}
+    {Answer.code; body; headers=("content-type", content_type)::headers}
   | Json enc ->
     {Answer.code; body = EzEncoding.construct enc body;
-     headers=["content-type", "application/json"]}
+     headers=("content-type", "application/json")::headers}
 
 let ser_handler :
   type i o e. ?content_type:string -> ('a -> i -> (o, e) result Answer.t Lwt.t) -> 'a ->
   i io -> o io -> e Json_encoding.encoding ->
   string -> (string Answer.t, handler_error) result Lwt.t =
   fun ?content_type handler args input output errors ->
-  let handle_result {Answer.code; body; _} = match body with
-    | Ok o -> io_to_answer ~code output o
+  let handle_result {Answer.code; body; headers} = match body with
+    | Ok o -> io_to_answer ~code ~headers output o
     | Error e ->
       {Answer.code; body = EzEncoding.construct errors e;
        headers=["content-type", "application/json"]} in
