@@ -139,6 +139,30 @@ let handle ?meth ?content_type ?ws s r path body =
         | Some ws -> ws ?onclose ?step ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
-let access_control_headers = [
+(* Default access control headers *)
+let default_access_control_headers = [
   "access-control-allow-origin", "*";
-  "access-control-allow-headers", "accept, content-type" ]
+  "access-control-allow-headers", "accept, content-type" 
+]
+
+(* merge headers correctly with default one *)
+let merge_headers_with_default headers : (string * string) list =
+  (* combining existing headers *)
+  let l = List.fold_left
+      (fun acc ((hn,hv) as h) ->
+         match List.assoc_opt hn default_access_control_headers with
+         | None -> h::acc
+         | Some _ when hn = "access-control-allow-origin" ->
+           h::acc
+         | Some v when hn = "access-control-allow-headers" ->
+           (hn, hv ^ "," ^ v)::acc 
+         | _ -> acc)
+      []
+      headers
+  in
+  (* Adding default if not present *)
+  List.fold_left (fun acc ((hn,_) as h) ->
+      match List.assoc_opt hn l with
+      | None -> h::acc
+      | _ -> acc    
+    ) l default_access_control_headers

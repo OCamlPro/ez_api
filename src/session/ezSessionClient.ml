@@ -43,7 +43,10 @@ module type Make_S = sig
   val get : unit -> auth option
 end
 
-module Make(S: SessionArg) : Make_S with
+(* Takes Req module, that implements request calls. Passing 
+   this Req module allows to configure request implementation
+  instead of using default EzReq implementation*)
+module Make(S: SessionArg)(Req: EzReq_S.S) : Make_S with
   type user_id = S.user_id and type user_info = S.user_info
   and type auth = (S.user_id, S.user_info) auth = struct
 
@@ -84,7 +87,7 @@ module Make(S: SessionArg) : Make_S with
     match S.token_kind with
     | `Cookie _name -> [] (* Cookies are automatically added by browsers *)
     | `CSRF name -> [name, token ]
-
+  
   let connect api ?token f =
     begin
       match token with
@@ -97,7 +100,7 @@ module Make(S: SessionArg) : Make_S with
          | Some token -> Some (auth_headers ~token)
          | None -> None
        in
-       EzReq.get0 ~msg:"connect"
+       Req.get0 ~msg:"connect"
          api
          Service.connect
          ?headers
@@ -125,7 +128,7 @@ module Make(S: SessionArg) : Make_S with
     | Connected _
       -> (try f (Ok false) with _ -> ())
     | User u ->
-      EzReq.get0 ~msg:"logout"
+      Req.get0 ~msg:"logout"
         api
         Service.logout
         ~params:[]
@@ -182,7 +185,7 @@ module Make(S: SessionArg) : Make_S with
             | None -> pwhash
             | Some f -> f pwhash in
           let login_challenge_reply = EzSession.Hash.challenge ~challenge ~pwhash in
-          EzReq.post0 ~msg:"login" api Service.login
+          Req.post0 ~msg:"login" api Service.login
             ~input:(Local {
                 login_user = login;
                 login_challenge_id = challenge_id;
@@ -200,7 +203,7 @@ module Make(S: SessionArg) : Make_S with
               | Error e -> f (Error (e :> login_error))
             )
         | _, _, Some (foreign_origin, foreign_token) ->
-          EzReq.post0 ~msg:"login" api Service.login
+          Req.post0 ~msg:"login" api Service.login
             ~input:(Foreign { foreign_origin; foreign_token })
             (function
               | Ok (LoginOk u) ->

@@ -70,12 +70,12 @@ let dispatch ?catch s io req body =
   >>= function
   | `ws (Ok ra) -> Lwt.return ra
   | `ws (Error _) ->
-    let headers = Header.of_list access_control_headers in
+    let headers = Header.of_list default_access_control_headers in
     let status = Code.status_of_code 501 in
     Server.respond_string ~headers ~status ~body:"" () >|= fun (r, b) ->
     `Response (r, b)
   | `http {Answer.code; body; headers} ->
-    let headers = headers @ access_control_headers in
+    let headers = merge_headers_with_default headers in
     let status = Code.status_of_code code in
     debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
     debug ~v:3 "Reply content:\n  %s" body;

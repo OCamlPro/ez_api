@@ -256,7 +256,7 @@ let connection_handler :
          | Some c -> c path_str exn >|= fun a -> `http a)
     >>= function
     | `ws (Error _) ->
-      let headers = Headers.of_list access_control_headers in
+      let headers = Headers.of_list default_access_control_headers in
       let status = Status.unsafe_of_code 501 in
       let response = Response.create ~headers status in
       Reqd.respond_with_string reqd response "";
@@ -266,7 +266,7 @@ let connection_handler :
     | `http {Answer.code; body; headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      let headers = headers @ access_control_headers in
+      let headers = merge_headers_with_default headers in
       let headers = Headers.of_list headers in
       let len = String.length body in
       let headers = Headers.add headers "content-length" (string_of_int len) in

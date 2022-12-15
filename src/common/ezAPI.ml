@@ -94,38 +94,40 @@ let forge0 url s params = forge url s Req.dummy params
 let forge1 url s arg1 params =  forge url s (Req.dummy, arg1) params
 let forge2 url s arg1 arg2 params =  forge url s ((Req.dummy, arg1), arg2) params
 
+(* access_control allows to set acces control that will be included in server response headers. *)
 let raw_service :
   type i. ?section:Doc.section -> ?name:string -> ?descr:string -> ?meth:Meth.t ->
   input:i io -> output:'o io -> ?errors:'e Err.case list -> ?params:Param.t list ->
-  ?security:'s list -> ?register:bool -> ?input_example:i ->
-  ?output_example:'o -> (Req.t, 'a) Path.t -> ('a, i, 'o, 'e, 's) service =
+  ?security:'s list -> ?access_control:(string * string) list -> ?register:bool -> 
+  ?input_example:i -> ?output_example:'o -> (Req.t, 'a) Path.t -> 
+  ('a, i, 'o, 'e, 's) service =
   fun ?section ?name ?descr ?meth ~input ~output ?(errors=[]) ?(params=[])
-    ?(security=[]) ?register ?input_example ?output_example path ->
+    ?(security=[]) ?access_control ?register ?input_example ?output_example path ->
   let meth = match meth, input with
     | None, Empty -> `GET
     | None, _ -> `POST
     | Some m, _ -> m in
   let s = Service.make ~meth ~input ~output
-      ~errors ~params ~security path in
+      ~errors ~params ~security ?access_control path in
   let doc = Doc.make ?name ?descr ?register ?section ?input_example ?output_example s in
   { s; doc }
 
 let post_service ?section ?name ?descr ?(meth=`POST)
     ~input ~output ?errors ?params
-    ?security ?register ?input_example ?output_example
+    ?security ?register ?access_control ?input_example ?output_example
     path =
   raw_service ?section ?name ?descr ~input:(Json input) ~output:(Json output)
-    ?errors ~meth ?params ?security ?register ?input_example ?output_example path
+    ?errors ~meth ?params ?security ?access_control ?register ?input_example ?output_example path
 
 let service ?section ?name ?descr ?(meth=`GET) ~output ?errors ?params
-    ?security ?register ?output_example path =
+    ?security ?access_control ?register ?output_example path =
   raw_service ?section ?name ?descr ~input:Empty ~output:(Json output)
-    ?errors ~meth ?params ?security ?register ?output_example path
+    ?errors ~meth ?params ?security ?access_control ?register ?output_example path
 
 let ws_service ?section ?name ?descr ~input ~output ?errors ?params
-    ?security ?register ?output_example path =
+    ?security ?access_control ?register ?output_example path =
   raw_service ?section ?name ?descr ~input ~output
-    ?errors ~meth:`GET ?params ?security ?register ?output_example path
+    ?errors ~meth:`GET ?params ?security ?access_control ?register ?output_example path
 
 let register service =
   service.doc.Doc.doc_registered <- true;

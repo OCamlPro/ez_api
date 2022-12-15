@@ -33,6 +33,9 @@ module TYPES = struct
     (** Associated to user information *)
     type user_info
 
+    (** Web host, that should be used in access control headers. *)
+    val web_host : string 
+
     (** Json encoding for user's id *)
     val user_id_encoding : user_id Json_encoding.encoding
     
@@ -49,10 +52,10 @@ module TYPES = struct
   (`CSRF "X-Csrf-Token" `).
      *)
 
-    (** Describes two ways to store a token within a client request: 
-    - Store as a cookie associated with the given cookie name. 
-    - Store as a CSRF header with the given name. *)
-    val token_kind : [`Cookie of string | `CSRF of string ]
+    (** Describes two ways to store a token within a client request : 
+    - Stores as a cookie associated with the given cookie name and its max-age, if provided. 
+    - Stores as a CSRF header with the given name. *)
+    val token_kind : [`Cookie of string * int64 option | `CSRF of string ]
   end
 
   (** Authentification information returned by server after successful connection *)
@@ -351,8 +354,8 @@ module Make(S : SessionArg) = struct
       match S.token_kind with
       | `CSRF name ->
         EzAPI.(`Header { Security.ref_name = name ^ " Header"; name })
-      | `Cookie name ->
-        EzAPI.(`Cookie { Security.ref_name = name ^ " Cookie"; name })
+      | `Cookie (name, max_age) ->
+        EzAPI.(`Cookie ({ Security.ref_name = name ^ " Cookie"; name }, max_age))
 
     (** Security that combines [param_security] and [header_cookie_security]
         in the corresponding order. Represents the security configuration for
@@ -369,6 +372,11 @@ module Make(S : SessionArg) = struct
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
+    let access_control = 
+      [ "access-control-allow-credentials", "true"; 
+        "access-control-allow-origin", S.web_host ]
+
+
     (** Connection service that requires authentication token. For more details, see corresponding 
     [EzSessionServer.Make.connect] handler and default client request implementation 
     [EzSessionClient.Make.connect]. *)
@@ -379,6 +387,7 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.connect_response
         ~errors:[Encoding.session_expired_case; Encoding.invalid_session_connect_case]
         ~security
+        ~access_control
         EzAPI.Path.(rpc_root // "connect")
 
     (** Logining service. For more details, see corresponding [EzSessionServer.Make.login] handler
@@ -394,6 +403,7 @@ module Make(S : SessionArg) = struct
                  Encoding.unverified_user_case;
                  Encoding.challenge_not_found_case;
                  Encoding.invalid_session_login_case]
+        ~access_control
         EzAPI.Path.(rpc_root // "login")
 
     (** Disconnection service that requires authentication token. For more details, see corresponding 
@@ -407,6 +417,7 @@ module Make(S : SessionArg) = struct
         ~output:Encoding.auth_needed
         ~errors:[Encoding.invalid_session_logout_case]
         ~security
+        ~access_control
         EzAPI.Path.(rpc_root // "logout")
   end
 
