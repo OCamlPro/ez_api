@@ -7,11 +7,15 @@ let debug = false
 
 module TYPES = struct
 
+  (** Foreign user without password, whose login is equal to [foreign_origin ^ foreign_token] and
+  whose password is not req. *)
   type foreign_info = {
     foreign_origin : string;
     foreign_token : string;
   }
 
+  (** A session that helps to keep connection for the given user and stores useful information 
+  about his communication with the sever. *)
   type 'user_id session = {
     session_token : string;
     session_login : string;
@@ -20,14 +24,23 @@ module TYPES = struct
     session_foreign : foreign_info option;
   }
 
+  (** Main module that specifies the session parameters for given implementation of API server. *)
   module type SessionArg = sig
 
+    (** User identifier, which generally is the same as login *)
     type user_id
+
+    (** Associated to user information *)
     type user_info
 
+    (** Json encoding for user's id *)
     val user_id_encoding : user_id Json_encoding.encoding
+    
+    (** Json encoding for user's information *)
     val user_info_encoding : user_info Json_encoding.encoding
 
+    (** RPC path where authentication services like {b connect}, {b login} and {b logout} 
+    would be placed. *)
     val rpc_path : string list (* ["v1"] *)
 
     (*
@@ -36,9 +49,13 @@ module TYPES = struct
   (`CSRF "X-Csrf-Token" `).
      *)
 
+    (** Describes two ways to store a token within a client request: 
+    - Store as a cookie associated with the given cookie name. 
+    - Store as a CSRF header with the given name. *)
     val token_kind : [`Cookie of string | `CSRF of string ]
   end
 
+  (** Authentification information returned by server after successful connection *)
   type ('user_id, 'user_info) auth = {
     auth_login : string;
     auth_user_id : 'user_id;
@@ -46,29 +63,38 @@ module TYPES = struct
     auth_user_info : 'user_info;
   }
 
+  (** Challenge that should be resolved to be able to connect *)
   type auth_needed = {
     challenge_id : string;
     challenge : string;
   }
 
+  (** Connection response, that either describes user information if connection successes either
+  describes challenge to resolve to be able to connect *)
   type 'auth connect_response =
     | AuthOk of 'auth
     | AuthNeeded of auth_needed
 
+  (** Logining request, that contains the login and the challenge resolution obtained by hashing
+  challenge and password provided by the user. *)
   type local_login_message = {
     login_user : string;
     login_challenge_id : string;
     login_challenge_reply : string;
   }
 
+  (** Logining request, that could be asked either by user with the password provided either by a
+  foreign user without a password. *)
   type login_message =
     | Local of local_login_message
     | Foreign of foreign_info
 
+  (** Possible logining outcomes. *)
   type ('user_id, 'user_info) login_response =
     | LoginOk of ('user_id, 'user_info) auth
     | LoginWait of 'user_id
 
+  (** Errors that could be raised while logining. *)
   type login_error =
     [ `Bad_user_or_password
     | `User_not_registered
@@ -76,9 +102,11 @@ module TYPES = struct
     | `Challenge_not_found_or_expired of string
     | `Invalid_session_login of string ]
 
+  (** Errors that could be raised while disconnecting. *)
   type logout_error =
     [ `Invalid_session_logout of string]
 
+  (** Errors that could be raised while connecting. *)
   type connect_error =
     [ `Session_expired | `Invalid_session_connect of string ]
 
@@ -86,17 +114,21 @@ end
 
 open TYPES
 
+(** Hash module, that hashing algorithms. *)
 module Hash = struct
 
   include EzHash
 
+  (** Hashed version of the password that is computed by the hash function applied on 
+  [login ^ password] *)
   let password ~login ~password =
     let s = hash (login ^ password) in
     if debug then
       EzDebug.printf "EzSession.Hash.password:\n  %S %S => %S"
         login password s;
     s
-
+  (** Hashed version of the challenge that is computed by the hash function applied on 
+  [challenge ^ pwhash] *)
   let challenge ~challenge ~pwhash =
     let s = hash (challenge ^ pwhash) in
     if debug then
@@ -106,6 +138,7 @@ module Hash = struct
 
 end
 
+(** Output signature for Make functor *)
 module type M = sig
   type user_id
   type user_info
@@ -120,10 +153,14 @@ module type M = sig
   val logout : (auth_needed, logout_error, token_security) EzAPI.service0
 end
 
+(** Main functor that produces definition for authentication services and encodings for types used 
+by service's input, output and errors. *)
 module Make(S : SessionArg) = struct
 
   type nonrec auth = (S.user_id, S.user_info) auth
 
+  (** Encodings for data types used in server's requests/responses and for error cases that 
+  could be raised by one of them. *)
   module Encoding = struct
     open Json_encoding
 
@@ -281,25 +318,35 @@ module Make(S : SessionArg) = struct
 
   end
 
+  (** Definition for services and their security's configuration. *)
   module Service = struct
     type user_id = S.user_id
     type user_info = S.user_info
     type nonrec auth = auth
 
+    (** Documentation section for openapi. *)
     let section_session = EzAPI.Doc.section "Session Requests"
 
+    (** Parameter with name {i token} that stores an authentication token string *)
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
+    (** Type that represents security by authentication token and the way that request uses 
+    to store it. *)
     type token_security =
       [ EzAPI.Security.cookie | EzAPI.Security.header | EzAPI.Security.query ]
 
+    (** Security that requires [param_token] parameter in query. *)
     let param_security =
       EzAPI.(`Query {
           Security.ref_name = "Token parameter";
           name = param_token
         })
 
+    (** Security that checks [S.token_kind]:
+        If it is a CSRF token, then requires a CSRF header.
+        Otherwise requires token to be found in the cookies. 
+    *)
     let header_cookie_security =
       match S.token_kind with
       | `CSRF name ->
@@ -307,16 +354,24 @@ module Make(S : SessionArg) = struct
       | `Cookie name ->
         EzAPI.(`Cookie { Security.ref_name = name ^ " Cookie"; name })
 
+    (** Security that combines [param_security] and [header_cookie_security]
+        in the corresponding order. Represents the security configuration for
+        [connect] and [logout] requests. 
+    *)
     let security : token_security list = [
       param_security; (* Parameter fisrt *)
       header_cookie_security; (* Header CSRF or Cookie *)
     ]
-
+    
+    (** Defines path to authentication services *)
     let rpc_root =
       List.fold_left (fun path s ->
            EzAPI.Path.( path // s )
         ) EzAPI.Path.root S.rpc_path
 
+    (** Connection service that requires authentication token. For more details, see corresponding 
+    [EzSessionServer.Make.connect] handler and default client request implementation 
+    [EzSessionClient.Make.connect]. *)
     let connect : (auth connect_response, connect_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session
@@ -326,6 +381,8 @@ module Make(S : SessionArg) = struct
         ~security
         EzAPI.Path.(rpc_root // "connect")
 
+    (** Logining service. For more details, see corresponding [EzSessionServer.Make.login] handler
+    and default client request implementation [EzSessionClient.Make.login]. *)
     let login : (login_message, (S.user_id, S.user_info) login_response, login_error, EzAPI.Security.none) EzAPI.post_service0  =
       EzAPI.post_service
         ~section:section_session
@@ -339,6 +396,9 @@ module Make(S : SessionArg) = struct
                  Encoding.invalid_session_login_case]
         EzAPI.Path.(rpc_root // "login")
 
+    (** Disconnection service that requires authentication token. For more details, see corresponding 
+    [EzSessionServer.Make.logout] handler and default client request implementation 
+    [EzSessionClient.Make.logout]. *)
     let logout : (auth_needed, logout_error, token_security) EzAPI.service0  =
       EzAPI.service
         ~section:section_session

@@ -49,10 +49,12 @@ module type Arg = sig
     (SessionArg.user_id * SessionArg.user_info option, int * string option) result Lwt.t
 end
 
+(** Dummy implementation for [Arg.check_foreign] *)
 let default_check_foreign ~origin ~token =
   ignore (origin, token);
   Lwt.return (Error (400, Some "Foreign authentication not implemented"))
 
+(** Dummy implementation for [Arg.register_foreign] *)
 let default_register_foreign ~origin ~token =
   ignore (origin, token);
   Lwt.return (Error (400, Some "Foreign registration not implemented"))
@@ -79,13 +81,20 @@ end = struct
   module M = EzSession.Make(S)
   include M
 
+  (** Searches in the given request for the parameter indicated in security configuration. 
+  Returns concatenated with ',' strting containing all values associated to the parameter,
+  if exists. *)
   let cookie_of_param req (`Query { EzAPI.Security.name = param ; _}) =
     Req.find_param param req
 
+  (** Searches in the given request for the cookie with the name as indicated in security 
+  configuration. Cookies aree implemented only for given Cohttp request implementation. *)
   let cookie_of_cookie req (`Cookie { EzAPI.Security.name ; _ }) =
     try Some (StringMap.find name (EzCookieServer.get req))
     with Not_found -> None
 
+  (** Searches in the given request for the header with the name indicated in security
+  configuration. Returns the first occurence of the value for the given header. *)
   let cookie_of_header req (`Header { EzAPI.Security.name ; _ }) =
     let name = String.lowercase_ascii name in
     match StringMap.find name req.Req.req_headers with
@@ -93,6 +102,9 @@ end = struct
     | [] -> None
     | cookie :: _ -> Some cookie
 
+  (** Extracts token from then given request by applying one from the defined security
+  configurations. If token was succesfully retreived, then it looks up and returns 
+  associated to it session. *)
   let get_request_session security req =
     List.map (function
         | `Query _ as s -> cookie_of_param req s
@@ -107,10 +119,17 @@ end = struct
       ) None
 
   module Handler = struct
-
+    (** Hash map of challenges' id associated with challenge itself and with a time it 
+    was created (client's request time). *)
     let challenges = Hashtbl.create initial_hashtbl_size
+    
+    (** Queue of challenge ids, that allows to remove the oldest one when maximal size 
+    of challenge is achieved. *)
     let challenge_queue = Queue.create ()
 
+    (** Create new [auth_needed] that contains random challenge with its random id. If
+    maximal size of id challenges is reached, the oldest id is reused to store new
+    challenge *)
     let rec new_challenge req =
       let challenge_id = random_challenge () in
       if Hashtbl.mem challenges challenge_id then
@@ -125,6 +144,11 @@ end = struct
         Queue.add challenge_id challenge_queue;
         { challenge_id; challenge }
 
+    (** Returns authentication header that sould be then added inside the server response.
+    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with 
+    [token] as a cookie value. Otherwise creates header {i Access-control-allow-headers} 
+    and mention CSRF header name that should be present for every client's request for 
+    authentication purpose. *)
     let add_auth_header ?token req =
       match S.token_kind with
       | `Cookie name ->
@@ -141,11 +165,14 @@ end = struct
       let res, code = f @@ new_challenge req in
       return ?code ~headers res
 
+    (** Creates authentification response that returns challenge to resolve. Adds 
+    authentification header with [add_auth_header] *)
     let request_auth req =
       request_auth_base req (fun auth_needed ->
           Ok (AuthNeeded auth_needed), Some 200
         )
-
+    (** Creates response that contains error with specified code. Adds authentification 
+    header with [add_auth_header]*)
     let request_error ~code req msg =
       let headers = add_auth_header req in
       return ~code ~headers (Error msg)
@@ -166,6 +193,9 @@ end = struct
           auth_user_info = user_info } in
         return ~headers (f auth)
 
+    (** Creates login response, that returns authentification information. Return [LoginWait]
+    if user info isn't provided. If token isn't provided then the new session is created and 
+    new session's token is used. *)
     let return_auth req ?token ?foreign ~login user_id user_info =
       match user_info with
       | Some user_info ->
@@ -174,6 +204,13 @@ end = struct
       | None ->
         return (Ok (LoginWait user_id))
 
+    (** Connection service handler. It performs next actions:
+        - Looks up for the session that is associated to the token extracted from request (returned by [get_request_session]). If session or token don't exist then returns challenge to resolve with
+        [request_auth].
+        - If session was found, then it extracts user's login related to the session and search for the corresponding user information. If user doesn't exists, it means that session is expired and it responds with an error.
+        - If user exists then checks if it contains password. If it does, then returns response containing authentification information and authentification headers. 
+        - If it doesn't checks if foreign user with given login exists and returns its information.
+        - Otherwise returns an error {!Invalid_session_connect}. *)
     let connect req security () =
       get_request_session security req >>= function
       | None -> request_auth req
@@ -195,6 +232,17 @@ end = struct
                     request_error req ~code:400 (`Invalid_session_connect "wrong user"))
           | _ -> request_error req ~code:400 (`Invalid_session_connect "wrong type of authentication")
 
+    (** Login service handler. It performs next actions for local users (have password):
+        - Search for the user with the provided login.
+        - Verify password by comparing challenge reply send by client with expected one computed by server.
+        - Discard used challenge.
+        - Create session with given user and storee it.
+        - Returns authentification information (if login sucessed).
+        And for foreign (without password) users:
+        - Checks if foreign user exists and get its login.
+        - Searching for user information with the given login.
+        - If user exists, create session and storee it.
+        - Otherwise, register foreign user and returns authentification information. *)
     let login req _  = function
       | Local { login_user; login_challenge_id; login_challenge_reply } ->
         begin
@@ -237,6 +285,9 @@ end = struct
               debug ~v:1 "/login: could not register foreign user";
               request_error req ~code:400 `User_not_registered
 
+    (** Connection service handler that at the end returns new challenge to make possible 
+    further connections. It checks for authentification token within request and if it 
+    exists then remove current session associtated to the token. Otherwise returns an error. *)
     let logout req security () =
        get_request_session security req >>= function
       | None -> return ~code:400 (Error (`Invalid_session_logout "session doesn't exist"))
@@ -269,6 +320,7 @@ module SessionStoreInMemory :
 
   type user_id = string
 
+  (** Hash map that stores sessions by token *)
   let (session_by_token : (string, user_id session) Hashtbl.t) =
     Hashtbl.create initial_hashtbl_size
 
@@ -331,6 +383,7 @@ end = struct
   module SessionStore =
     (SessionStoreInMemory : SessionStore with type user_id = S.user_id)
 
+  (** User information *)
   type user = {
     login : string;
     user_id : S.user_id;
@@ -339,6 +392,7 @@ end = struct
     kind : string option;
   }
 
+  (** Hash map of users by their login *)
   let (users : (string, user) Hashtbl.t) =
     Hashtbl.create initial_hashtbl_size
 
