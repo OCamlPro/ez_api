@@ -1,3 +1,13 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                 Copyright 2018-2023 OCamlPro                           *)
+(*                                                                        *)
+(*  All rights reserved. This file is distributed under the terms of the  *)
+(*  GNU Lesser General Public License version 2.1, with the special       *)
+(*  exception on linking described in the file LICENSE.                   *)
+(*                                                                        *)
+(**************************************************************************)
+
 open EzAPIServerUtils
 open EzSession.TYPES
 open Lwt.Infix
@@ -81,13 +91,13 @@ end = struct
   module M = EzSession.Make(S)
   include M
 
-  (** Searches in the given request for the parameter indicated in security configuration. 
+  (** Searches in the given request for the parameter indicated in security configuration.
   Returns concatenated with ',' strting containing all values associated to the parameter,
   if exists. *)
   let cookie_of_param req (`Query { EzAPI.Security.name = param ; _}) =
     Req.find_param param req
 
-  (** Searches in the given request for the cookie with the name as indicated in security 
+  (** Searches in the given request for the cookie with the name as indicated in security
   configuration. Cookies aree implemented only for given Cohttp request implementation. *)
   let cookie_of_cookie req (`Cookie { EzAPI.Security.name ; _ }) =
     try Some (StringMap.find name (EzCookieServer.get req))
@@ -103,7 +113,7 @@ end = struct
     | cookie :: _ -> Some cookie
 
   (** Extracts token from then given request by applying one from the defined security
-  configurations. If token was succesfully retreived, then it looks up and returns 
+  configurations. If token was succesfully retreived, then it looks up and returns
   associated to it session. *)
   let get_request_session security req =
     List.map (function
@@ -119,11 +129,11 @@ end = struct
       ) None
 
   module Handler = struct
-    (** Hash map of challenges' id associated with challenge itself and with a time it 
+    (** Hash map of challenges' id associated with challenge itself and with a time it
     was created (client's request time). *)
     let challenges = Hashtbl.create initial_hashtbl_size
-    
-    (** Queue of challenge ids, that allows to remove the oldest one when maximal size 
+
+    (** Queue of challenge ids, that allows to remove the oldest one when maximal size
     of challenge is achieved. *)
     let challenge_queue = Queue.create ()
 
@@ -145,9 +155,9 @@ end = struct
         { challenge_id; challenge }
 
     (** Returns authentication header that sould be then added inside the server response.
-    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with 
-    [token] as a cookie value. Otherwise creates header {i Access-control-allow-headers} 
-    and mention CSRF header name that should be present for every client's request for 
+    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with
+    [token] as a cookie value. Otherwise creates header {i Access-control-allow-headers}
+    and mention CSRF header name that should be present for every client's request for
     authentication purpose. *)
     let add_auth_header ?token req =
       match S.token_kind with
@@ -165,13 +175,14 @@ end = struct
       let res, code = f @@ new_challenge req in
       return ?code ~headers res
 
-    (** Creates authentification response that returns challenge to resolve. Adds 
+    (** Creates authentification response that returns challenge to resolve. Adds
     authentification header with [add_auth_header] *)
     let request_auth req =
       request_auth_base req (fun auth_needed ->
           Ok (AuthNeeded auth_needed), Some 200
         )
-    (** Creates response that contains error with specified code. Adds authentification 
+
+    (** Creates response that contains error with specified code. Adds authentification
     header with [add_auth_header]*)
     let request_error ~code req msg =
       let headers = add_auth_header req in
@@ -194,7 +205,7 @@ end = struct
         return ~headers (f auth)
 
     (** Creates login response, that returns authentification information. Return [LoginWait]
-    if user info isn't provided. If token isn't provided then the new session is created and 
+    if user info isn't provided. If token isn't provided then the new session is created and
     new session's token is used. *)
     let return_auth req ?token ?foreign ~login user_id user_info =
       match user_info with
@@ -208,7 +219,7 @@ end = struct
         - Looks up for the session that is associated to the token extracted from request (returned by [get_request_session]). If session or token don't exist then returns challenge to resolve with
         [request_auth].
         - If session was found, then it extracts user's login related to the session and search for the corresponding user information. If user doesn't exists, it means that session is expired and it responds with an error.
-        - If user exists then checks if it contains password. If it does, then returns response containing authentification information and authentification headers. 
+        - If user exists then checks if it contains password. If it does, then returns response containing authentification information and authentification headers.
         - If it doesn't checks if foreign user with given login exists and returns its information.
         - Otherwise returns an error {!Invalid_session_connect}. *)
     let connect req security () =
@@ -285,8 +296,8 @@ end = struct
               debug ~v:1 "/login: could not register foreign user";
               request_error req ~code:400 `User_not_registered
 
-    (** Connection service handler that at the end returns new challenge to make possible 
-    further connections. It checks for authentification token within request and if it 
+    (** Connection service handler that at the end returns new challenge to make possible
+    further connections. It checks for authentification token within request and if it
     exists then remove current session associtated to the token. Otherwise returns an error. *)
     let logout req security () =
        get_request_session security req >>= function
