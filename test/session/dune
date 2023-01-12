@@ -1,0 +1,19 @@
+(library
+ (name test_session_lib)
+ (modules test_session_lib)
+ (libraries ez_api ez_api.sha2 ez_api.session))
+
+(executable
+ (name test_cookie_client)
+ (modules test_cookie_client)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries js_of_ocaml test_session_lib ez_api.session_client ez_api.icoxhr)
+ (modes js)
+ (js_of_ocaml
+  (flags
+   (:standard --no-sourcemap))))
+
+(executable
+ (name test_cookie_server)
+ (modules test_cookie_server)
+ (libraries test_session_lib ez_api.server_session ez_api.server))

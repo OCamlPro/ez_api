@@ -33,8 +33,13 @@ module TYPES = struct
     (** Associated to user information *)
     type user_info
 
-    (** Web host, that should be used in access control headers. *)
-    val web_host : string 
+    (** Web host, that should be used in access control headers, if specified. If web_host isn't specified,
+        then acces-control header in response will be set to '*' and authentication wwith cookies wouldn't 
+        work.
+        Note : Cookies would be set by browser only if request's flag 'with_credentials' is set to true. 
+        Last one in turn, requires that "Access-control_allow_origin" header by reponse returns something 
+        different from "*". *)
+    val web_host : string option 
 
     (** Json encoding for user's id *)
     val user_id_encoding : user_id Json_encoding.encoding
@@ -374,7 +379,8 @@ module Make(S : SessionArg) = struct
 
     let access_control = 
       [ "access-control-allow-credentials", "true"; 
-        "access-control-allow-origin", S.web_host ]
+        "access-control-allow-origin", 
+          match S.web_host with None -> "*" | Some origin -> origin ]
 
 
     (** Connection service that requires authentication token. For more details, see corresponding 
