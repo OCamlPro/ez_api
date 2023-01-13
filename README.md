@@ -36,7 +36,7 @@ For web:
 - javascript XHR implemenation `ez_api.ixhr` or `ez_api.ixhr_lwt`
 - cohttp web `ez_api.icoxhr` or `ez_api.icoxhr_lwt` that requires cohttp-lwt-jsoo:
 ```
-opem install cohttp-lwt-jsoo
+opam install cohttp-lwt-jsoo
 ```
 - fetch implemetation `ez_api.ifetch` or `ez_api.ifetch_lwt` requiring `ezjs_fetch`
 ```
