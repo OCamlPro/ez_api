@@ -99,7 +99,7 @@ end = struct
 
   (** Searches in the given request for the cookie with the name as indicated in security
   configuration. Cookies aree implemented only for given Cohttp request implementation. *)
-  let cookie_of_cookie req (`Cookie { EzAPI.Security.name ; _ }) =
+  let cookie_of_cookie req (`Cookie ({ EzAPI.Security.name ; _ }, _) ) =
     try Some (StringMap.find name (EzCookieServer.get req))
     with Not_found -> None
 
@@ -155,37 +155,39 @@ end = struct
         { challenge_id; challenge }
 
     (** Returns authentication header that sould be then added inside the server response.
-    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with
-    [token] as a cookie value. Otherwise creates header {i Access-control-allow-headers}
-    and mention CSRF header name that should be present for every client's request for
-    authentication purpose. *)
-    let add_auth_header ?token req =
+    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with 
+    [token] as a cookie value, if it is specified (else, clears cookie). Otherwise creates 
+    header {i Access-control-allow-headers} and mention CSRF header name that should be present
+    for every client's request for authentication purpose. *)
+    let add_auth_header ?(clear_cookie=false) ?token () =
+
       match S.token_kind with
-      | `Cookie name ->
-        begin match token with
-          | None -> []
-          | Some value ->
-            [ EzCookieServer.set req ~name ~value ]
+      | `Cookie (name,max_age) ->
+        begin match token, clear_cookie with
+          | (None,false) -> []
+          | (_,true) -> [ EzCookieServer.clear ~name () ]
+          | (Some value,_) -> [ EzCookieServer.set ?expiration:max_age ~name ~value () ]
         end
       | `CSRF header ->
         [ "access-control-allow-headers", header ]
 
-    let request_auth_base req f =
-      let headers = add_auth_header req in
+    let request_auth_base ?(clear_cookie=false) req f =
+      let headers = add_auth_header ~clear_cookie () in
       let res, code = f @@ new_challenge req in
       return ?code ~headers res
 
-    (** Creates authentification response that returns challenge to resolve. Adds
-    authentification header with [add_auth_header] *)
+    (** Creates authentification response that returns challenge to resolve. Adds 
+    authentification header with [add_auth_header]. Clears the cookie, if presents. *)
+
     let request_auth req =
-      request_auth_base req (fun auth_needed ->
+      request_auth_base ~clear_cookie:true req (fun auth_needed ->
           Ok (AuthNeeded auth_needed), Some 200
         )
-
-    (** Creates response that contains error with specified code. Adds authentification
-    header with [add_auth_header]*)
-    let request_error ~code req msg =
-      let headers = add_auth_header req in
+        
+    (** Creates response that contains error with specified code. Adds authentification 
+    header with [add_auth_header] *)
+    let request_error ?(clear_cookie=false) ~code msg =
+      let headers = add_auth_header ~clear_cookie () in
       return ~code ~headers (Error msg)
 
     let return_auth_base req ?token ?foreign ~login user_id user_info f =
@@ -196,7 +198,7 @@ end = struct
             Lwt.return s.session_token
       end
       >>= function token ->
-        let headers = add_auth_header ~token req in
+        let headers = add_auth_header ~token () in
         let auth = {
           auth_login = login;
           auth_user_id = user_id;
@@ -227,21 +229,21 @@ end = struct
       | None -> request_auth req
       | Some { session_token = token; session_login = login; session_foreign = foreign; _ } ->
         find_user ~login >>= function
-        | None -> request_error req ~code:440 `Session_expired
+        | None -> request_error ~clear_cookie:true ~code:440 `Session_expired
         | Some (pwhash, user_id, user_info) ->
           match pwhash, foreign with
           | Some _pwhash, None ->
             return_auth_base req ~token ~login user_id user_info (fun a -> Ok (AuthOk a))
           | None, Some {foreign_origin = origin; foreign_token = token} ->
             check_foreign ~origin ~token >>= (function
-                | Error _e -> request_error req ~code:440 `Session_expired
+                | Error _e -> request_error ~clear_cookie:true ~code:440 `Session_expired
                 | Ok foreign_id ->
                   if login = foreign_id then
                     return_auth_base req ~token ~login ?foreign user_id user_info
                       (fun a -> Ok (AuthOk a))
                   else
-                    request_error req ~code:400 (`Invalid_session_connect "wrong user"))
-          | _ -> request_error req ~code:400 (`Invalid_session_connect "wrong type of authentication")
+                    request_error ~code:400 (`Invalid_session_connect "wrong user"))
+          | _ -> request_error ~code:400 (`Invalid_session_connect "wrong type of authentication")
 
     (** Login service handler. It performs next actions for local users (have password):
         - Search for the user with the provided login.
@@ -262,13 +264,13 @@ end = struct
             begin match Hashtbl.find challenges login_challenge_id with
               | exception Not_found ->
                 debug ~v:1 "/login: could not find challenge\n%!";
-                request_error req ~code:401
+                request_error ~code:401
                   (`Challenge_not_found_or_expired login_challenge_id)
               | (challenge, _t0) ->
                 let expected_reply = EzSession.Hash.challenge ~challenge ~pwhash in
                 if expected_reply <> login_challenge_reply then begin
                   debug ~v:1 "/login: challenge failed";
-                  request_error req ~code:401 `Bad_user_or_password
+                  request_error ~code:401 `Bad_user_or_password
                 end else begin
                   Hashtbl.remove challenges login_challenge_id;
                   return_auth req ~login:login_user user_id (Some user_info)
@@ -276,12 +278,12 @@ end = struct
             end
           | _ ->
             debug ~v:1 "/login: could not find user %S" login_user;
-            request_error req ~code:401 `Bad_user_or_password
+            request_error ~code:401 `Bad_user_or_password
 
         end
       | Foreign {foreign_origin; foreign_token} ->
         check_foreign ~origin:foreign_origin ~token:foreign_token >>= function
-        | Error _ -> request_error req ~code:400 (`Invalid_session_login "foreign authentication fail")
+        | Error _ -> request_error ~code:400 (`Invalid_session_login "foreign authentication fail")
         | Ok foreign_login ->
           find_user ~login:foreign_login >>= function
           | Some (_, user_id, user_info) ->
@@ -294,7 +296,7 @@ end = struct
                 user_id user_info
             | Error _ ->
               debug ~v:1 "/login: could not register foreign user";
-              request_error req ~code:400 `User_not_registered
+              request_error ~code:400 `User_not_registered
 
     (** Connection service handler that at the end returns new challenge to make possible
     further connections. It checks for authentification token within request and if it
@@ -304,7 +306,7 @@ end = struct
       | None -> return ~code:400 (Error (`Invalid_session_logout "session doesn't exist"))
       | Some { session_user_id ; session_token = token; _ } ->
          remove_session session_user_id ~token >>= fun () ->
-         request_auth_base req (fun auth_needed -> Ok auth_needed, None)
+         request_auth_base ~clear_cookie:true req (fun auth_needed -> Ok auth_needed, None)
   end
 
   let register_handlers dir =

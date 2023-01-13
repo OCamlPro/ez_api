@@ -16,7 +16,8 @@ type basic_desc = { basic_name : string }
 type bearer = [ `Bearer of bearer_desc ]
 type basic = [ `Basic of basic_desc ]
 type header = [ `Header of string apikey ]
-type cookie = [ `Cookie of string apikey ]
+(* cookie name * max age atribute (defaults to 1 day) *)
+type cookie = [ `Cookie of string apikey * int64 option ]
 type query = [ `Query of Param.t apikey ]
 type scheme = [
   | none
@@ -32,7 +33,7 @@ let ref_name = function
   | `Nosecurity u -> unreachable u
   | `Basic { basic_name = ref_name }
   | `Bearer { bearer_name = ref_name; format=_  }
-  | `Cookie { ref_name; name=_ }
+  | `Cookie ({ ref_name; name=_ }, _ )
   | `Header { ref_name; name=_ }
   | `Query { ref_name; name=_ } -> ref_name
 

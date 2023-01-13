@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(S: EzSession.TYPES.SessionArg) : sig
+module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
 
 (* If cookies are in use on server-side, `connect` might return
   an already authenticated user. Otherwise (CSRF protection),

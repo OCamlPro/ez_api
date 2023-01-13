@@ -480,7 +480,7 @@ module Encoding = struct
       Some (bearer_name, Makers.mk_security_scheme ?format ~scheme:"bearer" "http")
     | `Header { EzAPI.Security.ref_name; name } ->
       Some (ref_name, Makers.mk_security_scheme ~loc:"header" ~name "apiKey")
-    | `Cookie { EzAPI.Security.ref_name; name } ->
+    | `Cookie ({ EzAPI.Security.ref_name; name }, _ ) ->
       Some (ref_name, Makers.mk_security_scheme ~loc:"cookie" ~name "apiKey")
     | `Query { EzAPI.Security.ref_name; name } ->
       Some (ref_name, Makers.mk_security_scheme ~loc:"query" ~name:name.EzAPI.Param.param_id "apiKey")

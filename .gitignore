@@ -4,3 +4,6 @@ _local
 *~
 *.merlin
 *.install
+*.exe
+.ocamlformat
+test/session/*.js

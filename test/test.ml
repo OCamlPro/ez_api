@@ -60,6 +60,7 @@ module SessionArg = struct
   type user_info = Types.user_info
   let user_id_encoding = Json_encoding.string
   let user_info_encoding = Encoding.user_info
+  let web_host = None
   let rpc_path = []
   let token_kind = `CSRF "X-Csrf-Token" (* `Cookie "EZSESSION" *)
 end
@@ -199,7 +200,7 @@ module MakeClient(S : sig end) = struct
   module Service = MakeService(S)
   open Types
 
-  module Session = EzSessionClient.Make(SessionArg)
+  module Session = EzSessionClient.Make(SessionArg)(EzReq)
   open EzAPI.TYPES
 
   let string_of_test t =

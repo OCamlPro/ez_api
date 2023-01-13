@@ -92,7 +92,8 @@ let rec resolve :
   (resolved_directory, lookup_error) result Lwt.t =
   fun prefix dir args path ->
   match path, dir with
-  | [], dir -> Lwt.return_ok (Dir (dir, args))
+  | [], dir -> 
+    Lwt.return_ok (Dir (dir, args))
   | _name :: _path, { subdirs = None, None; _ } -> Lwt.return_error `Not_found
   | name :: path, { subdirs = Some static, None; _ } ->
     begin match StringMap.find_opt name static with
@@ -114,28 +115,33 @@ let rec resolve :
       | Error msg -> Lwt.return_error @@
         `Cannot_parse (arg.Arg.description, msg, name :: prefix)
 
-let io_to_answer : type a. code:int -> a io -> a -> string Answer.t = fun ~code io body ->
+(* Note : headers are merged with predefined headers *)
+let io_to_answer : type a. code:int -> headers:(string * string) list -> a io -> a -> string Answer.t = 
+fun ~code ~headers io body ->
   match io with
-  | Empty -> {Answer.code; body=""; headers=[]}
+  | Empty -> {Answer.code; body=""; headers}
   | Raw l ->
     let content_type = match l with
       | [] -> "application/octet-stream"
       | h :: _ -> Mime.to_string h in
-    {Answer.code; body; headers=["content-type", content_type]}
+    {Answer.code; body; headers=("content-type", content_type)::headers}
   | Json enc ->
     {Answer.code; body = EzEncoding.construct enc body;
-     headers=["content-type", "application/json"]}
+     headers=("content-type", "application/json")::headers}
 
 let ser_handler :
-  type i o e. ?content_type:string -> ('a -> i -> (o, e) result Answer.t Lwt.t) -> 'a ->
+  type i o e. ?content_type:string -> access_control:(string * string) list 
+  -> ('a -> i -> (o, e) result Answer.t Lwt.t) -> 'a ->
   i io -> o io -> e Json_encoding.encoding ->
   string -> (string Answer.t, handler_error) result Lwt.t =
-  fun ?content_type handler args input output errors ->
-  let handle_result {Answer.code; body; _} = match body with
-    | Ok o -> io_to_answer ~code output o
+  fun ?content_type ~access_control handler args input output errors ->
+  let handle_result {Answer.code; body; headers} = 
+    match body with
+    | Ok o -> io_to_answer ~code ~headers:(headers @ access_control) output o
     | Error e ->
       {Answer.code; body = EzEncoding.construct errors e;
-       headers=["content-type", "application/json"]} in
+       headers=("content-type", "application/json")::access_control } 
+  in
   match input with
   | Empty -> (fun _ ->
       Lwt.catch
@@ -185,11 +191,15 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
       begin match MethMap.bindings dir.services with
         | [] -> Lwt.return_error `Not_found
         | l ->
+          (* Todo : combine access control headers correctly. *)
+          let access_control = List.fold_left (fun acc (_,rs) -> match rs with
+              | Http {service; _} when acc = [] -> Service.access_control service
+              | _ -> acc) [] l in 
           let meths = Meth.headers @@ List.map fst l in
           let sec_set = List.fold_left (fun acc (_, rs) -> match rs with
               | Http {service; _} -> Security.StringSet.union acc (Security.headers (Service.security service))
               | Websocket _ -> acc) Security.StringSet.empty l in
-          Lwt.return_ok @@ `options (meths @ (Security.header sec_set))
+          Lwt.return_ok @@ `options (access_control @ meths @ (Security.header sec_set))
       end
     | Some `HEAD -> Lwt.return_ok `head
     | Some (#Meth.t as m) ->
@@ -198,7 +208,8 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
         let input = Service.input service in
         let output = Service.output service in
         let errors = Service.errors_encoding service in
-        let h = ser_handler ?content_type handler args input output errors in
+        let access_control = Service.access_control service in
+        let h = ser_handler ?content_type ~access_control handler args input output errors in
         Lwt.return_ok @@ `http h
       | `GET, Some (Websocket {service; react; bg; onclose; step}) ->
         let input = Service.input service in

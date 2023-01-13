@@ -51,10 +51,13 @@ type ('args, 'input, 'output, 'error, 'security) t = {
   meth : Meth.t;
   params : Param.t list;
   security: ([< Security.scheme ] as 'security) list;
+  access_control : (string * string) list
 }
 
-let make ?(meth : Meth.t =`GET) ?(params=[]) ?(security=[]) ?(errors=[]) ~input ~output path =
-  { path ; input ; output; errors; meth; params; security }
+let make =
+  fun ?(meth : Meth.t =`GET) ?(params=[]) ?(security=[]) ?(errors=[]) 
+    ?(access_control=[]) ~input ~output path ->
+  { path ; input ; output; errors; meth; params; security; access_control }
 
 let input s = s.input
 let output s = s.output
@@ -69,5 +72,6 @@ let meth s = s.meth
 let path s = s.path
 let security s = s.security
 let params s = s.params
+let access_control s = s.access_control
 
 let error s ~code = Err.get ~code s.errors

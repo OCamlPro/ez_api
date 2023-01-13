@@ -24,6 +24,8 @@ open EzAPIServerUtils
 let cookie_re = Re.Str.regexp "[;,][ \t]*"
 let equals_re = Re.Str.regexp_string "="
 
+let day_in_seconds = 86400L
+
 let get ( req : Req.t ) =
   List.fold_left
     (fun acc header ->
@@ -40,13 +42,21 @@ let get ( req : Req.t ) =
       List.fold_left split_pair acc cookies
     ) StringMap.empty (StringMap.find "cookie" req.Req.req_headers)
 
-let set ?secure ?http_only ?expiration (req : Req.t) ~name ~value =
-  let version = req.Req.req_version in
-  Cohttp.Cookie.Set_cookie_hdr.serialize ~version @@
-  Cohttp.Cookie.Set_cookie_hdr.make ?expiration ?secure ?http_only (name, value)
+(* TODO: Find a proper way to do that, Cohttp lib doesn't provide valid header when trying to clear header *)
+let set ?secure ?http_only ~expiration ~name ~value () =
+ ignore secure;
+ ignore http_only;
+ "Set-Cookie", Printf.sprintf "%s=%s; Max-Age=%s" name value (Int64.to_string expiration)
+  (* Cohttp.Cookie.Set_cookie_hdr.serialize ~version:`HTTP_1_0 @@
+  Cohttp.Cookie.Set_cookie_hdr.make ~expiration ?secure ?http_only (name, value) *)
 
-let clear req ~name =
-  set req ~name ~value:"" ~expiration:(`Max_age 0L)
+let clear ~name () =
+  set ~name ~value:"" ~expiration:0L ()
 
-let set ?secure ?http_only req ~name ~value =
-  set ?secure ?http_only req ~name ~value
+let set ?secure ?http_only ?expiration ~name ~value =
+  let expiration = 
+    match expiration with
+    | Some exp -> exp
+    | None -> day_in_seconds
+  in
+  set ?secure ?http_only ~name ~value ~expiration 
