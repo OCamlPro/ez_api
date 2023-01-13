@@ -1,3 +1,12 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                 Copyright 2018-2023 OCamlPro                           *)
+(*                                                                        *)
+(*  All rights reserved. This file is distributed under the terms of the  *)
+(*  GNU Lesser General Public License version 2.1, with the special       *)
+(*  exception on linking described in the file LICENSE.                   *)
+(*                                                                        *)
+(**************************************************************************)
 
 (* TODO:
   * Use a better hash fuction than md5 !!!
@@ -14,7 +23,7 @@ module TYPES = struct
     foreign_token : string;
   }
 
-  (** A session that helps to keep connection for the given user and stores useful information 
+  (** A session that helps to keep connection for the given user and stores useful information
   about his communication with the sever. *)
   type 'user_id session = {
     session_token : string;
@@ -43,11 +52,11 @@ module TYPES = struct
 
     (** Json encoding for user's id *)
     val user_id_encoding : user_id Json_encoding.encoding
-    
+
     (** Json encoding for user's information *)
     val user_info_encoding : user_info Json_encoding.encoding
 
-    (** RPC path where authentication services like {b connect}, {b login} and {b logout} 
+    (** RPC path where authentication services like {b connect}, {b login} and {b logout}
     would be placed. *)
     val rpc_path : string list (* ["v1"] *)
 
@@ -61,6 +70,7 @@ module TYPES = struct
     - Stores as a cookie associated with the given cookie name and its max-age, if provided. 
     - Stores as a CSRF header with the given name. *)
     val token_kind : [`Cookie of string * int64 option | `CSRF of string ]
+
   end
 
   (** Authentification information returned by server after successful connection *)
@@ -127,7 +137,7 @@ module Hash = struct
 
   include EzHash
 
-  (** Hashed version of the password that is computed by the hash function applied on 
+  (** Hashed version of the password that is computed by the hash function applied on
   [login ^ password] *)
   let password ~login ~password =
     let s = hash (login ^ password) in
@@ -135,7 +145,8 @@ module Hash = struct
       EzDebug.printf "EzSession.Hash.password:\n  %S %S => %S"
         login password s;
     s
-  (** Hashed version of the challenge that is computed by the hash function applied on 
+
+  (** Hashed version of the challenge that is computed by the hash function applied on
   [challenge ^ pwhash] *)
   let challenge ~challenge ~pwhash =
     let s = hash (challenge ^ pwhash) in
@@ -161,13 +172,13 @@ module type M = sig
   val logout : (auth_needed, logout_error, token_security) EzAPI.service0
 end
 
-(** Main functor that produces definition for authentication services and encodings for types used 
+(** Main functor that produces definition for authentication services and encodings for types used
 by service's input, output and errors. *)
 module Make(S : SessionArg) = struct
 
   type nonrec auth = (S.user_id, S.user_info) auth
 
-  (** Encodings for data types used in server's requests/responses and for error cases that 
+  (** Encodings for data types used in server's requests/responses and for error cases that
   could be raised by one of them. *)
   module Encoding = struct
     open Json_encoding
@@ -339,7 +350,7 @@ module Make(S : SessionArg) = struct
     let param_token =
       EzAPI.Param.string ~name:"token" ~descr:"An authentication token" "token"
 
-    (** Type that represents security by authentication token and the way that request uses 
+    (** Type that represents security by authentication token and the way that request uses
     to store it. *)
     type token_security =
       [ EzAPI.Security.cookie | EzAPI.Security.header | EzAPI.Security.query ]
@@ -353,7 +364,7 @@ module Make(S : SessionArg) = struct
 
     (** Security that checks [S.token_kind]:
         If it is a CSRF token, then requires a CSRF header.
-        Otherwise requires token to be found in the cookies. 
+        Otherwise requires token to be found in the cookies.
     *)
     let header_cookie_security =
       match S.token_kind with
@@ -364,13 +375,13 @@ module Make(S : SessionArg) = struct
 
     (** Security that combines [param_security] and [header_cookie_security]
         in the corresponding order. Represents the security configuration for
-        [connect] and [logout] requests. 
+        [connect] and [logout] requests.
     *)
     let security : token_security list = [
       param_security; (* Parameter fisrt *)
       header_cookie_security; (* Header CSRF or Cookie *)
     ]
-    
+
     (** Defines path to authentication services *)
     let rpc_root =
       List.fold_left (fun path s ->
@@ -385,6 +396,7 @@ module Make(S : SessionArg) = struct
 
     (** Connection service that requires authentication token. For more details, see corresponding 
     [EzSessionServer.Make.connect] handler and default client request implementation 
+
     [EzSessionClient.Make.connect]. *)
     let connect : (auth connect_response, connect_error, token_security) EzAPI.service0  =
       EzAPI.service
@@ -412,8 +424,8 @@ module Make(S : SessionArg) = struct
         ~access_control
         EzAPI.Path.(rpc_root // "login")
 
-    (** Disconnection service that requires authentication token. For more details, see corresponding 
-    [EzSessionServer.Make.logout] handler and default client request implementation 
+    (** Disconnection service that requires authentication token. For more details, see corresponding
+    [EzSessionServer.Make.logout] handler and default client request implementation
     [EzSessionClient.Make.logout]. *)
     let logout : (auth_needed, logout_error, token_security) EzAPI.service0  =
       EzAPI.service
