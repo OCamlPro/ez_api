@@ -1,6 +1,6 @@
 (lang dune 2.8)
 (name ez_api)
-
+(version 2.0.0)
 (source (github ocamlpro/ez_api))
 (authors
  "Cagdas Bozman <cagdas.bozman@ocamlpro.com>"
