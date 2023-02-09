@@ -8,8 +8,9 @@ let make ?meth ?headers ?content ?content_type ?msg url f =
       let rc = Curl.get_responsecode c in
       Curl.cleanup c;
       rc, Buffer.contents r
-    with _ -> -1, ""
-  in
+    with
+    | Curl.CurlException (_, i, s) -> i, s
+    | exn -> -1, Printexc.to_string exn in
   EzCurl_common.log ~meth:("RECV " ^ string_of_int rc) url msg;
   if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." data;
   if rc >= 200 && rc < 300 then try f (Ok data) with _ -> ()

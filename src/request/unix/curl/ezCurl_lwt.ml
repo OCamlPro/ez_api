@@ -11,7 +11,9 @@ let make ?msg ?meth ?content ?content_type ?headers url =
     if !Verbose.v land 1 <> 0 then Format.printf "received:\n%s@." data;
     if rc >= 200 && rc < 300 then Lwt.return_ok data
     else Lwt.return_error (rc, Some data) in
-  Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
+  Lwt.catch r (function
+      | Curl.CurlException (_, i, s) -> Lwt.return (Error (i, Some s))
+      | exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
 module Interface = struct
   let get ?(meth="GET") ?headers ?msg url =
