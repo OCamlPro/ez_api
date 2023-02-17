@@ -81,9 +81,15 @@ module Make(S : Interface) : S = struct
       | Ok res ->
         match IO.from_string io (fun x -> x) res with
         | Ok s -> Ok s
-        | Error (`destruct_exn exn) -> Error (UnknownError {
+        | Error (`destruct_exn exn) ->
+          let msg = match exn with
+            | Json_encoding.Cannot_destruct _ ->
+              Json_encoding.print_error Format.str_formatter exn;
+              Format.flush_str_formatter ()
+            | _ -> Printexc.to_string exn in
+          Error (UnknownError {
             code = -3;
-            msg = Some (Printexc.to_string exn) })
+            msg = Some msg })
 
     let handle_result service res =
       let err_encodings = Service.error service.s in

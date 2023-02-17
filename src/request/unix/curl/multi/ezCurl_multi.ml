@@ -20,7 +20,9 @@ let make ?msg ?meth ?content ?content_type ?headers url =
         if rc >= 200 && rc < 300 then Ok data
         else Error (rc, Some data))
       (Curl_lwt.perform c) in
-  Lwt.catch r (fun exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
+  Lwt.catch r (function
+      | Curl.CurlException (_, i, s) -> Lwt.return (Error (i, Some s))
+      | exn -> Lwt.return (Error (-1, Some (Printexc.to_string exn))))
 
 module Interface = struct
   let get ?(meth="GET") ?headers ?msg url =

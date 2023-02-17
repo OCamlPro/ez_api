@@ -24,7 +24,13 @@ let decode_result ?error io f res =
   | Ok () -> ()
   | Error (`destruct_exn exn) -> match error with
     | None -> ()
-    | Some error -> error (-3) (Some (Printexc.to_string exn))
+    | Some error ->
+      let msg = match exn with
+        | Json_encoding.Cannot_destruct _ ->
+          Json_encoding.print_error Format.str_formatter exn;
+          Format.flush_str_formatter ()
+        | _ -> Printexc.to_string exn in
+      error (-3) (Some msg)
 
 let any_get = ref (fun ?meth:_m ?headers:_ ?msg:_ _url f ->
     f (Error (-2,Some "No http client loaded")))
