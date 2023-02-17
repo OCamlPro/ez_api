@@ -395,7 +395,8 @@ module Encoding = struct
       (opt "servers" (list server_object))
 
   let method_enc encoding = conv
-      (fun (m, x) -> match m with
+      (fun (m, x) ->
+         match String.lowercase_ascii m with
          | "get" -> Some x, None, None, None, None, None, None, None
          | "put"-> None, Some x, None, None, None, None, None, None
          | "post" -> None, None, Some x, None, None, None, None, None
