@@ -3,7 +3,7 @@
  (public_name ez_api.curl_multi)
  (optional)
  (modules ezCurl_multi)
- (libraries curl.lwt ezCurl_common ezRequest_lwt))
+ (libraries verbose curl.lwt ezCurl_common ezRequest_lwt))
 
 (library
  (name ezCurl_multi_i)
