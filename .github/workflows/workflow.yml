@@ -16,43 +16,30 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-        ocaml-version:
+          - macos-latest
+        ocaml-compiler:
           - 4.14.1
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Retrieve opam cache
-        uses: actions/cache@v2
-        id: cache-opam
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
         with:
-          path: ~/.opam
-          key: v1-${{ runner.os }}-opam-${{ matrix.ocaml-version }}-${{ hashFiles('ez_api.opam') }}
-          restore-keys: |
-            v1-${{ runner.os }}-opam-${{ matrix.ocaml-version }}-
-
-      - name: Use OCaml ${{ matrix.ocaml-version }}
-        uses: avsm/setup-ocaml@v1
-        with:
-          ocaml-version: ${{ matrix.ocaml-version }}
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
       - name: Install system packages required by opam packages
-        run: opam depext --yes --update geoip ocurl tls
+        run: opam depext --update geoip ocurl tls
 
       - name: Install opam packages
-        if: steps.cache-opam.outputs.cache-hit != 'true'
         run: |
           opam pin add websocket-httpaf.~dev https://github.com/anmonteiro/websocket-httpaf.git
           opam pin add websocket-httpaf-lwt.~dev https://github.com/anmonteiro/websocket-httpaf.git
           opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
           opam install . --deps-only --with-doc --with-test
-
-      - name: Check the consistency of installed opam packages
-        if: steps.cache-opam.outputs.cache-hit == 'true'
-        run: opam upgrade --fixup
 
       - name: Run build
         run: opam exec -- make build
