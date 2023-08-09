@@ -63,16 +63,18 @@ let register_res service handler dir =
   let security = Service.security service.s in
   let path = Service.path service.s in
   let handler args input =
-    let t0 = (Path.get_root path args).Req.req_time in
-    let add_timing_wrap b =
-      let t1 = GMTime.time () in
-      Timings.add_timing (EzAPI.id service) b t0 (t1-.t0) in
-    Lwt.catch
-      (function () ->
-         handler args security input >>= fun res ->
-         add_timing_wrap true;
-         Lwt.return res)
-      (fun exn -> add_timing_wrap true; Lwt.fail exn) in
+    if !Timings.enabled then
+      let t0 = (Path.get_root path args).Req.req_time in
+      let add_timing_wrap b =
+        let t1 = GMTime.time () in
+        Timings.add_timing (EzAPI.id service) b t0 (t1-.t0) in
+      Lwt.catch
+        (function () ->
+           handler args security input >>= fun res ->
+           add_timing_wrap true;
+           Lwt.return res)
+        (fun exn -> add_timing_wrap true; Lwt.fail exn)
+    else handler args security input in
   let service = register service in
   Directory.register_http dir service handler
 
@@ -152,7 +154,7 @@ let handle ?meth ?content_type ?ws s r path body =
 (* Default access control headers *)
 let default_access_control_headers = [
   "access-control-allow-origin", "*";
-  "access-control-allow-headers", "accept, content-type" 
+  "access-control-allow-headers", "accept, content-type"
 ]
 
 (* merge headers correctly with default one *)
@@ -165,7 +167,7 @@ let merge_headers_with_default headers : (string * string) list =
          | Some _ when hn = "access-control-allow-origin" ->
            h::acc
          | Some v when hn = "access-control-allow-headers" ->
-           (hn, hv ^ "," ^ v)::acc 
+           (hn, hv ^ "," ^ v)::acc
          | _ -> acc)
       []
       headers
@@ -174,5 +176,5 @@ let merge_headers_with_default headers : (string * string) list =
   List.fold_left (fun acc ((hn,_) as h) ->
       match List.assoc_opt hn l with
       | None -> h::acc
-      | _ -> acc    
+      | _ -> acc
     ) l default_access_control_headers

@@ -672,8 +672,10 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
       List.fold_left (fun acc s -> if List.mem s acc then acc else s :: acc) acc sd.Doc.doc_security)
       [] sds in
   let paths, definitions = List.fold_left (fun (paths, definitions) sd ->
-      let path, definitions = make_path ~definitions ~docs sd in
-      path :: paths, definitions) ([], Json_schema.any) sds in
+      if sd.Doc.doc_hide then (paths, definitions)
+      else
+        let path, definitions = make_path ~definitions ~docs sd in
+        path :: paths, definitions) ([], Json_schema.any) sds in
   let schemas = definitions_schemas definitions in
   let oa = Makers.mk_openapi ?servers ~info
       ~components:(Makers.mk_components ~security ?schemas ())

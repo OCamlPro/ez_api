@@ -37,6 +37,7 @@ type options = {
   descr : expression;
   security : expression;
   register : expression;
+  hide : expression;
   input_example : expression;
   output_example : expression;
   error_type : core_type;
@@ -63,7 +64,7 @@ let options ?register loc =
   path = pexp_ident ~loc (llid ~loc "EzAPI.Path.root");
   input = empty ~loc; output = empty ~loc; errors = enone ~loc; params = enone ~loc;
   section = enone ~loc; name = enone ~loc; descr = enone ~loc;
-  security = enone ~loc; register; input_example = enone ~loc;
+  security = enone ~loc; register; input_example = enone ~loc; hide = enone ~loc;
   output_example = enone ~loc; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
   security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
   debug = false; directory = None; service = None
@@ -134,6 +135,7 @@ let get_options ~loc ?name ?(client=false) a =
         | "descr" -> name, { acc with descr = esome e }
         | "security" -> name, { acc with security = esome e; security_type = ptyp_any ~loc }
         | "register" -> name, { acc with register = e }
+        | "hide" -> name, { acc with hide = e }
         | "input_example" -> name, { acc with input_example = esome e }
         | "output_example" -> name, { acc with output_example = esome e }
         | "debug" -> name, { acc with debug = true }
