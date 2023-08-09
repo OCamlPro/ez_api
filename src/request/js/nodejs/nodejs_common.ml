@@ -22,7 +22,7 @@ class type message = object
   method statusCode : int readonly_prop
   method statusMessage : js_string t readonly_prop
   method url : js_string t readonly_prop
-  method on_data : js_string t -> (js_string t -> unit) callback -> unit meth
+  method on_data : js_string t -> (Typed_array.arrayBuffer t -> unit) callback -> unit meth
   method on_end : js_string t -> (unit -> unit) callback -> unit meth
 end
 
@@ -56,7 +56,7 @@ let handle f (m : message t) =
   if m##.statusCode >= 200 && m##.statusCode < 300 then
     let s = ref "" in
     m##on_data (string "data") (wrap_callback (fun chunk ->
-        s := !s ^ (to_string chunk)));
+        s := !s ^ (Typed_array.String.of_arrayBuffer chunk)));
     m##on_end (string "end") (wrap_callback (fun () ->
         if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." !s;
         f (Ok !s)))
@@ -75,7 +75,7 @@ let get ?(protocol=http) ?options url f =
 let post ?(protocol=http) ?options url ~content f =
   if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." content;
   let o = optdef options_to_jsoo options in
-  let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
+  let req = protocol##request (string url) o (def @@ wrap_callback (handle f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
       f (Error (e##.code, Some (to_string e##.message)))));
   req##end_ (def (string content))
