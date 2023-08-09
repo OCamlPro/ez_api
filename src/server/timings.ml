@@ -8,6 +8,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let enabled = ref false
+let enable () = enabled := true
+let disable () = enabled := false
+
 type period = {
   name : string;
   mutable prev : int;
@@ -125,11 +129,9 @@ let timings = {
 }
 
 let add_timing n ok t dt =
-  if ok then add timings.timings_ok.(n) t dt
-  else add timings.timings_fail.(n) t dt
+  if ok then try add timings.timings_ok.(n) t dt with _ -> ()
+  else try add timings.timings_fail.(n) t dt with _ -> ()
 
 let init t0 nservices =
-  timings.timings_ok <-Array.init nservices
-      (fun _ -> create t0);
-  timings.timings_fail <- Array.init nservices
-      (fun _ -> create t0)
+  timings.timings_ok <- Array.init nservices (fun _ -> create t0);
+  timings.timings_fail <- Array.init nservices (fun _ -> create t0)

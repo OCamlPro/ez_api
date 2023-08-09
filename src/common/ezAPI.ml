@@ -108,18 +108,18 @@ let forge2 url s arg1 arg2 params =  forge url s ((Req.dummy, arg1), arg2) param
 let raw_service :
   type i. ?section:Doc.section -> ?name:string -> ?descr:string -> ?meth:Meth.t ->
   input:i io -> output:'o io -> ?errors:'e Err.case list -> ?params:Param.t list ->
-  ?security:'s list -> ?access_control:(string * string) list -> ?register:bool -> 
-  ?input_example:i -> ?output_example:'o -> (Req.t, 'a) Path.t -> 
+  ?security:'s list -> ?access_control:(string * string) list -> ?register:bool -> ?hide:bool ->
+  ?input_example:i -> ?output_example:'o -> (Req.t, 'a) Path.t ->
   ('a, i, 'o, 'e, 's) service =
   fun ?section ?name ?descr ?meth ~input ~output ?(errors=[]) ?(params=[])
-    ?(security=[]) ?access_control ?register ?input_example ?output_example path ->
+    ?(security=[]) ?access_control ?register ?hide ?input_example ?output_example path ->
   let meth = match meth, input with
     | None, Empty -> `GET
     | None, _ -> `POST
     | Some m, _ -> m in
   let s = Service.make ~meth ~input ~output
       ~errors ~params ~security ?access_control path in
-  let doc = Doc.make ?name ?descr ?register ?section ?input_example ?output_example s in
+  let doc = Doc.make ?name ?descr ?section ?input_example ?output_example ?hide ?register s in
   { s; doc }
 
 let post_service ?section ?name ?descr ?(meth=`POST)
@@ -140,7 +140,7 @@ let ws_service ?section ?name ?descr ~input ~output ?errors ?params
     ?errors ~meth:`GET ?params ?security ?access_control ?register ?output_example path
 
 let register service =
-  service.doc.Doc.doc_registered <- true;
+  Doc.register service.doc;
   service.s
 
 let id s = s.doc.Doc.doc_id
