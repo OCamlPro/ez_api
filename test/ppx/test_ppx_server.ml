@@ -15,4 +15,4 @@ and onclose _ =
   Lwt.return_unit
 [@@websocket {path="/ws"; input=Json_encoding.string; output=Json_encoding.string}]
 
-[@@@server 8080]
+[%%server 8080]
