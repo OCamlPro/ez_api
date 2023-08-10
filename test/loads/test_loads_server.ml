@@ -1,3 +1,3 @@
 open Test_loads_lib
 
-[@@@server 8080]
+[%%server 8080]

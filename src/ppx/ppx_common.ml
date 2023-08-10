@@ -99,9 +99,9 @@ let string_literal = function
   | Ppxlib.Pconst_string (s, _, _) -> Some s
   | _ -> None
 
-let get_options ~loc ?name ?(client=false) a =
+let get_options ~loc ?name ?(client=false) p =
   let register = if not client then None else Some (pexp_construct ~loc (llid ~loc "false") None) in
-  match a.attr_payload with
+  match p with
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ] ->
     let l = List.filter_map (function ({txt=Lident s; loc}, e) -> Some (s, loc, e) | _ -> None) l in
     List.fold_left (fun (name, acc) (s, loc, e) -> match s with
@@ -152,10 +152,9 @@ let get_options ~loc ?name ?(client=false) a =
         | _ -> name, acc) (name, options ?register loc) l
   | _ -> name, options ?register loc
 
-let service_value ?name ?client a =
-  let loc = a.attr_loc in
-  let meth = pexp_variant ~loc (String.uppercase_ascii a.attr_name.txt) None in
-  let name, options = get_options ~loc ?name ?client a in
+let service_value ?name ?client ~meth ~loc p =
+  let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
+  let name, options = get_options ~loc ?name ?client p in
   match name with
   | None -> Location.raise_errorf ~loc "service doesn't have a name"
   | Some name ->
@@ -195,7 +194,7 @@ let ppx_dir ~loc dir =
 
 let register name a =
   let loc = a.attr_loc in
-  let _, options = get_options ~loc a in
+  let _, options = get_options ~loc a.attr_payload in
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   match options.service with
@@ -211,7 +210,7 @@ let register name a =
 
 let register_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
-  let _, options = get_options ~loc a in
+  let _, options = get_options ~loc a.attr_payload in
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
@@ -236,7 +235,7 @@ let register_ws ~onclose react_name bg_name a =
 let process name a =
   let loc = a.attr_loc in
   let service_name = if name = "handler" then "service" else name ^ "_s" in
-  let service, service_name, options = service_value ~name:service_name a in
+  let service, service_name, options = service_value ~name:service_name ~meth:a.attr_name.txt ~loc a.attr_payload in
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let register =
@@ -251,7 +250,7 @@ let process_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let service_name =  react_name ^ "_s" in
   let service, service_name, options =
-    service_value ~name:service_name { a with attr_name = { a.attr_name with txt = "get" } } in
+    service_value ~name:service_name ~meth:"get" ~loc a.attr_payload in
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
@@ -292,9 +291,7 @@ type server_options = {
   catch : expression;
 }
 
-let server_options a =
-  let loc = a.attr_loc in
-  match a.attr_payload with
+let server_options ~loc = function
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_constant c; pexp_loc; _}, _); _} ] ->
     { port = pexp_constant ~loc:pexp_loc c; dir = evar ~loc "ppx_dir";
       catch = enone ~loc }
@@ -307,9 +304,8 @@ let server_options a =
         | _ -> acc) {port = eint ~loc 8080; dir = evar ~loc "ppx_dir"; catch = enone ~loc } l
   | _ -> Location.raise_errorf ~loc "payload not understood"
 
-let server a =
-  let options = server_options a in
-  let loc = a.attr_loc in
+let server ~loc p =
+  let options = server_options ~loc p in
   eapply ~loc (evar ~loc "EzLwtSys.run") [
     pexp_fun ~loc Nolabel None (punit ~loc)
       (pexp_apply ~loc (evar ~loc "EzAPIServer.server") [
@@ -322,6 +318,15 @@ let server a =
           ]
         ])
   ]
+
+let deprecate =
+  let t : (string, unit) Hashtbl.t = Hashtbl.create 10 in
+  fun s ->
+    match Hashtbl.find_opt t s with
+    | None ->
+      Hashtbl.add t s ();
+      Format.eprintf "deprecated: [@@@@@@%s ...] -> [%%%%%s ...]@." s s
+    | Some () -> ()
 
 let rec impl ?kind str =
   let rec pmod_impl pmod = match pmod.pmod_desc with
@@ -405,12 +410,20 @@ let rec impl ?kind str =
         end
       (* server main *)
       | Pstr_attribute a when a.attr_name.txt = "server" && kind = Some `server ->
-        let expr = server a in
+        deprecate "server";
         let loc = a.attr_loc in
+        let expr = server ~loc a.attr_payload in
+        pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
+      | Pstr_extension (({txt="server"; loc}, p), _) when kind = Some `server ->
+        let expr = server ~loc p in
         pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
       (* client service *)
       | Pstr_attribute a when List.mem a.attr_name.txt methods ->
-        let service, _, _ = service_value ~client:true a in
+        deprecate a.attr_name.txt;
+        let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
+        service :: acc
+      | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
+        let service, _, _ = service_value ~client:true ~meth:txt ~loc p in
         service :: acc
       | Pstr_module ({pmb_expr; _} as m) ->
         {str with pstr_desc = Pstr_module {m with pmb_expr = pmod_impl pmb_expr}} :: acc

@@ -1,8 +1,9 @@
 (library
  (name ppx_common)
- (modules ppx_common)
  (public_name ez_api.ppx_common)
  (optional)
+ (modules ppx_common)
+ (preprocess (pps ppxlib.metaquot))
  (libraries ppxlib))
 
 (library
