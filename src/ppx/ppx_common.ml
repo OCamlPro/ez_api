@@ -422,6 +422,9 @@ let rec impl ?kind str =
         deprecate a.attr_name.txt;
         let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
         service :: acc
+      | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
+        let service, _, _ = service_value ~name ~client:true ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+        service :: acc
       | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
         let service, _, _ = service_value ~client:true ~meth:txt ~loc p in
         service :: acc
