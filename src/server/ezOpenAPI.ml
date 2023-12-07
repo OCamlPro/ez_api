@@ -113,8 +113,7 @@ module Types = struct
     opa_ref : string option;
     opa_summary : string option;
     opa_description : string option;
-    opa_method : string;
-    opa_operation : operation_object;
+    opa_operations : (string * operation_object) list;
     opa_servers : server_object list option;
     opa_params : param_object list option;
   }
@@ -209,9 +208,9 @@ module Makers = struct
     opt_responses; opt_deprecated = deprecated; opt_security = security;
     opt_servers = servers }
 
-  let mk_path ?oref ?summary ?descr ?servers ?params ~meth opa_operation = {
+  let mk_path ?oref ?summary ?descr ?servers ?params opa_operations = {
     opa_ref = oref; opa_summary = summary; opa_description = descr;
-    opa_method = meth; opa_operation; opa_servers = servers; opa_params = params }
+    opa_operations; opa_servers = servers; opa_params = params }
 
   let mk_example ?summary ?descr ?value ?ext () = {
     oex_summary = summary; oex_description = descr; oex_value = value;
@@ -236,6 +235,16 @@ end
 module Encoding = struct
   open Types
   open Json_encoding
+
+  (* Json_encoding.assoc uses Json_encoding.schema that fails on merge_objs _ custom *)
+  let assoc enc =
+    Json_encoding.custom ~is_object:true
+      (fun l -> `O (List.map (fun (n, v) -> (n, Json_encoding.construct enc v)) l))
+      (function
+        | `O l -> List.map (fun (n, v) -> (n, Json_encoding.destruct enc v)) l
+        | _ -> failwith "asssociative object")
+      ~schema:(Json_encoding.schema Json_encoding.any_ezjson_object)
+
 
   let contact_object = conv
       (fun {oco_name; oco_url; oco_email} -> (oco_name, oco_url, oco_email))
@@ -394,47 +403,11 @@ module Encoding = struct
       (opt "security" (list @@ assoc (list string)))
       (opt "servers" (list server_object))
 
-  let method_enc encoding = conv
-      (fun (m, x) ->
-         match String.lowercase_ascii m with
-         | "get" -> Some x, None, None, None, None, None, None, None
-         | "put"-> None, Some x, None, None, None, None, None, None
-         | "post" -> None, None, Some x, None, None, None, None, None
-         | "delete" -> None, None, None, Some x, None, None, None, None
-         | "options" -> None, None, None, None, Some x, None, None, None
-         | "head" -> None, None, None, None, None, Some x, None, None
-         | "patch" -> None, None, None, None, None, None, Some x, None
-         | "trace" -> None, None, None, None, None, None, None, Some x
-         | _ -> None, None, None, None, None, None, None, None)
-      (function
-        | Some x, _, _, _, _, _, _, _ -> "get", x
-        | _, Some x, _, _, _, _, _, _ -> "put", x
-        | _, _, Some x, _, _, _, _, _ -> "post", x
-        | _, _, _, Some x, _, _, _, _ -> "delete", x
-        | _, _, _, _, Some x, _, _, _ -> "options", x
-        | _, _, _, _, _, Some x, _, _ -> "head", x
-        | _, _, _, _, _, _, Some x, _ -> "patch", x
-        | _, _, _, _, _, _, _, Some x -> "trace", x
-        | _ -> assert false) @@
-    obj8
-      (opt "get" encoding)
-      (opt "put" encoding)
-      (opt "post" encoding)
-      (opt "delete" encoding)
-      (opt "options" encoding)
-      (opt "head" encoding)
-      (opt "patch" encoding)
-      (opt "trace" encoding)
-
   let path_item = conv
-      (fun {opa_ref; opa_summary; opa_description; opa_method; opa_operation;
-            opa_servers; opa_params} ->
-        (opa_ref, opa_summary, opa_description, opa_servers, opa_params),
-        (opa_method, opa_operation))
-      (fun ((opa_ref, opa_summary, opa_description, opa_servers, opa_params),
-            (opa_method, opa_operation))
-        -> {opa_ref; opa_summary; opa_description; opa_method; opa_operation;
-            opa_servers; opa_params}) @@
+      (fun {opa_ref; opa_summary; opa_description; opa_operations; opa_servers; opa_params}
+        -> (opa_ref, opa_summary, opa_description, opa_servers, opa_params), opa_operations)
+      (fun ((opa_ref, opa_summary, opa_description, opa_servers, opa_params), opa_operations)
+        -> {opa_ref; opa_summary; opa_description; opa_operations; opa_servers; opa_params}) @@
     merge_objs
       (obj5
          (opt "$ref" string)
@@ -442,7 +415,7 @@ module Encoding = struct
          (opt "description" string)
          (opt "servers" (list server_object))
          (opt "parameters" (list param_object)))
-      (method_enc operation_object)
+      (assoc operation_object)
 
   let example_object = conv
       (fun {oex_summary; oex_description; oex_value; oex_external}
@@ -583,41 +556,40 @@ let merge_definitions ?(definitions=Json_schema.any) sd =
       (output_schema, definitions) sd.Doc.doc_errors in
   input_schema, output_schemas, definitions
 
-let make_path ?(docs=[]) ?definitions sd =
+let make_path ?(docs=[]) ~definitions (path, l) =
   let open Doc in
-  let path = sd.doc_path in
-  let id, summary, descr, input_ex, output_ex = match sd.doc_name with
-    | None ->
-      string_of_int sd.doc_id, sd.doc_name,
-      sd.doc_descr, sd.doc_input_example, sd.doc_output_example
-    | Some name -> match List.assoc_opt name docs with
-      | None ->
-        name, sd.doc_name, sd.doc_descr,
-        sd.doc_input_example, sd.doc_output_example
-      | Some (summary, descr, input, output) ->
-        summary, None, Some descr,
-        (match input with None -> sd.doc_input_example | Some x -> Some x),
-        (match output with None -> sd.doc_output_example | Some x -> Some x) in
-  let input_schema, output_schemas, definitions = merge_definitions ?definitions sd in
-  let params, definitions = List.fold_left (fun (acc, definitions) p ->
-      let p, definitions = make_query_param ~definitions p in
-      acc @ [ p ], definitions) ([], definitions) sd.doc_params in
-  (path,
-   Makers.mk_path ?summary ?descr ~meth:(Meth.to_string sd.doc_meth) (
-     Makers.mk_operation ?summary ?descr
-       ~tags:[sd.doc_section.section_name] ~id
-       ~params:(params @ make_path_params sd.doc_args)
-       ~security:sd.doc_security
-       ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
-     List.map (fun (code, schema) ->
-         let example = if code = 200 then output_ex else None in
-         let code_str = string_of_int code in
-         let content =
-           empty_schema ~none:[ "application/json", Makers.mk_media ?example ()] schema (fun schema ->
-               [ "application/json", Makers.mk_media ?example ~schema () ]) in
-         code_str, Makers.mk_response ~content
-           (Option.value ~default:code_str @@ Error_codes.error code)) output_schemas)),
-  definitions
+  let definitions, operations = List.fold_left (fun (definitions, acc) sd ->
+      let input_schema, output_schemas, definitions = merge_definitions ~definitions sd in
+      let params, definitions = List.fold_left (fun (acc, definitions) p ->
+          let p, definitions = make_query_param ~definitions p in
+          acc @ [ p ], definitions) ([], definitions) sd.doc_params in
+      let id, summary, descr, input_ex, output_ex = match sd.doc_name with
+        | None ->
+          string_of_int sd.doc_id, sd.doc_name,
+          sd.doc_descr, sd.doc_input_example, sd.doc_output_example
+        | Some name -> match List.assoc_opt name docs with
+          | None ->
+            name, sd.doc_name, sd.doc_descr,
+            sd.doc_input_example, sd.doc_output_example
+          | Some (summary, descr, input, output) ->
+            name, Some summary, Some descr,
+            (match input with None -> sd.doc_input_example | Some x -> Some x),
+            (match output with None -> sd.doc_output_example | Some x -> Some x) in
+      let op = Makers.mk_operation ?summary ?descr
+          ~tags:[sd.doc_section.section_name] ~id
+          ~params:(params @ make_path_params sd.doc_args)
+          ~security:sd.doc_security
+          ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
+        List.map (fun (code, schema) ->
+            let example = if code = 200 then output_ex else None in
+            let code_str = string_of_int code in
+            let content =
+              empty_schema ~none:[ "application/json", Makers.mk_media ?example ()] schema (fun schema ->
+                  [ "application/json", Makers.mk_media ?example ~schema () ]) in
+            code_str, Makers.mk_response ~content
+              (Option.value ~default:code_str @@ Error_codes.error code)) output_schemas in
+      definitions, (String.lowercase_ascii (Meth.to_string sd.doc_meth), op) :: acc) (definitions, []) l in
+  (path, Makers.mk_path (List.rev operations)), definitions
 
 let definitions_schemas definitions =
   match Json_schema.to_json definitions with
@@ -671,11 +643,18 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
   let security = List.rev @@ List.fold_left (fun acc sd ->
       List.fold_left (fun acc s -> if List.mem s acc then acc else s :: acc) acc sd.Doc.doc_security)
       [] sds in
-  let paths, definitions = List.fold_left (fun (paths, definitions) sd ->
-      if sd.Doc.doc_hide then (paths, definitions)
+  let lsd = List.fold_left (fun acc sd ->
+      if sd.Doc.doc_hide then acc
       else
-        let path, definitions = make_path ~definitions ~docs sd in
-        path :: paths, definitions) ([], Json_schema.any) sds in
+        let path = sd.Doc.doc_path in
+        match List.assoc_opt path acc with
+        | None -> acc @ [ path, [ sd ] ]
+        | Some l ->
+          let acc = List.remove_assoc path acc in
+          acc @ [ path, l @ [ sd ] ]) [] sds in
+  let paths, definitions = List.fold_left (fun (paths, definitions) l ->
+      let path, definitions = make_path ~definitions ~docs l in
+      path :: paths, definitions) ([], Json_schema.any) lsd in
   let schemas = definitions_schemas definitions in
   let oa = Makers.mk_openapi ?servers ~info
       ~components:(Makers.mk_components ~security ?schemas ())
