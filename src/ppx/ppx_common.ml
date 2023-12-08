@@ -57,13 +57,16 @@ let json e =
   let loc = e.pexp_loc in
   pexp_construct ~loc (llid ~loc "EzAPI.Json") @@ Some e
 
-let options ?register loc =
+let options ?register ?name loc =
   let register = match register with
     | None -> pexp_construct ~loc (llid ~loc "true") None
-    | Some register -> register in {
+    | Some register -> register in
+  let name = match name with
+    | None -> enone ~loc
+    | Some name -> esome (estring ~loc name) in {
   path = pexp_ident ~loc (llid ~loc "EzAPI.Path.root");
   input = empty ~loc; output = empty ~loc; errors = enone ~loc; params = enone ~loc;
-  section = enone ~loc; name = enone ~loc; descr = enone ~loc;
+  section = enone ~loc; name; descr = enone ~loc;
   security = enone ~loc; register; input_example = enone ~loc; hide = enone ~loc;
   output_example = enone ~loc; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
   security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
@@ -149,8 +152,16 @@ let get_options ~loc ?name ?(client=false) p =
           end
         | "service" ->
           name, { acc with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
-        | _ -> name, acc) (name, options ?register loc) l
-  | _ -> name, options ?register loc
+        | _ -> name, acc) (name, options ?register ?name loc) l
+  | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident _; _} as e, _); _} ] ->
+    let o = options ?register ?name loc in
+    name, { o with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
+  | PStr s ->
+    Format.eprintf "attribute not understood %a@." Pprintast.structure s;
+    name, options ?register ?name loc
+  | _ ->
+    Format.eprintf "attribute not understood@.";
+    name, options ?register ?name loc
 
 let service_value ?name ?client ~meth ~loc p =
   let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
