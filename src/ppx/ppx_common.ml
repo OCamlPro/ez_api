@@ -153,7 +153,15 @@ let get_options ~loc ?name ?(client=false) p =
         | "service" ->
           name, { acc with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
         | _ -> name, acc) (name, options ?register ?name loc) l
-  | _ -> name, options ?register ?name loc
+  | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident _; _} as e, _); _} ] ->
+    let o = options ?register ?name loc in
+    name, { o with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
+  | PStr s ->
+    Format.eprintf "attribute not understood %a@." Pprintast.structure s;
+    name, options ?register ?name loc
+  | _ ->
+    Format.eprintf "attribute not understood@.";
+    name, options ?register ?name loc
 
 let service_value ?name ?client ~meth ~loc p =
   let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
