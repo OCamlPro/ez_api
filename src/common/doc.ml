@@ -79,7 +79,7 @@ let make :
 
 let rec update_service_list services doc = match services with
   | [] -> [ doc ]
-  | h :: t when h.doc_path = doc.doc_path -> doc :: t
+  | h :: t when h.doc_path = doc.doc_path && h.doc_meth = doc.doc_meth -> doc :: t
   | h :: t -> h :: (update_service_list t doc)
 
 let services = ref []
