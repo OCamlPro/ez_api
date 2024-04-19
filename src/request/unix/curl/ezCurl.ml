@@ -8,12 +8,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let make ?meth ?headers ?content ?content_type ?msg url f =
+let make ?meth ?headers ?msg ~url l f =
   EzCurl_common.log ?meth url msg;
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (Option.value ~default:"" content);
+  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (EzCurl_common.payload_to_string l);
   let rc, data =
     try
-      let r, c = EzCurl_common.init ?meth ?headers ?content ?content_type url in
+      let r, c = EzCurl_common.init ?meth ?headers ~url l in
       Curl.perform c;
       let rc = Curl.get_responsecode c in
       Curl.cleanup c;
@@ -29,11 +29,11 @@ let make ?meth ?headers ?content ?content_type ?msg url f =
 module Interface = struct
 
   let get ?(meth="GET") ?headers ?msg url f =
-    make ~meth ?headers ?msg url f
+    make ~meth ?headers ?msg ~url [] f
 
   let post ?(meth="POST") ?(content_type="application/json") ?(content="{}")
       ?headers ?msg url  f =
-    make ~meth ?headers ?msg ~content_type ~content url f
+    make ~meth ?headers ?msg ~url [ "", `content content, Some content_type ] f
 end
 
 include EzRequest.Make(Interface)

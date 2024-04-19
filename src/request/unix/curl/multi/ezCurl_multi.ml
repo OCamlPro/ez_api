@@ -8,17 +8,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let make ?msg ?meth ?content ?content_type ?headers url =
+let make ?msg ?meth ?headers ~url l =
   EzCurl_common.log ?meth url msg;
-  if !Verbose.v land 2 <> 0 then Format.printf "sent:\n%s@." (Option.value ~default:"" content);
+  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (EzCurl_common.payload_to_string l);
   let r () =
-    let r, c = EzCurl_common.init ?meth ?content ?content_type ?headers url in
+    let r, c = EzCurl_common.init ?meth ?headers ~url l in
     Lwt.map (fun _code ->
         let rc = Curl.get_responsecode c in
         Curl.cleanup c;
         let data = Buffer.contents r in
         EzCurl_common.log ~meth:("RECV " ^ string_of_int rc) url msg;
-        if !Verbose.v land 1 <> 0 then Format.printf "received:\n%s@." data;
+        if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." data;
         if rc >= 200 && rc < 300 then Ok data
         else Error (rc, Some data))
       (Curl_lwt.perform c) in
@@ -28,11 +28,11 @@ let make ?msg ?meth ?content ?content_type ?headers url =
 
 module Interface = struct
   let get ?(meth="GET") ?headers ?msg url =
-    make ?msg ~meth ?headers url
+    make ?msg ~meth ?headers ~url []
 
   let post ?(meth="POST") ?(content_type="application/json") ?(content="{}") ?headers
       ?msg url =
-    make ?msg ~meth ?headers ~content ~content_type url
+    make ?msg ~meth ?headers ~url [ "", `content content, Some content_type ]
 end
 
 include EzRequest_lwt.Make(Interface)
