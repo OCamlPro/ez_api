@@ -637,7 +637,7 @@ let fix_descr_ref json =
     ) json
 
 let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
-    ?(yaml=false) ?(pretty=false) ~sections ~title filename =
+    ?(yaml=false) ?(pretty=false) ?(definitions=Json_schema.any) ~sections ~title filename =
   let info = Makers.mk_info ?descr ?terms ?contact ?license ~version title in
   let sds = List.concat @@ List.map (fun s -> s.Doc.section_docs) sections in
   let security = List.rev @@ List.fold_left (fun acc sd ->
@@ -654,7 +654,7 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
           acc @ [ path, l @ [ sd ] ]) [] sds in
   let paths, definitions = List.fold_left (fun (paths, definitions) l ->
       let path, definitions = make_path ~definitions ~docs l in
-      path :: paths, definitions) ([], Json_schema.any) lsd in
+      path :: paths, definitions) ([], definitions) lsd in
   let schemas = definitions_schemas definitions in
   let oa = Makers.mk_openapi ?servers ~info
       ~components:(Makers.mk_components ~security ?schemas ())
@@ -672,13 +672,13 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
 
 
 let write ?descr ?terms ?contact ?license ?version ?servers ?docs ?(yaml=false)
-    ?pretty ~sections ~title filename =
-  let filename, s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ~yaml ?pretty ~sections ~title filename in
+    ?pretty ?definitions ~sections ~title filename =
+  let filename, s = make ?descr ?terms ?contact ?license ?version ?servers ?docs ?definitions ~yaml ?pretty ~sections ~title filename in
   let oc = open_out filename in
   output_string oc s;
   close_out oc
 
-let executable ~sections ~docs =
+let exec ?docs ?definitions sections =
   let open Stdlib in
   let str_opt s = Arg.String (fun x -> s := Some x) in
   let output_file, title, descr, version, terms, contact, license, servers, yaml, pretty =
@@ -712,4 +712,6 @@ let executable ~sections ~docs =
   Stdlib.Arg.parse speclist (fun _ -> ()) usage_msg;
   write ?descr:!descr ?version:!version ~title:!title ?terms:!terms
     ?license:!license ?servers:!servers ?contact:!contact ~yaml:!yaml ~pretty:!pretty
-    ~docs ~sections !output_file
+    ?docs ?definitions ~sections !output_file
+
+let executable ~docs ~sections = exec ~docs sections
