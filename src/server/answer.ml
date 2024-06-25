@@ -14,7 +14,7 @@ type 'a t = {
   headers : (string * string) list;
 }
 
-let return ?(code=200) ?(headers=[]) body = Lwt.return {code; body; headers}
+let return ?(code= -1) ?(headers=[]) body = Lwt.return {code; body; headers}
 
 let not_found () = return ~code:404 ""
 

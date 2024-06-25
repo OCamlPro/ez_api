@@ -92,7 +92,7 @@ let rec resolve :
   (resolved_directory, lookup_error) result Lwt.t =
   fun prefix dir args path ->
   match path, dir with
-  | [], dir -> 
+  | [], dir ->
     Lwt.return_ok (Dir (dir, args))
   | _name :: _path, { subdirs = None, None; _ } -> Lwt.return_error `Not_found
   | name :: path, { subdirs = Some static, None; _ } ->
@@ -116,31 +116,36 @@ let rec resolve :
         `Cannot_parse (arg.Arg.description, msg, name :: prefix)
 
 (* Note : headers are merged with predefined headers *)
-let io_to_answer : type a. code:int -> headers:(string * string) list -> a io -> a -> string Answer.t = 
-fun ~code ~headers io body ->
+let io_to_answer : type a. code:int -> headers:(string * string) list -> a io -> a -> string Answer.t =
+  fun ~code ~headers io body ->
   match io with
-  | Empty -> {Answer.code; body=""; headers}
+  | Empty ->
+    let code = if code = -1 then 204 else code in
+    {Answer.code; body=""; headers}
   | Raw l ->
     let content_type = match l with
       | [] -> "application/octet-stream"
       | h :: _ -> Mime.to_string h in
+    let code = if code = -1 then 200 else code in
     {Answer.code; body; headers=("content-type", content_type)::headers}
   | Json enc ->
+    let code = if code = -1 then 200 else code in
     {Answer.code; body = EzEncoding.construct enc body;
      headers=("content-type", "application/json")::headers}
 
 let ser_handler :
-  type i o e. ?content_type:string -> access_control:(string * string) list 
+  type i o e. ?content_type:string -> access_control:(string * string) list
   -> ('a -> i -> (o, e) result Answer.t Lwt.t) -> 'a ->
-  i io -> o io -> e Json_encoding.encoding ->
+  i io -> o io -> (e -> int * string) ->
   string -> (string Answer.t, handler_error) result Lwt.t =
   fun ?content_type ~access_control handler args input output errors ->
-  let handle_result {Answer.code; body; headers} = 
+  let handle_result {Answer.code; body; headers} =
     match body with
     | Ok o -> io_to_answer ~code ~headers:(headers @ access_control) output o
     | Error e ->
-      {Answer.code; body = EzEncoding.construct errors e;
-       headers=("content-type", "application/json")::access_control } 
+      let c, body = errors e in
+      let code = if code = -1 then c else code in
+      {Answer.code; body; headers=("content-type", "application/json")::access_control }
   in
   match input with
   | Empty -> (fun _ ->
@@ -194,7 +199,7 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
           (* Todo : combine access control headers correctly. *)
           let access_control = List.fold_left (fun acc (_,rs) -> match rs with
               | Http {service; _} when acc = [] -> Service.access_control service
-              | _ -> acc) [] l in 
+              | _ -> acc) [] l in
           let meths = Meth.headers @@ List.map fst l in
           let sec_set = List.fold_left (fun acc (_, rs) -> match rs with
               | Http {service; _} -> Security.StringSet.union acc (Security.headers (Service.security service))
@@ -207,7 +212,7 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
       | _, Some (Http {service; handler}) ->
         let input = Service.input service in
         let output = Service.output service in
-        let errors = Service.errors_encoding service in
+        let errors = Service.errors_handler service in
         let access_control = Service.access_control service in
         let h = ser_handler ?content_type ~access_control handler args input output errors in
         Lwt.return_ok @@ `http h

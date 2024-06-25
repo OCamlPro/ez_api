@@ -55,7 +55,7 @@ type ('args, 'input, 'output, 'error, 'security) t = {
 }
 
 let make =
-  fun ?(meth : Meth.t =`GET) ?(params=[]) ?(security=[]) ?(errors=[]) 
+  fun ?(meth : Meth.t =`GET) ?(params=[]) ?(security=[]) ?(errors=[])
     ?(access_control=[]) ~input ~output path ->
   { path ; input ; output; errors; meth; params; security; access_control }
 
@@ -75,3 +75,14 @@ let params s = s.params
 let access_control s = s.access_control
 
 let error s ~code = Err.get ~code s.errors
+
+let errors_handler s e =
+  let rec aux = function
+    | [] ->
+      let Err.Case {encoding; code; select; _} = Err.catch_all_error_case () in
+      code, EzEncoding.construct encoding (Option.get (select e))
+    | Err.Case {encoding; code; select; _} :: tl ->
+      match select e with
+      | None -> aux tl
+      | Some x -> code, EzEncoding.construct encoding x in
+  aux s.errors
