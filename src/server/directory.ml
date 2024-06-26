@@ -208,22 +208,23 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
       end
     | Some `HEAD -> Lwt.return_ok `head
     | Some (#Meth.t as m) ->
-      match m, MethMap.find_opt m dir.services with
-      | _, Some (Http {service; handler}) ->
-        let input = Service.input service in
-        let output = Service.output service in
-        let errors = Service.errors_handler service in
-        let access_control = Service.access_control service in
-        let h = ser_handler ?content_type ~access_control handler args input output errors in
-        Lwt.return_ok @@ `http h
-      | `GET, Some (Websocket {service; react; bg; onclose; step}) ->
-        let input = Service.input service in
-        let output = Service.output service in
-        let errors = Service.errors_encoding service in
-        let react, bg = ser_websocket react bg args input output errors in
-        let onclose = match onclose with None -> None | Some f -> Some (fun () -> f args) in
-        Lwt.return_ok @@ `ws (react, bg, onclose, step)
-      | _ -> Lwt.return_error `Method_not_allowed
+      if MethMap.is_empty dir.services then Lwt.return_error `Not_found
+      else match m, MethMap.find_opt m dir.services with
+        | _, Some (Http {service; handler}) ->
+          let input = Service.input service in
+          let output = Service.output service in
+          let errors = Service.errors_handler service in
+          let access_control = Service.access_control service in
+          let h = ser_handler ?content_type ~access_control handler args input output errors in
+          Lwt.return_ok @@ `http h
+        | `GET, Some (Websocket {service; react; bg; onclose; step}) ->
+          let input = Service.input service in
+          let output = Service.output service in
+          let errors = Service.errors_encoding service in
+          let react, bg = ser_websocket react bg args input output errors in
+          let onclose = match onclose with None -> None | Some f -> Some (fun () -> f args) in
+          Lwt.return_ok @@ `ws (react, bg, onclose, step)
+        | _ -> Lwt.return_error `Method_not_allowed
 
 let step_of_path path =
   let rec aux : type r p. (r, p) Path.t -> Step.t list -> Step.t list = fun path acc ->
