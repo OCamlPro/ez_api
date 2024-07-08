@@ -16,7 +16,7 @@
  (documentation "https://ocpmax.github.io/ez_api/ez_api/index.html")
  (depends
   (ocaml (>= 4.08))
-  (json-data-encoding (>= 0.9))
+  (json-data-encoding (>= 1.0.1))
   (lwt (>= 4.0.0))
   (ezjsonm (>= 1.1.0))
   uuidm)
