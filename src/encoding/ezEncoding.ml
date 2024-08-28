@@ -459,3 +459,5 @@ let ignore_enc encoding =
 
 let enc_constant enc v =
   conv (fun () -> v) (fun v2 -> if v2 = v then () else assert false) enc
+
+let pp ?compact enc fmt x = Format.fprintf fmt "%s" (construct ?compact enc x)

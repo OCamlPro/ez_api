@@ -359,3 +359,5 @@ val result : 'a Json_encoding.encoding -> 'b Json_encoding.encoding ->
 val ignore_enc : 'a Json_encoding.encoding -> 'a Json_encoding.encoding
 
 val enc_constant : 'a Json_encoding.encoding -> 'a -> unit Json_encoding.encoding
+
+val pp : ?compact:bool -> 'a Json_encoding.encoding -> Format.formatter -> 'a -> unit
