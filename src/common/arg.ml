@@ -39,52 +39,74 @@ module Ty = struct
 end
 
 type descr = {
-  name: string ;
-  descr: string option ;
-  example: string option
+  name: string;
+  descr: string option;
+  example: string option;
+  schema: Json_schema.schema option;
 }
 
 type 'a t = {
   id: 'a Ty.id;
-  destruct: string -> ('a, string) result ;
-  construct: 'a -> string ;
-  description: descr ;
+  destruct: string -> ('a, string) result;
+  construct: 'a -> string;
+  description: descr;
 }
 
-let make ?example ?descr ~name ~destruct ~construct () =
+let make ?example ?descr ?schema ~name ~destruct ~construct () =
   let id = Ty.new_id () in
   let example = match example with
     | None -> None
     | Some example -> Some (construct example) in
-  let description = { name ; descr; example } in
-  { description ; id ; construct ; destruct }
+  let description = { name; descr; example; schema } in
+  { description; id; construct; destruct }
 
 let descr (ty: 'a t) = ty.description
 
-let int ?descr ?example name =
-  let int_of_string s =
+let int ?descr ?example ?schema name =
+  let destruct s =
     try Ok (int_of_string s)
     with Failure _ ->
       Error (Printf.sprintf "Cannot parse integer value: %S." s) in
-  make ?example ?descr ~name ~destruct:int_of_string ~construct:string_of_int ()
+  let schema = match schema with
+    | None -> Json_schema.(
+        create @@ element @@ Number
+          { numeric_specs with minimum=Some (Int.to_float (-(1 lsl 30)), `Inclusive);
+                               maximum=Some (Int.to_float ((1 lsl 30) -1), `Inclusive) })
+    | Some sch -> sch in
+  make ?example ?descr ~schema ~name ~destruct ~construct:string_of_int ()
 
-let float ?descr ?example name =
-  let float_of_string s = match float_of_string_opt s with
+let float ?descr ?example ?schema name =
+  let destruct s = match float_of_string_opt s with
     | Some f -> Ok f
     | None -> Error (Printf.sprintf "Cannot parse float value: %S." s) in
-  make ?example ?descr ~name ~destruct:float_of_string ~construct:string_of_float ()
+  let schema = match schema with
+    | None -> Json_schema.(create @@ element @@ Number numeric_specs)
+    | Some sch -> sch in
+  make ?example ?descr ~schema ~name ~destruct ~construct:string_of_float ()
 
-let int32 ?descr ?example name =
-  let int32_of_string s = match Int32.of_string_opt s with
+let int32 ?descr ?example ?schema name =
+  let destruct s = match Int32.of_string_opt s with
     | Some i -> Ok i
     | None -> Error (Printf.sprintf "Cannot parse int32 value: %S." s) in
-  make ?example ?descr ~name ~destruct:int32_of_string ~construct:Int32.to_string ()
+  let schema = match schema with
+    | None -> Json_schema.(
+        create @@ element @@ Number
+          { numeric_specs with minimum=Some (Int32.(to_float min_int), `Inclusive);
+                               maximum=Some (Int32.(to_float max_int), `Inclusive) })
+    | Some sch -> sch in
+  make ?example ?descr ~schema ~name ~destruct ~construct:Int32.to_string ()
 
-let int64 ?descr ?example name =
-  let int64_of_string s = match Int64.of_string_opt s with
+let int64 ?descr ?example ?schema name =
+  let destruct s = match Int64.of_string_opt s with
     | Some i -> Ok i
     | None -> Error (Printf.sprintf "Cannot parse int64 value: %S." s) in
-  make ?descr ?example ~name ~destruct:int64_of_string ~construct:Int64.to_string ()
+  let schema = match schema with
+    | None -> Json_schema.(
+        create @@ element @@ Number
+          { numeric_specs with minimum=Some (Int64.(to_float min_int), `Inclusive);
+                              maximum=Some (Int64.(to_float max_int), `Inclusive) })
+    | Some sch -> sch in
+  make ?descr ?example ~schema ~name ~destruct ~construct:Int64.to_string ()
 
-let string ?descr ?example name =
-  make ?descr ?example ~name ~destruct:Result.ok ~construct:(fun s -> s) ()
+let string ?descr ?example ?schema name =
+  make ?descr ?example ?schema ~name ~destruct:Result.ok ~construct:(fun s -> s) ()

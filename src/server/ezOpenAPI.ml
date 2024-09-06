@@ -516,8 +516,10 @@ let make_query_param ?(definitions=Json_schema.any) p =
     ~schema (Option.value ~default:p.Param.param_id p.Param.param_name), definitions
 
 let make_path_params args =
-  let schema = Json_schema.(create @@ element @@ String string_specs) in
   List.map (fun arg ->
+      let schema = match arg.Arg.schema with
+        | None -> Json_schema.(create @@ element @@ String string_specs)
+        | Some sch -> sch in
       Makers.mk_param
         ?example:(Option.map (fun s -> Json_repr.to_any (`String s)) arg.Arg.example)
         ?descr:arg.Arg.descr ~schema arg.Arg.name) args
