@@ -302,33 +302,36 @@ type server_options = {
   catch : expression;
 }
 
-let server_options ~loc = function
-  | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_constant c; pexp_loc; _}, _); _} ] ->
-    { port = pexp_constant ~loc:pexp_loc c; dir = evar ~loc "ppx_dir";
-      catch = enone ~loc }
-  | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); pexp_loc=loc; _}, _); _} ] ->
+let server_options e =
+  let loc = e.pexp_loc in
+  match e.pexp_desc with
+  | Pexp_constant c ->
+    { port = pexp_constant ~loc c; dir = evar ~loc "ppx_dir"; catch = enone ~loc }
+  | Pexp_record (l, _) ->
     let l = List.filter_map (function ({txt=Lident s; _}, e) -> Some (s, e) | _ -> None) l in
     List.fold_left (fun acc (s, e) -> match s with
         | "port" -> { acc with port = e }
         | "dir" -> { acc with dir = e }
         | "catch" -> { acc with catch = esome e }
         | _ -> acc) {port = eint ~loc 8080; dir = evar ~loc "ppx_dir"; catch = enone ~loc } l
-  | _ -> Location.raise_errorf ~loc "payload not understood"
+  | _ -> Location.raise_errorf ~loc "server options not understood"
+
+let server_aux e =
+  let loc = e.pexp_loc in
+  let options = server_options e in
+  [%expr
+    EzAPIServer.server ?catch:[%e options.catch]
+      [%e elist ~loc [
+          pexp_tuple ~loc [
+            options.port;
+            pexp_construct ~loc (llid ~loc "EzAPIServerUtils.API") (Some options.dir)
+          ] ] ] ]
 
 let server ~loc p =
-  let options = server_options ~loc p in
-  eapply ~loc (evar ~loc "EzLwtSys.run") [
-    pexp_fun ~loc Nolabel None (punit ~loc)
-      (pexp_apply ~loc (evar ~loc "EzAPIServer.server") [
-          Optional "catch", options.catch;
-          Nolabel, elist ~loc [
-            pexp_tuple ~loc [
-              options.port;
-              pexp_construct ~loc (llid ~loc "EzAPIServerUtils.API") (Some options.dir)
-            ]
-          ]
-        ])
-  ]
+  match p with
+  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
+    [%expr EzLwtSys.run (fun () -> [%e server_aux e])]
+  | _ -> Location.raise_errorf ~loc "server options not understood"
 
 let deprecate =
   let t : (string, unit) Hashtbl.t = Hashtbl.create 10 in
@@ -339,67 +342,152 @@ let deprecate =
       Format.eprintf "deprecated: [@@@@@@%s ...] -> [%%%%%s ...]@." s s
     | Some () -> ()
 
-let rec impl ?kind str =
-  let rec pmod_impl pmod = match pmod.pmod_desc with
-    | Pmod_structure str -> {pmod with pmod_desc = Pmod_structure (impl ?kind str)}
-    | Pmod_functor (f, m) -> {pmod with pmod_desc = Pmod_functor (f, pmod_impl m)}
-    | Pmod_apply (m1, m2) -> {pmod with pmod_desc = Pmod_apply (pmod_impl m1, pmod_impl m2)}
-    | Pmod_constraint (m, mt) -> {pmod with pmod_desc = Pmod_constraint (pmod_impl m, mt)}
-    | _ -> pmod in
-  List.rev @@
-  List.fold_left (fun acc str ->
-      match str.pstr_desc with
-      | Pstr_value (rflag, [ v ]) when kind <> Some `client ->
-        begin match List.partition (fun a -> List.mem a.attr_name.txt methods) v.pvb_attributes with
-          (* service for handler *)
-          | [ a ], pvb_attributes ->
-            begin match v.pvb_pat.ppat_desc with
-              | Ppat_var {txt=name;_} ->
-                let pvb_expr = handler_args v.pvb_expr in
-                let str = {str with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
-                (List.rev @@ process name a) @ str :: acc
-              | _ ->
-                str :: acc
-            end
-          (* link service *)
-          | [], attributes ->
-            begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with
+(* let rec impl ?kind str = *)
+(*   let rec pmod_impl pmod = match pmod.pmod_desc with *)
+(*     | Pmod_structure str -> {pmod with pmod_desc = Pmod_structure (impl ?kind str)} *)
+(*     | Pmod_functor (f, m) -> {pmod with pmod_desc = Pmod_functor (f, pmod_impl m)} *)
+(*     | Pmod_apply (m1, m2) -> {pmod with pmod_desc = Pmod_apply (pmod_impl m1, pmod_impl m2)} *)
+(*     | Pmod_constraint (m, mt) -> {pmod with pmod_desc = Pmod_constraint (pmod_impl m, mt)} *)
+(*     | _ -> pmod in *)
+(*   List.rev @@ *)
+(*   List.fold_left (fun acc str -> *)
+(*       match str.pstr_desc with *)
+(*       | Pstr_value (rflag, [ v ]) when kind <> Some `client -> *)
+(*         begin match List.partition (fun a -> List.mem a.attr_name.txt methods) v.pvb_attributes with *)
+(*           (\* service for handler *\) *)
+(*           | [ a ], pvb_attributes -> *)
+(*             begin match v.pvb_pat.ppat_desc with *)
+(*               | Ppat_var {txt=name;_} -> *)
+(*                 let pvb_expr = handler_args v.pvb_expr in *)
+(*                 let str = {str with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in *)
+(*                 (List.rev @@ process name a) @ str :: acc *)
+(*               | _ -> *)
+(*                 str :: acc *)
+(*             end *)
+(*           (\* link service *\) *)
+(*           | [], attributes -> *)
+(*             begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with *)
+(*               | [ a ], pvb_attributes -> *)
+(*                 begin match v.pvb_pat.ppat_desc with *)
+(*                   | Ppat_var {txt=name;_} -> *)
+(*                     let pvb_expr = handler_args v.pvb_expr in *)
+(*                     let str = {str with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in *)
+(*                     (List.rev @@ register name a) @ str :: acc *)
+(*                   | _ -> str :: acc *)
+(*                 end *)
+(*               | _ -> str :: acc *)
+(*             end *)
+(*           | _ -> str :: acc *)
+(*         end *)
+(*       | Pstr_value (rflag, (v_react :: v_bg :: onclose)) when kind <> Some `client -> *)
+(*         let attributes = match onclose with *)
+(*           | [] -> v_bg.pvb_attributes *)
+(*           | v :: _  -> v.pvb_attributes in *)
+(*         begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") attributes with *)
+(*           (\* service for websocket handlers *\) *)
+(*           | [ a ], pvb_attributes -> *)
+(*             begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with *)
+(*               | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} -> *)
+(*                 let pvb_expr_react = handler_args v_react.pvb_expr in *)
+(*                 let pvb_expr_bg = handler_args v_bg.pvb_expr in *)
+(*                 let pvb_attributes, vs = match onclose with *)
+(*                   | [] -> pvb_attributes, [] *)
+(*                   | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in *)
+(*                 let str = {str with pstr_desc = Pstr_value (rflag, ( *)
+(*                     {v_react with pvb_expr = pvb_expr_react } :: *)
+(*                     {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } :: *)
+(*                     vs )) } in *)
+(*                 (List.rev @@ process_ws ~onclose name_react name_bg a) @ str :: acc *)
+(*               | _ -> str :: acc *)
+(*             end *)
+(*           (\* link websocket service *\) *)
+(*           | [], attributes -> *)
+(*             begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with *)
+(*               | [ a ], pvb_attributes -> *)
+(*                 begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with *)
+(*                   | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} -> *)
+(*                     let pvb_expr_react = handler_args v_react.pvb_expr in *)
+(*                     let pvb_expr_bg = handler_args v_bg.pvb_expr in *)
+(*                     let pvb_attributes, vs = match onclose with *)
+(*                       | [] -> pvb_attributes, [] *)
+(*                       | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in *)
+(*                     let str = {str with pstr_desc = Pstr_value (rflag, ( *)
+(*                         {v_react with pvb_expr = pvb_expr_react } :: *)
+(*                         {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } :: *)
+(*                         vs )) } in *)
+(*                     (List.rev @@ register_ws ~onclose name_react name_bg a) @ str :: acc *)
+(*                   | _ -> str :: acc *)
+(*                 end *)
+(*               | _ -> str :: acc *)
+(*             end *)
+(*           | _ -> str :: acc *)
+(*         end *)
+(*       (\* server main *\) *)
+(*       | Pstr_attribute a when a.attr_name.txt = "server" && kind = Some `server -> *)
+(*         deprecate "server"; *)
+(*         let loc = a.attr_loc in *)
+(*         let expr = server ~loc a.attr_payload in *)
+(*         pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc *)
+(*       | Pstr_extension (({txt="server"; loc}, p), _) when kind = Some `server -> *)
+(*         let expr = server ~loc p in *)
+(*         pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc *)
+(*       (\* client service *\) *)
+(*       | Pstr_attribute a when List.mem a.attr_name.txt methods -> *)
+(*         deprecate a.attr_name.txt; *)
+(*         let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in *)
+(*         service :: acc *)
+(*       | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods -> *)
+(*         let service, _, _ = service_value ~name ~client:true ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in *)
+(*         service :: acc *)
+(*       | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods -> *)
+(*         let service, _, _ = service_value ~client:true ~meth:txt ~loc p in *)
+(*         service :: acc *)
+(*       | Pstr_module ({pmb_expr; _} as m) -> *)
+(*         {str with pstr_desc = Pstr_module {m with pmb_expr = pmod_impl pmb_expr}} :: acc *)
+(*       | _ -> str :: acc *)
+(*     ) [] str *)
+
+
+let transform ?kind () =
+  object(self)
+    inherit Ast_traverse.map as super
+    method! structure str =
+      List.rev @@
+      List.fold_left (fun acc it ->
+          match it.pstr_desc with
+          | Pstr_value (rflag, [ v ]) when kind <> Some `client ->
+            begin match List.partition (fun a -> List.mem a.attr_name.txt methods) v.pvb_attributes with
+              (* service for handler *)
               | [ a ], pvb_attributes ->
                 begin match v.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name;_} ->
                     let pvb_expr = handler_args v.pvb_expr in
-                    let str = {str with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
-                    (List.rev @@ register name a) @ str :: acc
-                  | _ -> str :: acc
+                    let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
+                    (List.rev @@ process name a) @ it :: acc
+                  | _ ->
+                    (self#structure_item it) :: acc
                 end
-              | _ -> str :: acc
+              (* link service *)
+              | [], attributes ->
+                begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with
+                  | [ a ], pvb_attributes ->
+                    begin match v.pvb_pat.ppat_desc with
+                      | Ppat_var {txt=name;_} ->
+                        let pvb_expr = handler_args v.pvb_expr in
+                        let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
+                        (List.rev @@ register name a) @ it :: acc
+                      | _ -> (self#structure_item it) :: acc
+                    end
+                  | _ -> (self#structure_item it) :: acc
+                end
+              | _ -> (self#structure_item it) :: acc
             end
-          | _ -> str :: acc
-        end
-      | Pstr_value (rflag, (v_react :: v_bg :: onclose)) when kind <> Some `client ->
-        let attributes = match onclose with
-          | [] -> v_bg.pvb_attributes
-          | v :: _  -> v.pvb_attributes in
-        begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") attributes with
-          (* service for websocket handlers *)
-          | [ a ], pvb_attributes ->
-            begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
-              | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
-                let pvb_expr_react = handler_args v_react.pvb_expr in
-                let pvb_expr_bg = handler_args v_bg.pvb_expr in
-                let pvb_attributes, vs = match onclose with
-                  | [] -> pvb_attributes, []
-                  | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
-                let str = {str with pstr_desc = Pstr_value (rflag, (
-                    {v_react with pvb_expr = pvb_expr_react } ::
-                    {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
-                    vs )) } in
-                (List.rev @@ process_ws ~onclose name_react name_bg a) @ str :: acc
-              | _ -> str :: acc
-            end
-          (* link websocket service *)
-          | [], attributes ->
-            begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with
+          | Pstr_value (rflag, (v_react :: v_bg :: onclose)) when kind <> Some `client ->
+            let attributes = match onclose with
+              | [] -> v_bg.pvb_attributes
+              | v :: _  -> v.pvb_attributes in
+            begin match List.partition (fun a -> a.attr_name.txt = "ws" || a.attr_name.txt = "websocket") attributes with
+              (* service for websocket handlers *)
               | [ a ], pvb_attributes ->
                 begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
@@ -408,38 +496,62 @@ let rec impl ?kind str =
                     let pvb_attributes, vs = match onclose with
                       | [] -> pvb_attributes, []
                       | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
-                    let str = {str with pstr_desc = Pstr_value (rflag, (
+                    let it = {it with pstr_desc = Pstr_value (rflag, (
                         {v_react with pvb_expr = pvb_expr_react } ::
                         {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
                         vs )) } in
-                    (List.rev @@ register_ws ~onclose name_react name_bg a) @ str :: acc
-                  | _ -> str :: acc
+                    (List.rev @@ process_ws ~onclose name_react name_bg a) @ it :: acc
+                  | _ -> (self#structure_item it) :: acc
                 end
-              | _ -> str :: acc
+              (* link websocket service *)
+              | [], attributes ->
+                begin match List.partition (fun a -> a.attr_name.txt = "service") attributes with
+                  | [ a ], pvb_attributes ->
+                    begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
+                      | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
+                        let pvb_expr_react = handler_args v_react.pvb_expr in
+                        let pvb_expr_bg = handler_args v_bg.pvb_expr in
+                        let pvb_attributes, vs = match onclose with
+                          | [] -> pvb_attributes, []
+                          | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
+                        let it = {it with pstr_desc = Pstr_value (rflag, (
+                            {v_react with pvb_expr = pvb_expr_react } ::
+                            {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
+                            vs )) } in
+                        (List.rev @@ register_ws ~onclose name_react name_bg a) @ it :: acc
+                      | _ -> (self#structure_item it) :: acc
+                    end
+                  | _ -> (self#structure_item it) :: acc
+                end
+              | _ -> (self#structure_item it) :: acc
             end
-          | _ -> str :: acc
-        end
-      (* server main *)
-      | Pstr_attribute a when a.attr_name.txt = "server" && kind = Some `server ->
-        deprecate "server";
-        let loc = a.attr_loc in
-        let expr = server ~loc a.attr_payload in
-        pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
-      | Pstr_extension (({txt="server"; loc}, p), _) when kind = Some `server ->
-        let expr = server ~loc p in
-        pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
-      (* client service *)
-      | Pstr_attribute a when List.mem a.attr_name.txt methods ->
-        deprecate a.attr_name.txt;
-        let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
-        service :: acc
-      | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
-        let service, _, _ = service_value ~name ~client:true ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
-        service :: acc
-      | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
-        let service, _, _ = service_value ~client:true ~meth:txt ~loc p in
-        service :: acc
-      | Pstr_module ({pmb_expr; _} as m) ->
-        {str with pstr_desc = Pstr_module {m with pmb_expr = pmod_impl pmb_expr}} :: acc
-      | _ -> str :: acc
-    ) [] str
+          (* server main *)
+          | Pstr_attribute a when a.attr_name.txt = "server" && kind = Some `server ->
+            deprecate "server";
+            let loc = a.attr_loc in
+            let expr = server ~loc a.attr_payload in
+            pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
+          | Pstr_extension (({txt="server"; loc}, p), _) when kind = Some `server ->
+            let expr = server ~loc p in
+            pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(punit ~loc) ~expr ] :: acc
+          (* client service *)
+          | Pstr_attribute a when List.mem a.attr_name.txt methods ->
+            deprecate a.attr_name.txt;
+            let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
+            service :: acc
+          | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
+            let service, _, _ = service_value ~name ~client:true ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+            service :: acc
+          | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
+            let service, _, _ = service_value ~client:true ~meth:txt ~loc p in
+            service :: acc
+          | _ -> (self#structure_item it) :: acc
+        ) [] str
+
+    method! expression e = match e.pexp_desc with
+      | Pexp_extension ({txt="server"; _}, PStr [ { pstr_desc = Pstr_eval (e, _); _} ]) when kind = Some `server ->
+        server_aux e
+      | _ -> super#expression e
+  end
+
+let impl ?kind str = (transform ?kind ())#structure str
