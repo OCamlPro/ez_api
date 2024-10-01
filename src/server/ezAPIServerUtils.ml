@@ -151,12 +151,12 @@ let handle ?meth ?content_type ?ws s r path body =
         | Some ws -> ws ?onclose ?step ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
+type allow_kind_without_none = [ `all | `default | `custom of string list ]
 type allow_kind = [ `all | `default | `custom of string list ]
-type allow_kind_with_none = [ `all | `default | `custom of string list ]
 
 let merge_headers_allow ~dft ~key headers = function
   | `none -> headers
-  | #allow_kind as k ->
+  | #allow_kind_without_none as k ->
     let v old =
       match k, old with
       | `all, _ -> "*"

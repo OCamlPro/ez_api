@@ -116,5 +116,7 @@ let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
     ~mode:(`TCP (`Port server_port))
     (Server.make_response_action ~callback ())
 
-let server ?catch servers =
-  Lwt.join (List.map (fun (port,kind) -> create_server ?catch port kind) servers)
+let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials servers =
+  Lwt.join (List.map (fun (port,kind) ->
+      create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
+        port kind) servers)

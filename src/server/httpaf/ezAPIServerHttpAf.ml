@@ -322,10 +322,12 @@ let create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_cred
           ?allow_credentials s sockaddr fd) >>= fun _server ->
   Lwt.return_unit
 
-let server ?catch servers =
+let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials servers =
   let max_connections =
     let n = List.length servers in
     if n = 0 then 0 else limit_open_file () / 2 / n in
   let waiter = fst @@ Lwt.wait () in
-  Lwt.join (List.map (fun (port,kind) -> create_server ?catch ~max_connections port kind) servers) >>= fun () ->
+  Lwt.join (List.map (fun (port,kind) ->
+      create_server ?catch ?allow_origin ?allow_headers ?allow_methods
+        ?allow_credentials ~max_connections port kind) servers) >>= fun () ->
   waiter (* keep the server running *)
