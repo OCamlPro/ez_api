@@ -19,17 +19,18 @@ let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
 
 let register_ip req io time =
   let open Conduit_lwt_unix in match io with
-  | Domain_socket _ | Vchan _ | Tunnel _ -> ()
   | TCP tcp ->
-    match[@warning "-42"] Lwt_unix.getpeername tcp.fd with
-    | Lwt_unix.ADDR_INET (ip,_port) ->
-      let ip = Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip) in
-      let ip =
-        match Header.get (Request.headers req) "x-forwarded-for" with
-        | None -> ip
-        | Some ip -> ip in
-      Ip.register time ip
-    | Lwt_unix.ADDR_UNIX _path -> ()
+    begin match Lwt_unix.getpeername tcp.fd with
+      | Lwt_unix.ADDR_INET (ip,_port) ->
+        let ip = Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip) in
+        let ip =
+          match Header.get (Request.headers req) "x-forwarded-for" with
+          | None -> ip
+          | Some ip -> ip in
+        Ip.register time ip
+      | Lwt_unix.ADDR_UNIX _path -> ()
+    end
+  | _ -> ()
 
 let headers_from_cohttp req =
   let headers = ref StringMap.empty in
