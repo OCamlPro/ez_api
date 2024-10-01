@@ -19,8 +19,7 @@ let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
 
 let register_ip req io time =
   let open Conduit_lwt_unix in match io with
-  | Domain_socket _
-  | Vchan _ -> ()
+  | Domain_socket _ | Vchan _ | Tunnel _ -> ()
   | TCP tcp ->
     match[@warning "-42"] Lwt_unix.getpeername tcp.fd with
     | Lwt_unix.ADDR_INET (ip,_port) ->
@@ -60,7 +59,8 @@ let debug_cohttp req =
             (String.split_on_char ',' v))
         (Request.headers req))
 
-let dispatch ?catch s io req body =
+let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
+    ?catch s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
   debug_cohttp req;
@@ -80,12 +80,18 @@ let dispatch ?catch s io req body =
   >>= function
   | `ws (Ok ra) -> Lwt.return ra
   | `ws (Error _) ->
-    let headers = Header.of_list default_access_control_headers in
+    let headers = Header.of_list @@
+      merge_headers_with_default ?allow_origin ?allow_headers ?allow_methods
+        ?allow_credentials [] in
     let status = Code.status_of_code 501 in
     Server.respond_string ~headers ~status ~body:"" () >|= fun (r, b) ->
     `Response (r, b)
-  | `http {Answer.code; body; headers} ->
-    let headers = merge_headers_with_default headers in
+  | `http {Answer.code; body; headers=resp_headers} ->
+    let origin = match allow_origin with
+      | Some `origin -> StringMap.find_opt "origin" headers
+      | _ -> None in
+    let headers = merge_headers_with_default ?allow_origin ?allow_headers
+        ?allow_methods ?allow_credentials ?origin resp_headers in
     let status = Code.status_of_code code in
     debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
     debug ~v:3 "Reply content:\n  %s" body;
@@ -93,11 +99,13 @@ let dispatch ?catch s io req body =
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
     `Response (r, b)
 
-let create_server ?catch server_port server_kind =
+let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
+    ?allow_credentials server_port server_kind =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
-  let callback conn req body = dispatch ?catch s (fst conn) req body in
+  let callback conn req body = dispatch ?allow_origin ?allow_headers
+      ?allow_methods ?allow_credentials ?catch s (fst conn) req body in
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in

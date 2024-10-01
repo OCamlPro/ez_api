@@ -240,10 +240,8 @@ let register_ip req time = function
     Ip.register time ip
   | Unix.ADDR_UNIX _ -> ()
 
-let connection_handler :
-  ?catch:(string -> exn -> string Answer.t Lwt.t) ->
-  server -> Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
-  fun ?catch s sockaddr fd ->
+let connection_handler ?allow_origin ?allow_headers ?allow_methods
+    ?allow_credentials ?catch s sockaddr fd =
   let request_handler sockaddr reqd =
     let req = Reqd.request reqd in
     let time = GMTime.time () in
@@ -266,17 +264,23 @@ let connection_handler :
          | Some c -> c path_str exn >|= fun a -> `http a)
     >>= function
     | `ws (Error _) ->
-      let headers = Headers.of_list default_access_control_headers in
+      let headers = Headers.of_list @@
+        merge_headers_with_default ?allow_origin ?allow_headers ?allow_methods
+          ?allow_credentials [] in
       let status = Status.unsafe_of_code 501 in
       let response = Response.create ~headers status in
       Reqd.respond_with_string reqd response "";
       Lwt.return_unit
     | `ws (Ok (_response, _b)) ->
       Lwt.return_unit
-    | `http {Answer.code; body; headers} ->
+    | `http {Answer.code; body; headers=resp_headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      let headers = merge_headers_with_default headers in
+      let origin = match allow_origin with
+        | Some `origin -> StringMap.find_opt "origin" headers
+        | _ -> None in
+      let headers = merge_headers_with_default ?allow_origin ?allow_headers
+          ?allow_methods ?allow_credentials ?origin resp_headers in
       let headers = Headers.of_list headers in
       let len = String.length body in
       let headers = Headers.add headers "content-length" (string_of_int len) in
@@ -285,23 +289,16 @@ let connection_handler :
       Lwt.return_unit
   in
 
-  let error_handler :
-    Unix.sockaddr ->
-    ?request:Httpaf.Request.t ->
-    _ ->
-    (Headers.t -> [`write] Body.t) ->
-    unit =
-    fun _client_address ?request:_ error start_response ->
-
-      let response_body = start_response Headers.empty in
-      begin match error with
-        | `Exn exn ->
-          Body.write_string response_body (Printexc.to_string exn);
-          Body.write_string response_body "\n";
-        | #Status.standard as error ->
-          Body.write_string response_body (Status.default_reason_phrase error)
-      end;
-      Body.flush response_body (fun () -> Body.close_writer response_body)
+  let error_handler _client_address ?request:_ error start_response =
+    let response_body = start_response Headers.empty in
+    begin match error with
+      | `Exn exn ->
+        Body.write_string response_body (Printexc.to_string exn);
+        Body.write_string response_body "\n";
+      | #Status.standard as error ->
+        Body.write_string response_body (Status.default_reason_phrase error)
+    end;
+    Body.flush response_body (fun () -> Body.close_writer response_body)
   in
 
   Httpaf_lwt_unix.Server.create_connection_handler
@@ -311,7 +308,8 @@ let connection_handler :
     sockaddr
     fd
 
-let create_server ?catch ~max_connections server_port server_kind =
+let create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
+    ~max_connections server_port server_kind =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
@@ -320,7 +318,8 @@ let create_server ?catch ~max_connections server_port server_kind =
   establish_server_with_client_socket
     ~nb_max_connections:max_connections
     listen_address (fun sockaddr fd ->
-        connection_handler ?catch s sockaddr fd) >>= fun _server ->
+        connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
+          ?allow_credentials s sockaddr fd) >>= fun _server ->
   Lwt.return_unit
 
 let server ?catch servers =

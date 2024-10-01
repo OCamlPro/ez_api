@@ -151,30 +151,43 @@ let handle ?meth ?content_type ?ws s r path body =
         | Some ws -> ws ?onclose ?step ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
-(* Default access control headers *)
-let default_access_control_headers = [
-  "access-control-allow-origin", "*";
-  "access-control-allow-headers", "accept, content-type"
-]
+type allow_kind = [ `all | `default | `custom of string list ]
+type allow_kind_with_none = [ `all | `default | `custom of string list ]
 
-(* merge headers correctly with default one *)
-let merge_headers_with_default headers : (string * string) list =
-  (* combining existing headers *)
-  let l = List.fold_left
-      (fun acc ((hn,hv) as h) ->
-         match List.assoc_opt hn default_access_control_headers with
-         | None -> h::acc
-         | Some _ when hn = "access-control-allow-origin" ->
-           h::acc
-         | Some v when hn = "access-control-allow-headers" ->
-           (hn, hv ^ "," ^ v)::acc
-         | _ -> acc)
-      []
-      headers
-  in
-  (* Adding default if not present *)
-  List.fold_left (fun acc ((hn,_) as h) ->
-      match List.assoc_opt hn l with
-      | None -> h::acc
-      | _ -> acc
-    ) l default_access_control_headers
+let merge_headers_allow ~dft ~key headers = function
+  | `none -> headers
+  | #allow_kind as k ->
+    let v old =
+      match k, old with
+      | `all, _ -> "*"
+      (* restrict headers if former ones are * *)
+      | `default, None | `default, Some "*" -> dft
+      | `custom l, None | `custom l, Some "*" -> String.concat "," l
+      | `default, Some old -> old ^ "," ^ dft
+      | `custom l, Some old -> String.concat "," (old :: l) in
+    match List.assoc_opt key headers with
+    | None -> headers @ [ key, v None ]
+    | Some old -> List.remove_assoc key headers @ [ key, v (Some old) ]
+
+let merge_headers_allow_origin ?origin headers kind =
+  let key = "access-control-allow-origin" in
+  match kind with
+  | `none -> headers
+  | `origin -> (match origin with None -> headers | Some o -> headers @ [ key, String.concat "," o ])
+  | `all | `default -> List.remove_assoc key headers @ [ key, "*" ]
+  | `custom l -> match List.assoc_opt key headers with
+    | None -> headers @ [ key, String.concat "," l ]
+    | Some "*" -> (List.remove_assoc key headers) @ [ key, String.concat "," l ]
+    | Some v -> (List.remove_assoc key headers) @ [ key, String.concat "," (v :: l) ]
+
+let merge_headers_with_default ?(allow_origin=`default) ?(allow_headers=`default) ?(allow_methods=`default)
+    ?allow_credentials ?origin headers =
+  let headers = merge_headers_allow_origin ?origin headers allow_origin in
+  let headers = merge_headers_allow ~dft:"accept,content-type" ~key:"access-control-allow-headers" headers allow_headers in
+  let headers = merge_headers_allow ~dft:"*" ~key:"access-control-allow-methods" headers allow_methods in
+  let key = "access-control-allow-credentials" in
+  match allow_credentials with
+  | None -> headers
+  | Some b -> match List.assoc_opt key headers with
+    | None -> headers @ [ key, string_of_bool b ]
+    | Some _ -> List.remove_assoc key headers @ [ key, string_of_bool b ]
