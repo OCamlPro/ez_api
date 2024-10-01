@@ -21,8 +21,6 @@ let llid ~loc s = {txt=Longident.parse s; loc}
 let esome e =
   let loc = e.pexp_loc in
   pexp_construct ~loc (llid ~loc "Some") (Some e)
-let enone ~loc =
-  pexp_construct ~loc (llid ~loc "None") None
 
 (** service *)
 
@@ -62,13 +60,13 @@ let options ?register ?name loc =
     | None -> pexp_construct ~loc (llid ~loc "true") None
     | Some register -> register in
   let name = match name with
-    | None -> enone ~loc
+    | None -> [%expr None]
     | Some name -> esome (estring ~loc name) in {
   path = pexp_ident ~loc (llid ~loc "EzAPI.Path.root");
-  input = empty ~loc; output = empty ~loc; errors = enone ~loc; params = enone ~loc;
-  section = enone ~loc; name; descr = enone ~loc;
-  security = enone ~loc; register; input_example = enone ~loc; hide = enone ~loc;
-  output_example = enone ~loc; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
+  input = empty ~loc; output = empty ~loc; errors = [%expr None]; params = [%expr None];
+  section = [%expr None]; name; descr = [%expr None];
+  security = [%expr None]; register; input_example = [%expr None]; hide = [%expr None];
+  output_example = [%expr None]; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
   security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
   debug = false; directory = None; service = None
 }
@@ -225,7 +223,7 @@ let register_ws ~onclose react_name bg_name a =
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
-    | [] -> enone ~loc
+    | [] -> [%expr None]
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
     | _ -> Location.raise_errorf ~loc "too many value bindings" in
   match options.service with
@@ -265,7 +263,7 @@ let process_ws ~onclose react_name bg_name a =
   let ppx_dir = ppx_dir ~loc options.directory in
   let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
   let onclose = match onclose with
-    | [] -> enone ~loc
+    | [] -> [%expr None]
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> esome (evar ~loc txt)
     | _ -> Location.raise_errorf ~loc "too many value bindings" in
   let register =
@@ -297,30 +295,43 @@ let handler_args e =
 (** server *)
 
 type server_options = {
-  port : expression;
-  dir : expression;
-  catch : expression;
+  port: expression;
+  dir: expression;
+  catch: expression;
+  allow_headers: expression;
+  allow_origin: expression;
+  allow_methods: expression;
+  allow_credentials: expression;
 }
 
 let server_options e =
   let loc = e.pexp_loc in
+  let dft port = {
+    port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
+    allow_origin = [%expr None]; allow_methods = [%expr None]; allow_headers = [%expr None];
+    allow_credentials = [%expr None] } in
   match e.pexp_desc with
-  | Pexp_constant c ->
-    { port = pexp_constant ~loc c; dir = evar ~loc "ppx_dir"; catch = enone ~loc }
+  | Pexp_constant c -> dft (pexp_constant ~loc c)
   | Pexp_record (l, _) ->
     let l = List.filter_map (function ({txt=Lident s; _}, e) -> Some (s, e) | _ -> None) l in
     List.fold_left (fun acc (s, e) -> match s with
         | "port" -> { acc with port = e }
         | "dir" -> { acc with dir = e }
         | "catch" -> { acc with catch = esome e }
-        | _ -> acc) {port = eint ~loc 8080; dir = evar ~loc "ppx_dir"; catch = enone ~loc } l
+        | "headers" -> { acc with allow_headers = esome e }
+        | "methods" -> { acc with allow_methods = esome e }
+        | "origin" -> { acc with allow_origin = esome e }
+        | "credentials" -> { acc with allow_credentials = esome e }
+        | _ -> acc) (dft (eint ~loc 8080)) l
   | _ -> Location.raise_errorf ~loc "server options not understood"
 
 let server_aux e =
   let loc = e.pexp_loc in
   let options = server_options e in
   [%expr
-    EzAPIServer.server ?catch:[%e options.catch]
+    EzAPIServer.server ?catch:[%e options.catch] ?allow_headers:[%e options.allow_headers]
+      ?allow_methods:[%e options.allow_methods] ?allow_origin:[%e options.allow_origin]
+      ?allow_credentials:[%e options.allow_credentials]
       [%e elist ~loc [
           pexp_tuple ~loc [
             options.port;
