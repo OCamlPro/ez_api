@@ -243,7 +243,7 @@ module Encoding = struct
       (function
         | `O l -> List.map (fun (n, v) -> (n, Json_encoding.destruct enc v)) l
         | _ -> failwith "asssociative object")
-      ~schema:(Json_encoding.schema Json_encoding.any_ezjson_object)
+      ~schema:(Json_encoding.schema ~definitions_path:EzAPI.Doc.definitions_path Json_encoding.any_ezjson_object)
 
 
   let contact_object = conv
@@ -671,7 +671,6 @@ let make ?descr ?terms ?contact ?license ?(version="0.1") ?servers ?(docs=[])
     | Ok s -> filename ^ ".yaml", s
   else
     filename ^ ".json", EzEncoding.Ezjsonm.to_string ~minify:(not pretty) openapi_json
-
 
 let write ?descr ?terms ?contact ?license ?version ?servers ?docs ?(yaml=false)
     ?pretty ?definitions ~sections ~title filename =

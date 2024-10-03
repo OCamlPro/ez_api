@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let server ?catch:_ _ =
+let server ?catch:_ ?allow_origin:_ ?allow_headers:_ ?allow_methods:_ ?allow_credentials:_ _ =
   Format.eprintf
     "Cohttp or Httpaf server implementation not availble\n\
      Try: `opam install cohttp-lwt-unix`\n\
