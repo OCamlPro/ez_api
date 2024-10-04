@@ -14,3 +14,8 @@
  (modules test_ppx_client)
  (libraries test_ppx_lib ez_api.ixhr_lwt)
  (modes js))
+
+(library
+ (name test_ppx_err_case)
+ (modules test_ppx_err_case)
+ (preprocess (pps ez_api.ppx ez_api.ppx_err_case)))

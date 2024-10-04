@@ -88,3 +88,11 @@ let get ~code l =
           Json_encoding.case enc select deselect
         ) l in
     Some (Json_encoding.union cases)
+
+let merge_selects l e =
+  let rec aux = function
+    | [] -> None
+    | f :: tl -> match f e with
+      | Some e -> Some e
+      | None -> aux tl in
+  aux l

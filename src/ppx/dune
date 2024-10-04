@@ -39,5 +39,6 @@
  (optional)
  (modules ppx_deriving_err_case)
  (preprocess (pps ppxlib.metaquot))
- (kind ppx_deriver)
- (libraries ppx_deriving_encoding.lib))
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries ez_api)
+ (libraries ppx_deriving_encoding.lib ez_api))
