@@ -25,21 +25,15 @@ let mk ~loc ?enc ?(kind_label="kind") ~title name code =
     else encoding in
   let select = pexp_function ~loc [
       case ~guard:None
-        ~lhs:(ppat_variant ~loc name (Option.map (fun _ -> pvar ~loc "x") enc))
-        ~rhs:(Option.fold ~none:(Utils.esome (eunit ~loc))
-                ~some:(fun _ -> Utils.esome (pexp_tuple ~loc [eunit ~loc; evar ~loc "x"])) enc) ;
-      case ~guard:None
-        ~lhs:(ppat_any ~loc)
-        ~rhs:(Utils.enone ~loc) ] in
+        ~lhs:(ppat_variant ~loc name (Option.map (fun _ -> [%pat? x]) enc))
+        ~rhs:(Option.fold ~none:[%expr Some ()] ~some:(fun _ -> [%expr Some ((), x)]) enc);
+      case ~guard:None ~lhs:[%pat? _] ~rhs:[%expr None] ] in
   let deselect = Utils.pexp_fun
-      (Option.fold ~none:(punit ~loc) ~some:(fun _ -> ppat_tuple ~loc [punit ~loc; pvar ~loc "x"]) enc)
-      (pexp_variant ~loc name (Option.map (fun _ -> evar ~loc "x") enc)) in
-  pexp_apply ~loc (evar ~loc "EzAPI.Err.make") [
-    Labelled "code", eint ~loc code;
-    Labelled "name", estring ~loc name;
-    Labelled "encoding", encoding;
-    Labelled "select", select;
-    Labelled "deselect", deselect ]
+      (Option.fold ~none:[%pat? ()] ~some:(fun _ -> [%pat? ((), x)]) enc)
+      (pexp_variant ~loc name (Option.map (fun _ -> [%expr x]) enc)) in
+  [%expr
+    EzAPI.Err.make ~code:[%e eint ~loc code] ~name:[%e estring ~loc name]
+      ~encoding:[%e encoding] ~select:[%e select] ~deselect:[%e deselect] ]
 
 let get_int_attr = function
   | PStr [{pstr_desc = Pstr_eval ({pexp_desc = Pexp_constant (Pconst_integer (s, None)); _}, _); _}] ->
@@ -78,8 +72,7 @@ let str_gen ~loc ~path:_ (rec_flag, l) debug title kind_label =
       let cases = expressions ?kind_label ~title t in
       List.map (fun (name, expr) ->
           let pat = ppat_constraint ~loc (pvar ~loc (String.lowercase_ascii name ^ "_case"))
-              (ptyp_constr ~loc (Utils.llid ~loc "EzAPI.Err.case") [
-                  ptyp_constr ~loc (Utils.llid ~loc t.ptype_name.txt) [] ]) in
+              [%type: [%t ptyp_constr ~loc (Utils.llid ~loc t.ptype_name.txt) []] EzAPI.Err.case] in
           value_binding ~loc ~pat ~expr) cases) l in
   let l = List.flatten l in
   let rec_flag = if List.length l < 2 then Nonrecursive else rec_flag in
