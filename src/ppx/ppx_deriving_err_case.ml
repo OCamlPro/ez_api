@@ -179,25 +179,28 @@ let transform =
   object
     inherit Ast_traverse.map
     method! structure_item it = match it.pstr_desc with
-      | Pstr_extension (({txt="err_case"; _}, PStr [{pstr_desc=Pstr_value (_, [ vb ]); pstr_loc=loc; _}]), _) ->
-        let typ, e, pat = match vb.pvb_expr.pexp_desc, vb.pvb_pat.ppat_desc with
-          | Pexp_constraint (e, typ), (Ppat_constraint ({ppat_desc=p; _}, _) | p) ->
-            remove_poly typ, e, { vb.pvb_pat with ppat_desc=p }
-          | _, Ppat_constraint (p, typ) ->
-            remove_poly typ, vb.pvb_expr, p
-          | _ -> Location.raise_errorf ~loc "no error type given to derive the error case" in
-        let code, debug, def = match e.pexp_desc with
-          | Pexp_constant Pconst_integer (s, _) -> int_of_string s, false, true
-          | Pexp_record (l, None) -> get_err_case_options ~loc:e.pexp_loc l
-          | _ -> Location.raise_errorf ~loc:e.pexp_loc "code not found" in
-        let typ = match typ.ptyp_desc with
-          | Ptyp_constr ({txt; _}, [])
-          | Ptyp_constr ({txt=(Ldot (Ldot (Lident "EzAPI", "Err"), "case") | Ldot (Lident "Err", "case")) ; _}, [
-              { ptyp_desc = Ptyp_constr ({txt; _}, []); _ }
-            ]) -> Longident.name txt
-          | _ -> Location.raise_errorf ~loc:typ.ptyp_loc "couldn't find type to derive error case" in
-        let expr = type_ext_err_case ~loc ~typ ~def code in
-        let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
+      | Pstr_extension (({txt="err_case"; _}, PStr [{pstr_desc=Pstr_value (_, l); pstr_loc=loc; _}]), _) ->
+        let l, debug = List.fold_left (fun (acc, acc_debug) vb ->
+            let typ, e, pat = match vb.pvb_expr.pexp_desc, vb.pvb_pat.ppat_desc with
+              | Pexp_constraint (e, typ), (Ppat_constraint ({ppat_desc=p; _}, _) | p) ->
+                remove_poly typ, e, { vb.pvb_pat with ppat_desc=p }
+              | _, Ppat_constraint (p, typ) ->
+                remove_poly typ, vb.pvb_expr, p
+              | _ -> Location.raise_errorf ~loc "no error type given to derive the error case" in
+            let code, debug, def = match e.pexp_desc with
+              | Pexp_constant Pconst_integer (s, _) -> int_of_string s, false, true
+              | Pexp_record (l, None) -> get_err_case_options ~loc:e.pexp_loc l
+              | _ -> Location.raise_errorf ~loc:e.pexp_loc "code not found" in
+            let typ = match typ.ptyp_desc with
+              | Ptyp_constr ({txt; _}, [])
+              | Ptyp_constr ({txt=(Ldot (Ldot (Lident "EzAPI", "Err"), "case") | Ldot (Lident "Err", "case")) ; _}, [
+                    { ptyp_desc = Ptyp_constr ({txt; _}, []); _ }
+                  ]) -> Longident.name txt
+              | _ -> Location.raise_errorf ~loc:typ.ptyp_loc "couldn't find type to derive error case" in
+            let expr = type_ext_err_case ~loc ~typ ~def code in
+            acc @ [ value_binding ~loc ~pat ~expr ], acc_debug || debug
+          ) ([], false) l in
+        let it = pstr_value ~loc Nonrecursive l in
         if debug then Format.printf "%a@." Pprintast.structure_item it;
         it
       | _ -> it
