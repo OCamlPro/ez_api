@@ -47,6 +47,6 @@
   (ocurl (< 0.8.0))
   (digestif (< 1.0.0))
   (ppxlib (< 0.18.0))
-  (ppx_deriving_encoding (< 0.3.0))
+  (ppx_deriving_encoding (<> 0.3.0))
   (result (< 1.5))
 ))
