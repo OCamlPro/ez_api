@@ -45,29 +45,19 @@ type options = {
   service : expression option;
 }
 
-let empty ~loc  = pexp_construct ~loc (llid ~loc "EzAPI.Empty") None
 let raw e =
   let loc = e.pexp_loc in
-  let e =
-    eapply ~loc (evar ~loc "List.filter_map") [ evar ~loc "EzAPI.Mime.parse"; e ] in
-  pexp_construct ~loc (llid ~loc "EzAPI.Raw") @@ Some e
-let json e =
-  let loc = e.pexp_loc in
-  pexp_construct ~loc (llid ~loc "EzAPI.Json") @@ Some e
+  [%expr EzAPI.Raw (List.filter_map EzAPI.Mime.parse [%e e])]
 
-let options ?register ?name loc =
-  let register = match register with
-    | None -> pexp_construct ~loc (llid ~loc "true") None
-    | Some register -> register in
-  let name = match name with
-    | None -> [%expr None]
-    | Some name -> esome (estring ~loc name) in {
-  path = pexp_ident ~loc (llid ~loc "EzAPI.Path.root");
-  input = empty ~loc; output = empty ~loc; errors = [%expr None]; params = [%expr None];
-  section = [%expr None]; name; descr = [%expr None];
-  security = [%expr None]; register; input_example = [%expr None]; hide = [%expr None];
-  output_example = [%expr None]; error_type = ptyp_constr ~loc (llid ~loc "exn") [];
-  security_type = ptyp_constr ~loc (llid ~loc "EzAPI.no_security") [];
+let options loc = {
+  path = [%expr EzAPI.Path.root];
+  input = [%expr EzAPI.Empty];
+  output = [%expr EzAPI.Empty];
+  errors = [%expr None]; params = [%expr None];
+  section = [%expr None]; name=[%expr None]; descr = [%expr None];
+  security = [%expr None]; register=[%expr true]; input_example = [%expr None];
+  hide = [%expr None]; output_example = [%expr None]; error_type = [%type: exn];
+  security_type = [%type: EzAPI.no_security];
   debug = false; directory = None; service = None
 }
 
@@ -100,13 +90,12 @@ let string_literal = function
   | Ppxlib.Pconst_string (s, _, _) -> Some s
   | _ -> None
 
-let get_options ~loc ?name ?(client=false) p =
-  let register = if not client then None else Some (pexp_construct ~loc (llid ~loc "false") None) in
+let get_options ~loc ?(options=options loc) ?name p =
   match p with
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ] ->
     let l = List.filter_map (function ({txt=Lident s; loc}, e) -> Some (s, loc, e) | _ -> None) l in
     List.fold_left (fun (name, acc) (s, loc, e) -> match s with
-        | "path" -> begin match e.pexp_desc with
+        | "path" | "p" -> begin match e.pexp_desc with
             | Pexp_constant cst ->
               begin match string_literal cst with
                 | Some s -> name, { acc with path = parse_path ~loc:e.pexp_loc s }
@@ -114,9 +103,9 @@ let get_options ~loc ?name ?(client=false) p =
               end
             | _ -> Format.eprintf "path should be a literal"; name, acc
           end
-        | "input" -> name, { acc with input = json e }
+        | "input" -> name, { acc with input = [%expr EzAPI.Json [%e e]] }
         | "raw_input" -> name, { acc with input = raw e }
-        | "output" -> name, { acc with output = json e }
+        | "output" -> name, { acc with output = [%expr EzAPI.Json [%e e]] }
         | "raw_output" -> name, { acc with output = raw e }
         | "params" -> name, { acc with params = esome e }
         | "errors" -> name, { acc with errors = esome e; error_type = ptyp_any ~loc }
@@ -130,8 +119,9 @@ let get_options ~loc ?name ?(client=false) p =
                 | _ -> Format.eprintf "name should be a string literal"; name, acc
               end
             | _ ->
-              Format.eprintf "name should be a literal";
-              name, acc
+              match name with
+              | Some n -> Some n, { acc with name = [%expr Some [%e estring ~loc n]] }
+              | _ -> name, acc
           end
         | "descr" -> name, { acc with descr = esome e }
         | "security" -> name, { acc with security = esome e; security_type = ptyp_any ~loc }
@@ -150,20 +140,21 @@ let get_options ~loc ?name ?(client=false) p =
           end
         | "service" ->
           name, { acc with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
-        | _ -> name, acc) (name, options ?register ?name loc) l
+        | _ -> name, acc) (name, options) l
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident _; _} as e, _); _} ] ->
-    let o = options ?register ?name loc in
-    name, { o with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
+    name, { options with service = Some e; error_type = ptyp_any ~loc; security_type = ptyp_any ~loc }
+  | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_constant Pconst_string (s, loc, _); _}, _); _} ] ->
+    name, { options with path = parse_path ~loc s }
   | PStr s ->
     Format.eprintf "attribute not understood %a@." Pprintast.structure s;
-    name, options ?register ?name loc
+    name, options
   | _ ->
     Format.eprintf "attribute not understood@.";
-    name, options ?register ?name loc
+    name, options
 
-let service_value ?name ?client ~meth ~loc p =
+let service_value ?name ?options ~meth ~loc p =
   let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
-  let name, options = get_options ~loc ?name ?client p in
+  let name, options = get_options ?name ?options ~loc p in
   match name with
   | None -> Location.raise_errorf ~loc "service doesn't have a name"
   | Some name ->
@@ -344,6 +335,8 @@ let server ~loc p =
     [%expr EzLwtSys.run (fun () -> [%e server_aux e])]
   | _ -> Location.raise_errorf ~loc "server options not understood"
 
+(** main mapper *)
+
 let deprecate =
   let t : (string, unit) Hashtbl.t = Hashtbl.create 10 in
   fun s ->
@@ -442,14 +435,52 @@ let transform ?kind () =
           (* client service *)
           | Pstr_attribute a when List.mem a.attr_name.txt methods ->
             deprecate a.attr_name.txt;
-            let service, _, _ = service_value ~client:true ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
+            let loc = a.attr_loc in
+            let options = { (options loc) with register = [%expr false] } in
+            let service, _, _ = service_value ~options ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
             service :: acc
           | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
-            let service, _, _ = service_value ~name ~client:true ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+            let options = { (options loc) with register = [%expr false] } in
+            let service, _, _ = service_value ~name ~options ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
             service :: acc
           | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
-            let service, _, _ = service_value ~client:true ~meth:txt ~loc p in
+            let options = { (options loc) with register = [%expr false] } in
+            let service, _, _ = service_value ~options ~meth:txt ~loc p in
             service :: acc
+          | Pstr_type (_rec_flag, [ t ]) ->
+            let loc = t.ptype_loc in
+            begin match List.find_opt (fun a -> List.mem a.attr_name.txt methods) t.ptype_attributes with
+              | None -> (super#structure_item it) :: acc
+              | Some a ->
+                let meth = a.attr_name.txt in
+                let enc =
+                  let open Ppx_deriving_encoding_lib.Encoding in
+                  let {enc; _} = expressions t in
+                  enc in
+                let input, output = match meth with
+                  | "get" | "put" -> [%expr Some EzAPI.Empty], [%expr EzAPI.Json [%e enc]]
+                  | _ -> [%expr EzAPI.Json [%e enc]], [%expr Some EzAPI.Empty] in
+                let options = { (options loc) with register = [%expr false]; input; output } in
+                let name = t.ptype_name.txt ^ "_s" in
+                let service, _, _ = service_value ~name ~options ~meth ~loc a.attr_payload in
+                service :: it :: acc
+            end
+          | Pstr_type (_rec_flag, [ t_input; t_output ]) ->
+            let loc = t_input.ptype_loc in
+            begin match List.find_opt (fun a -> List.mem a.attr_name.txt methods) t_output.ptype_attributes with
+              | None -> (super#structure_item it) :: acc
+              | Some a ->
+                let meth = a.attr_name.txt in
+                let input, output =
+                  let open Ppx_deriving_encoding_lib.Encoding in
+                  let {enc=enc_input; _} = expressions t_input in
+                  let {enc=enc_output; _} = expressions t_output in
+                  [%expr EzAPI.Json [%e enc_input]], [%expr EzAPI.Json [%e enc_output]] in
+                let options = { (options loc) with register = [%expr false]; input; output } in
+                let name = t_input.ptype_name.txt ^ "_s" in
+                let service, _, _ = service_value ~name ~options ~meth ~loc a.attr_payload in
+                service :: it :: acc
+            end
           | _ -> (self#structure_item it) :: acc
         ) [] str
 
@@ -460,3 +491,69 @@ let transform ?kind () =
   end
 
 let impl ?kind str = (transform ?kind ())#structure str
+
+let deriver_str_gen meth ~loc ~path:_ (_rec_flag, l) path input output errors params section name
+    descr security register hide input_example output_example debug =
+  let options = options loc in
+  let sname = match l with t :: _ -> Some (t.ptype_name.txt ^ "_s") | [] -> None in
+  let input, output = match meth, l with
+    | _, [ t_input; t_output ] ->
+      [%expr EzAPI.Json ([%e evar ~loc (t_input.ptype_name.txt ^ "_enc")] ())],
+      [%expr EzAPI.Json ([%e evar ~loc (t_output.ptype_name.txt ^ "_enc")] ())]
+    | ("get" | "put"), t :: _ ->
+      Option.value ~default:options.input input,
+      [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]]
+    |  _, t :: _ ->
+      [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
+      Option.value ~default:options.output output
+    | _ -> Option.value ~default:options.input input, Option.value ~default:options.output output in
+  let path = match path with
+    | Some { pexp_desc = Pexp_constant cst; pexp_loc=loc; _ } ->
+      begin match string_literal cst with
+        | Some s -> parse_path ~loc s
+        | _ -> Format.eprintf "path should be a string literal"; options.path
+      end
+    | _ -> options.path in
+  let security_type, security = match security with
+    | None -> options.security_type, options.security
+    | Some e -> [%type: _], e in
+  let options = {
+    options with
+    path; input; output;
+    errors = Option.value ~default:options.errors errors;
+    params = Option.value ~default:options.params params;
+    section = Option.value ~default:options.section section;
+    name = Option.value ~default:options.name name;
+    descr = Option.value ~default:options.descr descr;
+    security; security_type;
+    register = Option.value ~default:[%expr false] register;
+    hide = Option.value ~default:options.hide hide;
+    input_example = Option.value ~default:options.input_example input_example;
+    output_example = Option.value ~default:options.output_example output_example;
+    debug;
+  } in
+  let s, _, _ = service_value ~meth ~loc ~options ?name:sname (PStr []) in
+  [ s ]
+
+let derivers () =
+  let open Ppxlib.Deriving in
+  List.iter (fun meth ->
+      let args_str = Args.(
+          empty
+          +> arg "path" __
+          +> arg "input" __
+          +> arg "output" __
+          +> arg "errors" __
+          +> arg "params" __
+          +> arg "section" __
+          +> arg "name" __
+          +> arg "descr" __
+          +> arg "security" __
+          +> arg "register" __
+          +> arg "hide" __
+          +> arg "input_example" __
+          +> arg "output_example" __
+          +> flag "debug"
+        ) in
+      let str_type_decl = Generator.make args_str (deriver_str_gen meth) in
+      ignore @@ add meth ~str_type_decl) methods

@@ -1,7 +1,7 @@
 (library
  (name test_ppx_lib)
  (modules test_ppx_lib)
- (preprocess (pps ez_api.ppx)))
+ (preprocess (pps ez_api.ppx ppx_deriving_encoding)))
 
 (executable
  (name test_ppx_server)

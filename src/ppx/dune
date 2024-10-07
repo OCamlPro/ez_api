@@ -4,7 +4,7 @@
  (optional)
  (modules ppx_common)
  (preprocess (pps ppxlib.metaquot))
- (libraries ppxlib))
+ (libraries ppx_deriving_encoding.lib))
 
 (library
  (name ppx_client)
