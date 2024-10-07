@@ -132,9 +132,17 @@ let get_options ~loc ?(options=options loc) ?name p =
               end
             | _ -> Format.eprintf "path should be a literal"; name, acc
           end
-        | "input" -> name, { acc with input = [%expr EzAPI.Json [%e e]] }
+        | "input" ->
+          begin match e.pexp_desc with
+            | Pexp_construct ({txt=Lident "::"; _}, _) -> name, { acc with input = raw e }
+            | _ -> name, { acc with input = [%expr EzAPI.Json [%e e]] }
+          end
         | "raw_input" -> name, { acc with input = raw e }
-        | "output" -> name, { acc with output = [%expr EzAPI.Json [%e e]] }
+        | "output" ->
+          begin match e.pexp_desc with
+            | Pexp_construct ({txt=Lident "::"; _}, _) -> name, { acc with output = raw e }
+            | _ -> name, { acc with output = [%expr EzAPI.Json [%e e]] }
+          end
         | "raw_output" -> name, { acc with output = raw e }
         | "params" -> name, { acc with params = [%expr Some [%e e]] }
         | "errors" -> name, { acc with errors = [%expr Some [%e e]]; error_type = [%type: _] }
@@ -537,17 +545,22 @@ let deriver_str_gen meth ~loc ~path:_ (_rec_flag, l) path input output errors pa
     descr security register hide input_example output_example debug =
   let options = options loc in
   let sname = match l with t :: _ -> Some (t.ptype_name.txt ^ "_s") | [] -> None in
+  let aux e = match e.pexp_desc with
+    | Pexp_construct ({txt=Lident "::"; _}, _) -> raw e
+    | _ -> [%expr EzAPI.Json [%e e]] in
   let input, output = match meth, l with
     | _, [ t_input; t_output ] ->
       [%expr EzAPI.Json ([%e evar ~loc (t_input.ptype_name.txt ^ "_enc")] ())],
       [%expr EzAPI.Json ([%e evar ~loc (t_output.ptype_name.txt ^ "_enc")] ())]
     | ("get" | "put"), t :: _ ->
-      Option.value ~default:options.input input,
+      Option.fold ~none:options.input ~some:aux input,
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]]
     |  _, t :: _ ->
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
-      Option.value ~default:options.output output
-    | _ -> Option.value ~default:options.input input, Option.value ~default:options.output output in
+      Option.fold ~none:options.output ~some:aux output
+    | _ ->
+      Option.fold ~none:options.input ~some:aux input,
+      Option.fold ~none:options.output ~some:aux output in
   let path = match path with
     | Some { pexp_desc = Pexp_constant cst; pexp_loc=loc; _ } ->
       begin match string_literal cst with
