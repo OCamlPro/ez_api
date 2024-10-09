@@ -10,9 +10,7 @@
 
 open EzAPI
 
-type 'e api_error =
-  | KnownError of { code : int ; error : 'e }
-  | UnknownError of { code : int ; msg : string option }
+type 'e api_error = int * [`known of 'e | `unknown of string option]
 
 (* Note that `?content_type` in post can be overriden by a content-type
    header in `?headers` *)
