@@ -9,5 +9,6 @@
 (**************************************************************************)
 
 let () =
-  Ppxlib.Driver.register_transformation "ez_api" ~impl:Ppx_common.impl;
-  Ppx_common.derivers None
+  let kind = Some `request in
+  Ppxlib.Driver.register_transformation "ez_api_req" ~impl:(Ppx_common.impl ?kind);
+  Ppx_common.derivers kind
