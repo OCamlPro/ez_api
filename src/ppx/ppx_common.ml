@@ -203,7 +203,7 @@ let get_options ~loc ?(options=default_options loc) ?name p =
     Format.eprintf "attribute not understood@.";
     name, options
 
-let service_value ?name ?options ?(parse_options=true) ~meth ~loc p =
+let service_expr ?name ?options ?(parse_options=true) ~meth ~loc p =
   let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
   let name, options =
     if not parse_options then name, Option.value ~default:(default_options loc) options
@@ -227,9 +227,13 @@ let service_value ?name ?options ?(parse_options=true) ~meth ~loc p =
         Nolabel, options.path ] in
     let pat = ppat_constraint ~loc (pvar ~loc name) @@
       [%type: (_, _, _, [%t options.error_type], [%t options.security_type]) EzAPI.service] in
-    let str = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
-    if options.debug then Format.printf "%a@." Pprintast.structure_item str;
-    str, name, options
+    name, options, pat, expr
+
+let service_value ?name ?options ?parse_options ~meth ~loc p =
+  let name, options, pat, expr = service_expr ?name ?options ?parse_options ~meth ~loc p in
+  let str = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
+  if options.debug then Format.printf "%a@." Pprintast.structure_item str;
+  str, name, options
 
 (** register service/handler *)
 
@@ -598,6 +602,14 @@ let transform ?kind () =
     method! expression e = match e.pexp_desc with
       | Pexp_extension ({txt="server"; _}, PStr [ { pstr_desc = Pstr_eval (e, _); _} ]) when kind = Some `server ->
         server_aux e
+      | Pexp_extension (({txt; loc}, PStr [ {
+          pstr_desc = Pstr_eval ({
+              pexp_desc=Pexp_let (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ], e); _}, _); _} ])) when List.mem txt methods ->
+        let options = { (default_options loc) with register = [%expr false] } in
+        let _, _, pat, expr = service_expr ~name ~options ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+        let e = self#expression e in
+        if options.debug then Format.printf "%a@." Pprintast.expression expr;
+        [%expr let [%p pat] = [%e expr] in [%e e]]
       | _ -> super#expression e
   end
 
