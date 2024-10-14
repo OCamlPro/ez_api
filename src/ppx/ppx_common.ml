@@ -654,7 +654,8 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     hide = Option.value ~default:options.hide hide;
     input_example = Option.value ~default:options.input_example input_example;
     output_example = Option.value ~default:options.output_example output_example;
-    debug; nargs
+    debug; nargs;
+    error_type = (match errors with None -> options.error_type | Some _ -> [%type: _]);
   } in
   let s, _, options = service_value ~meth ~loc ~options ?name:sname ~parse_options:false (PStr []) in
   match kind with
