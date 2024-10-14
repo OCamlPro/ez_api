@@ -89,7 +89,7 @@ let raw e =
   let loc = e.pexp_loc in
   [%expr EzAPI.Raw (List.filter_map EzAPI.Mime.parse [%e e])]
 
-let options loc = {
+let default_options loc = {
   path = [%expr EzAPI.Path.root];
   input = [%expr EzAPI.Empty];
   output = [%expr EzAPI.Empty];
@@ -130,7 +130,7 @@ let string_literal = function
   | Ppxlib.Pconst_string (s, _, _) -> Some s
   | _ -> None
 
-let get_options ~loc ?(options=options loc) ?name p =
+let get_options ~loc ?(options=default_options loc) ?name p =
   match p with
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ] ->
     let l = List.filter_map (function ({txt=Lident s; loc}, e) -> Some (s, loc, e) | _ -> None) l in
@@ -203,9 +203,11 @@ let get_options ~loc ?(options=options loc) ?name p =
     Format.eprintf "attribute not understood@.";
     name, options
 
-let service_value ?name ?options ~meth ~loc p =
+let service_value ?name ?options ?(parse_options=true) ~meth ~loc p =
   let meth = pexp_variant ~loc (String.uppercase_ascii meth) None in
-  let name, options = get_options ?name ?options ~loc p in
+  let name, options =
+    if not parse_options then name, Option.value ~default:(default_options loc) options
+    else get_options ?name ?options ~loc p in
   match name with
   | None -> Location.raise_errorf ~loc "service doesn't have a name"
   | Some name ->
@@ -517,15 +519,15 @@ let transform ?kind () =
           | Pstr_attribute a when List.mem a.attr_name.txt methods ->
             deprecate a.attr_name.txt;
             let loc = a.attr_loc in
-            let options = { (options loc) with register = [%expr false] } in
+            let options = { (default_options loc) with register = [%expr false] } in
             let service, _, _ = service_value ~options ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
             service :: acc
           | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
-            let options = { (options loc) with register = [%expr false] } in
+            let options = { (default_options loc) with register = [%expr false] } in
             let service, _, _ = service_value ~name ~options ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
             service :: acc
           | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
-            let options = { (options loc) with register = [%expr false] } in
+            let options = { (default_options loc) with register = [%expr false] } in
             let service, _, _ = service_value ~options ~meth:txt ~loc p in
             service :: acc
           (* global errors and security *)
@@ -557,7 +559,7 @@ let transform ?kind () =
                 let input, output, with_input = match meth with
                   | "get" | "put" -> [%expr EzAPI.Empty], [%expr EzAPI.Json [%e evar ~loc enc_name]], false
                   | _ -> [%expr EzAPI.Json [%e evar ~loc enc_name]], [%expr EzAPI.Empty], true in
-                let options = { (options loc) with register = [%expr false]; input; output } in
+                let options = { (default_options loc) with register = [%expr false]; input; output } in
                 let name = t.ptype_name.txt ^ "_s" in
                 let service, _, options = service_value ~name ~options ~meth ~loc a.attr_payload in
                 let enc_value = [%stri let [%p pvar ~loc enc_name] = [%e enc]] in
@@ -579,7 +581,7 @@ let transform ?kind () =
                 let {enc=output_enc; _} = expressions t_output in
                 let input = [%expr EzAPI.Json [%e evar ~loc input_enc_name]] in
                 let output = [%expr EzAPI.Json [%e evar ~loc output_enc_name]] in
-                let options = { (options loc) with register = [%expr false]; input; output } in
+                let options = { (default_options loc) with register = [%expr false]; input; output } in
                 let name = t_input.ptype_name.txt ^ "_s" in
                 let service, _, options = service_value ~name ~options ~meth ~loc a.attr_payload in
                 let input_enc_value = [%stri let [%p pvar ~loc input_enc_name] = [%e input_enc]] in
@@ -603,7 +605,7 @@ let impl ?kind str = (transform ?kind ())#structure str
 
 let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output errors params section name
     descr security register hide input_example output_example debug =
-  let options = options loc in
+  let options = default_options loc in
   let sname = match l with t :: _ -> Some (t.ptype_name.txt ^ "_s") | [] -> None in
   let aux e = match e.pexp_desc with
     | Pexp_construct ({txt=Lident "::"; _}, _) -> raw e
@@ -654,7 +656,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     output_example = Option.value ~default:options.output_example output_example;
     debug; nargs
   } in
-  let s, _, options = service_value ~meth ~loc ~options ?name:sname (PStr []) in
+  let s, _, options = service_value ~meth ~loc ~options ?name:sname ~parse_options:false (PStr []) in
   match kind with
   | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
   | _ -> [ s ]
