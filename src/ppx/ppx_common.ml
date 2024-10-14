@@ -601,7 +601,7 @@ let transform ?kind () =
 
 let impl ?kind str = (transform ?kind ())#structure str
 
-let deriver_str_gen kind meth ~loc ~path:_ (_rec_flag, l) path input output errors params section name
+let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output errors params section name
     descr security register hide input_example output_example debug =
   let options = options loc in
   let sname = match l with t :: _ -> Some (t.ptype_name.txt ^ "_s") | [] -> None in
@@ -609,9 +609,13 @@ let deriver_str_gen kind meth ~loc ~path:_ (_rec_flag, l) path input output erro
     | Pexp_construct ({txt=Lident "::"; _}, _) -> raw e
     | _ -> [%expr EzAPI.Json [%e e]] in
   let input, output, tname = match meth, l with
-    | _, [ t_input; t_output ] ->
+    | _, [ t_input; t_output ] when rec_flag = Recursive ->
       [%expr EzAPI.Json ([%e evar ~loc (t_input.ptype_name.txt ^ "_enc")] ())],
       [%expr EzAPI.Json ([%e evar ~loc (t_output.ptype_name.txt ^ "_enc")] ())],
+      t_input.ptype_name.txt
+    | _, [ t_input; t_output ] ->
+      [%expr EzAPI.Json [%e evar ~loc (t_input.ptype_name.txt ^ "_enc")]],
+      [%expr EzAPI.Json [%e evar ~loc (t_output.ptype_name.txt ^ "_enc")]],
       t_input.ptype_name.txt
     | ("get" | "put"), t :: _ ->
       Option.fold ~none:options.input ~some:aux input,
