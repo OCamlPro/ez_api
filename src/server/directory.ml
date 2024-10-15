@@ -231,7 +231,8 @@ let step_of_path path =
     match path with
     | Path.Root -> acc
     | Path.Static (path, name) -> aux path (Step.Static name :: acc)
-    | Path.Dynamic (path, arg) -> aux path (Step.Dynamic arg.Arg.description :: acc) in
+    | Path.Dynamic (path, arg) -> aux path (Step.Dynamic arg.Arg.description :: acc)
+    | Path.Trailing path -> aux path acc in
   aux path []
 
 let conflict path kind = Error (step_of_path path, kind)
@@ -279,6 +280,7 @@ let rec insert
               rebuild { subdirs ; services } in
             Ok (dir, rebuild)
       end
+    | Path.Trailing subpath -> insert subpath dir
 
 let register :
   type a.
