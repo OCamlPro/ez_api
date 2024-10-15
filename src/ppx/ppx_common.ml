@@ -55,7 +55,8 @@ let extract_list_type = function
   | Some t ->
     let t = remove_poly t in
     match t.ptyp_desc with
-    | Ptyp_constr ({txt=(Lident "list" | Ldot (Lident "List", "t")); _}, [ c ]) -> c
+    | Ptyp_constr ({txt=(Lident "list" | Ldot (Lident "List", "t")); _}, [
+        { ptyp_desc=Ptyp_constr ({txt=Ldot (Ldot (Lident "EzAPI", "Err"), "case"); _}, [ c ]); _} ]) -> c
     | _ -> t
 
 let set_global_errors ?typ e =
@@ -536,17 +537,21 @@ let transform ?kind () =
           | Pstr_extension (({txt="service"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ]), _) ->
             let base = set_globals l in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
-          | Pstr_extension (({txt="service"; _}, PStr [ {pstr_desc=Pstr_value (_, l); _} ]), _) ->
-            let base = List.fold_left (fun acc vb ->
+          | Pstr_extension (({txt="service"; loc}, PStr [ {pstr_desc=Pstr_value (_, l); _} ]), _) ->
+            let acc_str, base = List.fold_left (fun (acc, base) vb ->
                 match vb.pvb_pat.ppat_desc with
-                | Ppat_var {txt="errors"; _} -> set_global_errors vb.pvb_expr; acc
-                | Ppat_var {txt="security"; _} -> set_global_security vb.pvb_expr; acc
-                | Ppat_var {txt="base"; _} -> Some (set_global_base vb.pvb_expr)
+                | Ppat_var {txt="errors"; _} ->
+                  set_global_errors [%expr errors] ; acc @ [ vb ], base
+                | Ppat_var {txt="security"; _} ->
+                  set_global_security [%expr security]; acc @ [ vb ], base
+                | Ppat_var {txt="base"; _} ->
+                  acc, Some (set_global_base vb.pvb_expr)
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="errors"; _}; _}, typ) ->
-                  set_global_errors ~typ vb.pvb_expr; acc
+                  set_global_errors ~typ [%expr errors]; acc @ [ { vb with pvb_pat = [%pat? errors]; pvb_expr=remove_constraint vb.pvb_expr } ], base
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
-                  set_global_security ~typ vb.pvb_expr; acc
-                | _ -> acc) None l in
+                  set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_constraint vb.pvb_expr } ], base
+                | _ -> acc, base) ([], None) l in
+            let acc = pstr_value ~loc Nonrecursive acc_str :: acc in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
           (* service deriver *)
           | Pstr_type (_rec_flag, [ t ]) ->
