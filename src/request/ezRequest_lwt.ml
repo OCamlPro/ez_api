@@ -167,6 +167,19 @@ module Make(S : Interface) : S = struct
       | UnknownError {code; msg} ->
         let content = match msg with None -> "" | Some s -> ": " ^ s in
         Printf.sprintf "Unknown Error %d%s" code content
+
+    let pp_error ?error pp = function
+      | UnknownError {code; msg} ->
+        Format.fprintf pp "Error %d%s" code
+          (Option.fold ~none:"" ~some:(fun s -> ": " ^ s) msg)
+      | KnownError {code; error=e} ->
+        match error with
+        | None -> Format.fprintf pp "Error %d" code
+        | Some ppe -> Format.fprintf pp "Error %d: %a" code ppe e
+
+    let wrap p = Lwt.map (Result.map_error (function
+        | UnknownError {code; msg} -> code, `unknown msg
+        | KnownError {code; error} -> code, `known error)) p
   end
 
   include Raw
@@ -252,6 +265,12 @@ module Make(S : Interface) : S = struct
     let string_of_error _ (code, content) =
         let content = match content with None -> "" | Some s -> ": " ^ s in
         Printf.sprintf "Error %d%s" code content
+
+    let pp_error ?error:_ pp (code, content) =
+      Format.fprintf pp "Error %d%s" code
+        (Option.fold ~none:"" ~some:(fun s -> ": " ^ s) content)
+    let wrap p = Lwt.map (Result.map_error (fun (code, content) -> code, `unknown content)) p
+
   end
 
 end

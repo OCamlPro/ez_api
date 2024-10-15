@@ -109,6 +109,8 @@ module type RAWGEN = sig
 
   val handle_error : ('a -> string option) -> 'a api_error -> int * string option
   val string_of_error : ('a -> string option) -> 'a api_error -> string
+  val pp_error : ?error:(Format.formatter -> 'a -> unit) -> Format.formatter -> 'a api_error -> unit
+  val wrap : ('a, 'e api_error) result Lwt.t -> ('a, int * [ `known of 'e | `unknown of string option ]) result Lwt.t
 end
 
 module type RAW = RAWGEN
