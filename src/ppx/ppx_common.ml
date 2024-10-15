@@ -408,13 +408,8 @@ let request_value ~meth ~name ~loc ?(input=true) options =
   let rec args_expr i =
     if i = 0 then [%expr EzAPI.Req.dummy]
     else [%expr [%e args_expr (i-1)], [%e evar ~loc ("arg" ^ string_of_int i)]] in
-  let wrap = [%expr
-    Lwt.map (Result.map_error (function
-        | EzReq_lwt_S.KnownError {code; error} -> code, `known error
-        | EzReq_lwt_S.UnknownError {code; msg} -> code, `unknown msg))
-  ] in
   let expr = f @@ args_pat options.nargs @@ [%expr
-      [%e wrap] @@ EzReq_lwt.request ?headers ?params ?msg ?post:[%e post_expr]
+      EzReq_lwt.wrap @@ EzReq_lwt.request ?headers ?params ?msg ?post:[%e post_expr]
         ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
         [%e service] [%e args_expr options.nargs]
     ] in
@@ -650,24 +645,27 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
         | _ -> Format.eprintf "path should be a string literal"; options.path, 0
       end
     | _ -> options.path, 0 in
+  let some e = [%expr Some [%e e]] in
   let security_type, security = match security with
     | None -> options.security_type, options.security
-    | Some e -> [%type: _], e in
+    | Some e -> [%type: _], some e in
+  let error_type, errors = match errors  with
+    | None -> options.error_type, options.errors
+    | Some e -> [%type: _], some e in
   let options = {
     options with
     path; input; output;
-    errors = Option.value ~default:options.errors errors;
-    params = Option.value ~default:options.params params;
-    section = Option.value ~default:options.section section;
-    name = Option.value ~default:options.name name;
-    descr = Option.value ~default:options.descr descr;
+    errors; error_type;
+    params = Option.fold ~none:options.params ~some params;
+    section = Option.fold ~none:options.section ~some section;
+    name = Option.fold ~none:options.name ~some name;
+    descr = Option.fold ~none:options.descr ~some descr;
     security; security_type;
     register = Option.value ~default:[%expr false] register;
     hide = Option.value ~default:options.hide hide;
-    input_example = Option.value ~default:options.input_example input_example;
-    output_example = Option.value ~default:options.output_example output_example;
+    input_example = Option.fold ~none:options.input_example ~some input_example;
+    output_example = Option.fold ~none:options.output_example ~some output_example;
     debug; nargs;
-    error_type = (match errors with None -> options.error_type | Some _ -> [%type: _]);
   } in
   let s, _, options = service_value ~meth ~loc ~options ?name:sname ~parse_options:false (PStr []) in
   match kind with
