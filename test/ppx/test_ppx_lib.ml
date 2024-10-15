@@ -13,7 +13,7 @@ and base = "http://localhost:8080"
 type test_derive = {
   foo: string;
   bar: int;
-} [@@get {path="/test/getter"; debug}]
+} [@@deriving encoding, get {path="/test/getter/{id: string}"; debug}]
 
 let%post echo_input = {
   path="/echo_input"; raw_input=["text/plain"];
