@@ -115,16 +115,19 @@ let parse_arg ~loc s = match String.index_opt s ':' with
       Location.raise_errorf ~loc "argument type not understood: %S" typ
 
 let parse_path ~loc s =
-  let path ~loc s = pexp_ident ~loc {txt=Longident.parse ("EzAPI.Path." ^ s); loc} in
   let l = String.split_on_char '/' s in
-  let l = List.filter (fun s -> s <> "") l in
-  List.fold_left (fun (acc, n) s ->
-      match String.get s 0 with
-      | '{' ->
-        let e = parse_arg ~loc String.(sub s 1 (length s - 2)) in
-        eapply ~loc (path ~loc "add_arg") [ acc; e ], n+1
-      | _ -> eapply ~loc (path ~loc "add_suffix") [ acc; estring ~loc s ], n
-    ) (path ~loc "root", 0) l
+  let npath = List.length l in
+  let acc, n, _ = List.fold_left (fun (acc, n, i) s ->
+      if s = "" && i <> npath-1 then (acc, n, i+1)
+      else if s = "" then [%expr EzAPI.Path.add_trailing [%e acc]], n, i+1
+      else match String.get s 0 with
+        | '{' ->
+          let e = parse_arg ~loc String.(sub s 1 (length s - 2)) in
+          [%expr EzAPI.Path.add_arg [%e acc] [%e e]], n+1, i+1
+        | _ ->
+          [%expr EzAPI.Path.add_suffix [%e acc] [%e estring ~loc s]], n, i+1
+    ) ([%expr EzAPI.Path.root], 0, 0) l in
+  acc, n
 
 let string_literal = function
   | Ppxlib.Pconst_string (s, _, _) -> Some s
