@@ -40,6 +40,7 @@ let global_errors = ref [%expr None]
 let global_error_type = ref [%type: exn]
 let global_security = ref [%expr None]
 let global_security_type = ref [%type: EzAPI.no_security]
+let global_headers = ref None
 let global_base = ref false
 
 let remove_poly c = match c.ptyp_desc with
@@ -79,6 +80,9 @@ let set_global_base e =
     | _ -> [%expr ![%e e]] in
   [%stri let ezreq_base = [%e e]]
 
+let set_global_headers e =
+  global_headers := Some e
+
 let set_globals l =
   List.fold_left (fun acc ({txt; _}, e) ->
       let name = Longident.name txt in
@@ -86,6 +90,7 @@ let set_globals l =
       | "errors" -> set_global_errors e; acc
       | "security" -> set_global_security e; acc
       | "base" -> Some (set_global_base e)
+      | "headers" -> set_global_headers e; acc
       | _ -> acc) None l
 
 let raw e =
@@ -405,7 +410,10 @@ let server ~loc p =
 
 let request_value ~meth ~name ~loc ?(input=true) options =
   let pat = pvar ~loc (meth ^ "_" ^ name) in
-  let f e = [%expr fun ?headers ?params ?msg -> [%e e]] in
+  let f, headers_expr = match !global_headers with
+    | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
+    | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
+  let f e = f [%expr fun ?params ?msg -> [%e e]] in
   let f, input_expr, url_encode_expr, post_expr =
     if input then
       (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
@@ -422,7 +430,7 @@ let request_value ~meth ~name ~loc ?(input=true) options =
     if i = 0 then [%expr EzAPI.Req.dummy]
     else [%expr [%e args_expr (i-1)], [%e evar ~loc ("arg" ^ string_of_int i)]] in
   let expr = f @@ args_pat options.nargs @@ [%expr
-      EzReq_lwt.wrap @@ EzReq_lwt.request ?headers ?params ?msg ?post:[%e post_expr]
+      EzReq_lwt.wrap @@ EzReq_lwt.request ?headers:[%e headers_expr] ?params ?msg ?post:[%e post_expr]
         ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
         [%e service] [%e args_expr options.nargs]
     ] in
@@ -555,6 +563,8 @@ let transform ?kind () =
                   set_global_security [%expr security]; acc @ [ vb ], base
                 | Ppat_var {txt="base"; _} ->
                   acc, Some (set_global_base vb.pvb_expr)
+                | Ppat_var {txt="headers"; _} ->
+                  set_global_headers vb.pvb_expr; acc, base
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="errors"; _}; _}, typ) ->
                   set_global_errors ~typ [%expr errors]; acc @ [ { vb with pvb_pat = [%pat? errors]; pvb_expr=remove_constraint vb.pvb_expr } ], base
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
@@ -720,7 +730,7 @@ let derivers kind =
       let str_type_decl = Generator.make args_str (deriver_str_gen kind meth) in
       ignore @@ add meth ~str_type_decl) methods
 
-let global_deriver_str_gen kind ~loc:_ ~path:_ (_rec_flag, l) errors security base =
+let global_deriver_str_gen kind ~loc:_ ~path:_ (_rec_flag, l) errors security base headers =
   let error_type = List.find_map (fun t ->
       match t.ptype_name.txt, t.ptype_manifest with
       | "errors", Some c -> Some c
@@ -731,10 +741,11 @@ let global_deriver_str_gen kind ~loc:_ ~path:_ (_rec_flag, l) errors security ba
       | _ -> None) l in
   Option.iter (set_global_errors ?typ:error_type) errors;
   Option.iter (set_global_security ?typ:security_type) security;
+  Option.iter (set_global_headers) headers;
   match kind, base with Some `request, Some e -> [ set_global_base e ] | _ -> []
 
 let global_deriver kind =
   let open Deriving in
-  let arg_str = Args.( empty +> arg "errors" __ +> arg "security" __ +> arg "base" __) in
+  let arg_str = Args.( empty +> arg "errors" __ +> arg "security" __ +> arg "base" __ +> arg "headers" __) in
   let str_type_decl = Generator.make arg_str (global_deriver_str_gen kind) in
   ignore @@ add "service" ~str_type_decl
