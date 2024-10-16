@@ -74,9 +74,10 @@ let set_global_base e =
   let loc = e.pexp_loc in
   global_base := true;
   let e = match e.pexp_desc with
-    | Pexp_constant Pconst_string (s, _, _) -> [%expr EzAPI.BASE [%e estring ~loc s]]
-    | _ -> e in
-  [%stri let ezreq_base = ref [%e e]]
+    | Pexp_constant Pconst_string (s, _, _) -> [%expr ref (EzAPI.BASE [%e estring ~loc s])]
+    | Pexp_apply ({pexp_desc=Pexp_ident {txt=Lident "!"; _}; _}, [ Nolabel, e ]) -> e
+    | _ -> [%expr ![%e e]] in
+  [%stri let ezreq_base = [%e e]]
 
 let set_globals l =
   List.fold_left (fun acc ({txt; _}, e) ->
