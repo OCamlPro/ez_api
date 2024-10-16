@@ -697,7 +697,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
   | _ -> [ s ]
 
 let derivers kind =
-  let open Ppxlib.Deriving in
+  let open Deriving in
   List.iter (fun meth ->
       let args_str = Args.(
           empty
@@ -718,3 +718,22 @@ let derivers kind =
         ) in
       let str_type_decl = Generator.make args_str (deriver_str_gen kind meth) in
       ignore @@ add meth ~str_type_decl) methods
+
+let global_deriver_str_gen kind ~loc:_ ~path:_ (_rec_flag, l) errors security base =
+  let error_type = List.find_map (fun t ->
+      match t.ptype_name.txt, t.ptype_manifest with
+      | "errors", Some c -> Some c
+      | _ -> None) l in
+  let security_type = List.find_map (fun t ->
+      match t.ptype_name.txt, t.ptype_manifest with
+      | "security", Some c -> Some c
+      | _ -> None) l in
+  Option.iter (set_global_errors ?typ:error_type) errors;
+  Option.iter (set_global_security ?typ:security_type) security;
+  match kind, base with Some `request, Some e -> [ set_global_base e ] | _ -> []
+
+let global_deriver kind =
+  let open Deriving in
+  let arg_str = Args.( empty +> arg "errors" __ +> arg "security" __ +> arg "base" __) in
+  let str_type_decl = Generator.make arg_str (global_deriver_str_gen kind) in
+  ignore @@ add "service" ~str_type_decl

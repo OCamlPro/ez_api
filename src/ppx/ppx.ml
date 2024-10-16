@@ -10,4 +10,5 @@
 
 let () =
   Ppxlib.Driver.register_transformation "ez_api" ~impl:Ppx_common.impl;
-  Ppx_common.derivers None
+  Ppx_common.derivers None;
+  Ppx_common.global_deriver None

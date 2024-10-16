@@ -11,4 +11,5 @@
 let () =
   let kind = Some `client in
   Ppxlib.Driver.register_transformation "ez_api_client" ~impl:(Ppx_common.impl ?kind);
-  Ppx_common.derivers kind
+  Ppx_common.derivers kind;
+  Ppx_common.global_deriver kind
