@@ -408,17 +408,17 @@ let server ~loc p =
 
 (** request *)
 
-let request_value ~meth ~name ~loc ?(input=true) options =
+let request_expr ~meth ~name ?sname ~loc options =
   let pat = pvar ~loc (meth ^ "_" ^ name) in
   let f, headers_expr = match !global_headers with
     | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
     | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
   let f e = f [%expr fun ?params ?msg -> [%e e]] in
   let f, input_expr, url_encode_expr, post_expr =
-    if input then
+    if not (meth="get" || meth="put") then
       (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
     else (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
-  let service = evar ~loc (name ^ "_s") in
+  let service = evar ~loc (Option.value ~default:(name ^ "_s") sname) in
   let f e =
     if !global_base && options.nargs = 0 then f [%expr fun ?(base= !ezreq_base) () -> [%e e]]
     else if !global_base then f [%expr fun ?(base= !ezreq_base) -> [%e e]]
@@ -434,6 +434,10 @@ let request_value ~meth ~name ~loc ?(input=true) options =
         ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
         [%e service] [%e args_expr options.nargs]
     ] in
+  pat, expr
+
+let request_value ~meth ~name ?sname ~loc options =
+  let pat, expr = request_expr ~meth ~name ?sname ~loc options in
   let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
   if options.debug then Format.printf "%a@." Pprintast.structure_item it;
   it
@@ -538,18 +542,30 @@ let transform ?kind () =
           (* client service *)
           | Pstr_attribute a when List.mem a.attr_name.txt methods ->
             deprecate a.attr_name.txt;
-            let loc = a.attr_loc in
+            let loc, meth = a.attr_loc, a.attr_name.txt in
             let options = { (default_options loc) with register = [%expr false] } in
-            let service, _, _ = service_value ~options ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
-            service :: acc
-          | Pstr_extension (({txt; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem txt methods ->
+            let service, name, options = service_value ~options ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
+            let acc = service :: acc in
+            begin match kind with
+              | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
+              | _ -> acc
+            end
+          | Pstr_extension (({txt=meth; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem meth methods ->
             let options = { (default_options loc) with register = [%expr false] } in
-            let service, _, _ = service_value ~name ~options ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
-            service :: acc
-          | Pstr_extension (({txt; loc}, p), _) when List.mem txt methods ->
+            let service, name, options = service_value ~name ~options ~meth ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+            let acc = service :: acc in
+            begin match kind with
+              | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
+              | _ -> acc
+            end
+          | Pstr_extension (({txt=meth; loc}, p), _) when List.mem meth methods ->
             let options = { (default_options loc) with register = [%expr false] } in
-            let service, _, _ = service_value ~options ~meth:txt ~loc p in
-            service :: acc
+            let service, name, options = service_value ~options ~meth ~loc p in
+            let acc = service :: acc in
+            begin match kind with
+              | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
+              | _ -> acc
+            end
           (* global errors and security *)
           | Pstr_extension (({txt="service"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ]), _) ->
             let base = set_globals l in
@@ -582,9 +598,9 @@ let transform ?kind () =
                 let open Ppx_deriving_encoding_lib.Encoding in
                 let {enc; _} = expressions t in
                 let enc_name = t.ptype_name.txt ^ "_enc" in
-                let input, output, with_input = match meth with
-                  | "get" | "put" -> [%expr EzAPI.Empty], [%expr EzAPI.Json [%e evar ~loc enc_name]], false
-                  | _ -> [%expr EzAPI.Json [%e evar ~loc enc_name]], [%expr EzAPI.Empty], true in
+                let input, output = match meth with
+                  | "get" | "put" -> [%expr EzAPI.Empty], [%expr EzAPI.Json [%e evar ~loc enc_name]]
+                  | _ -> [%expr EzAPI.Json [%e evar ~loc enc_name]], [%expr EzAPI.Empty] in
                 let options = { (default_options loc) with register = [%expr false]; input; output } in
                 let name = Option.value ~default:t.ptype_name.txt @@ get_name a.attr_payload in
                 let sname = name ^ "_s" in
@@ -592,7 +608,7 @@ let transform ?kind () =
                 let enc_value = [%stri let [%p pvar ~loc enc_name] = [%e enc]] in
                 let acc = service :: enc_value :: it :: acc in
                 match kind with
-                | Some `request -> request_value ~loc ~meth ~name ~input:with_input options :: acc
+                | Some `request -> request_value ~loc ~meth ~name options :: acc
                 | _ -> acc
             end
           | Pstr_type (_rec_flag, [ t_input; t_output ]) ->
@@ -626,14 +642,22 @@ let transform ?kind () =
     method! expression e = match e.pexp_desc with
       | Pexp_extension ({txt="server"; _}, PStr [ { pstr_desc = Pstr_eval (e, _); _} ]) when kind = Some `server ->
         server_aux e
-      | Pexp_extension (({txt; loc}, PStr [ {
+      | Pexp_extension (({txt=meth; loc}, PStr [ {
           pstr_desc = Pstr_eval ({
-              pexp_desc=Pexp_let (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ], e); _}, _); _} ])) when List.mem txt methods ->
+              pexp_desc=Pexp_let (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ], e); _}, _); _} ])) when List.mem meth methods ->
         let options = { (default_options loc) with register = [%expr false] } in
-        let _, _, pat, expr = service_expr ~name ~options ~meth:txt ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
-        let e = self#expression e in
-        if options.debug then Format.printf "%a@." Pprintast.expression expr;
-        [%expr let [%p pat] = [%e expr] in [%e e]]
+        let name, options, pat, expr = service_expr ~name ~options ~meth ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
+        let e_after = self#expression e in
+        let e_request, e_debug = match kind with
+          | Some `request ->
+            let pat, expr = request_expr ~loc ~meth ~name ~sname:name options in
+            [%expr let [%p pat] = [%e expr] in [%e e_after]],
+            (if options.debug then Some [%expr let [%p pat] = [%e expr] in ()] else None)
+          | _ -> e_after, (if options.debug then Some [%expr ()] else None) in
+        Option.iter (fun e_debug ->
+            let e_debug = [%expr let [%p pat] = [%e expr] in [%e e_debug]] in
+            Format.printf "%a@." Pprintast.expression e_debug) e_debug;
+        [%expr let [%p pat] = [%e expr] in [%e e_request]]
       | _ -> super#expression e
   end
 
@@ -648,27 +672,27 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
   let aux e = match e.pexp_desc with
     | Pexp_construct ({txt=Lident "::"; _}, _) -> raw e
     | _ -> [%expr EzAPI.Json [%e e]] in
-  let input, output, tname, with_input = match meth, l with
+  let input, output, tname = match meth, l with
     | _, [ t_input; t_output ] when rec_flag = Recursive ->
       [%expr EzAPI.Json ([%e evar ~loc (t_input.ptype_name.txt ^ "_enc")] ())],
       [%expr EzAPI.Json ([%e evar ~loc (t_output.ptype_name.txt ^ "_enc")] ())],
-      (Option.value ~default:t_input.ptype_name.txt name), true
+      (Option.value ~default:t_input.ptype_name.txt name)
     | _, [ t_input; t_output ] ->
       [%expr EzAPI.Json [%e evar ~loc (t_input.ptype_name.txt ^ "_enc")]],
       [%expr EzAPI.Json [%e evar ~loc (t_output.ptype_name.txt ^ "_enc")]],
-      (Option.value ~default:t_input.ptype_name.txt name), true
+      (Option.value ~default:t_input.ptype_name.txt name)
     | ("get" | "put"), t :: _ ->
       Option.fold ~none:options.input ~some:aux input,
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
-      (Option.value ~default:t.ptype_name.txt name), false
+      (Option.value ~default:t.ptype_name.txt name)
     |  _, t :: _ ->
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
       Option.fold ~none:options.output ~some:aux output,
-      (Option.value ~default:t.ptype_name.txt name), true
+      (Option.value ~default:t.ptype_name.txt name)
     | _ ->
       Option.fold ~none:options.input ~some:aux input,
       Option.fold ~none:options.output ~some:aux output,
-      (Option.value ~default:"default" name), true in
+      (Option.value ~default:"default" name) in
   let sname = tname ^ "_s" in
   let path, nargs = match path with
     | Some { pexp_desc = Pexp_constant cst; pexp_loc=loc; _ } ->
@@ -701,10 +725,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
   } in
   let s, _, options = service_value ~meth ~loc ~options ~name:sname ~parse_options:false (PStr []) in
   match kind with
-  | Some `request -> [
-      s;
-      request_value ~loc ~meth ~name:tname ~input:with_input options
-    ]
+  | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
   | _ -> [ s ]
 
 let derivers kind =
