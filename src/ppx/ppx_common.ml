@@ -229,9 +229,12 @@ let service_expr ?name ?options ?(parse_options=true) ~meth ~loc p =
   match name with
   | None -> Location.raise_errorf ~loc "service doesn't have a name"
   | Some name ->
+    let options_name = match options.name.pexp_desc with
+      | Pexp_construct ({txt=Lident "None"; _}, _) -> [%expr Some [%e estring ~loc name]]
+      | _ -> options.name in
     let expr = pexp_apply ~loc (evar ~loc "EzAPI.raw_service") [
         Optional "section", options.section;
-        Optional "name", options.name;
+        Optional "name", options_name;
         Optional "descr", options.descr;
         Optional "params", options.params;
         Labelled "meth", meth;
