@@ -47,9 +47,13 @@ let remove_poly c = match c.ptyp_desc with
   | Ptyp_poly ([], c) -> c
   | _ -> c
 
-let remove_constraint e = match e.pexp_desc with
+let remove_expr_constraint e = match e.pexp_desc with
   | Pexp_constraint (e, _) -> e
   | _ -> e
+
+let remove_pat_constraint p = match p.ppat_desc with
+  | Ppat_constraint (p, _) -> p
+  | _ -> p
 
 let extract_list_type = function
   | None -> [%type: _]
@@ -63,12 +67,12 @@ let extract_list_type = function
 
 let set_global_errors ?typ e =
   let loc = e.pexp_loc in
-  global_errors := [%expr Some [%e remove_constraint e]];
+  global_errors := [%expr Some [%e remove_expr_constraint e]];
   global_error_type := extract_list_type typ
 
 let set_global_security ?typ e =
   let loc = e.pexp_loc in
-  global_security := [%expr Some [%e remove_constraint e]];
+  global_security := [%expr Some [%e remove_expr_constraint e]];
   global_security_type := extract_list_type typ
 
 let set_global_base e =
@@ -445,6 +449,174 @@ let request_value ~meth ~name ?sname ~loc options =
   if options.debug then Format.printf "%a@." Pprintast.structure_item it;
   it
 
+(** param *)
+
+type param_options = {
+  debug: bool;
+  id: string;
+  name: expression option;
+  descr: expression option;
+  required: bool;
+  examples: expression;
+  schema: expression option;
+  kind: expression;
+  destruct: expression option;
+  construct: expression option;
+}
+
+let default_param ?(id="") ?kind ?schema ?destruct ?construct loc =
+  let kind = Option.value ~default:[%expr EzAPI.Param.PARAM_STRING] kind in
+  let name = if id = "" then None else Some (estring ~loc id) in {
+    id; debug=false; name; descr=None; required=false; examples=[%expr []];
+    schema; kind; destruct; construct;
+  }
+
+module SSet = Set.Make(String)
+
+let param_set = ref SSet.empty
+
+let param_options ~typ ~id ?kind ?schema ?destruct ?construct e = match e.pexp_desc with
+  | Pexp_construct ({txt=Lident "()"; _}, None) -> default_param ~id ?kind ?schema ?destruct ?construct e.pexp_loc
+  | Pexp_constant Pconst_string (id, _, _) -> default_param ~id ?kind ?schema ?destruct ?construct e.pexp_loc
+  | Pexp_record (l, None) ->
+    let param = default_param ~id ?kind ?destruct ?construct ?schema e.pexp_loc in
+    List.fold_left (fun acc ({txt; _}, e) ->
+        let loc = e.pexp_loc in
+        match Longident.name txt, e.pexp_desc with
+        | "id", Pexp_constant Pconst_string (id, _, _) -> { acc with id }
+        | "debug", _ -> { acc with debug = true }
+        | "name", _ -> { acc with name = Some e }
+        | "descr", _ -> { acc with descr = Some e }
+        | "examples", _ -> { acc with examples = e }
+        | "schema", _ -> { acc with schema = Some e }
+        | ("required" | "req"), _ -> { acc with required = true }
+        | "kind", _ -> { acc with kind = e }
+        | ("des" | "destruct"), _ -> { acc with destruct = Some e }
+        | ("cons" | "construct"), _ -> { acc with construct = Some e }
+        | "int", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_INT] }
+        | "bool", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_BOOL] }
+        | "enc", _ ->
+          let enc = Ppx_deriving_encoding_lib.Encoding.core typ in
+          let construct = Some [%expr fun x -> match Json_encoding.construct [%e enc] x with
+              | `String s -> s
+              | _ -> failwith [%e estring ~loc ("parameter " ^ acc.id ^ " should be constructed with a json string")]] in
+          let destruct = Some [%expr fun s -> try Some (Json_encoding.destruct [%e enc] (`String s)) with _ -> None] in
+          { acc with construct; destruct }
+        | "assoc", _ ->
+          begin match typ.ptyp_desc with
+            | Ptyp_constr ({txt; _}, []) ->
+              let txt = Longident.name txt in
+              let construct = Some [%expr fun x -> List.assoc x @@ List.map (fun (a, b) -> b, a) [%e evar ~loc (txt ^ "_assoc")]] in
+              let destruct = Some [%expr fun s -> try Some (List.assoc s [%e evar ~loc (txt ^ "_assoc")]) with _ -> None] in
+              { acc with construct; destruct }
+            | _ -> acc
+          end
+        | s, _ -> Format.eprintf "param option %S not understood" s; acc
+      ) param l
+  | _ -> Location.raise_errorf ~loc:e.pexp_loc "param options not understood"
+
+let param_value p e =
+  let t = match p.ppat_desc, e.pexp_desc with
+    | _, Pexp_constraint (_, t) | Ppat_constraint (_, t), _ -> remove_poly t
+    | _ -> [%type: string] in
+  let p, e = remove_pat_constraint p, remove_expr_constraint e in
+  let name = match p.ppat_desc with
+    | Ppat_var {txt; _} -> txt
+    | _ -> Location.raise_errorf ~loc:p.ppat_loc "wrong param pattern" in
+  param_set := SSet.add name !param_set;
+  let enc_schema t =
+    [%expr Json_encoding.schema [%e Ppx_deriving_encoding_lib.Encoding.core t]] in
+  let schema, construct, destruct, k = match t.ptyp_desc with
+    | Ptyp_constr ({txt; loc}, []) ->
+      let n = Longident.name txt in
+      begin match n with
+        | "int" | "Int.t" ->
+          None, None, Some [%expr int_of_string_opt], `int
+        | "int32" | "Int32.t" ->
+          None, Some [%expr Int32.to_int], Some [%expr Int32.of_string_opt], `int
+        | "int64" | "Int64.t" ->
+          None, Some [%expr Int64.to_int], Some [%expr Int64.of_string_opt], `int
+        | "nativeint" | "Nativeint.t" ->
+          None, Some [%expr Nativeint.to_int], Some [%expr Nativeint.of_string_opt], `int
+        | "bool" | "Bool.t" ->
+          None, None, Some [%expr bool_of_string_opt], `bool
+        | "string" | "String.t" ->
+          None, None, None, `string
+        | _ -> (try Some (enc_schema t) with _ -> None), None, None, `string
+      end
+    | _ -> (try Some (enc_schema t) with _ -> None), None, None, `string in
+  let kind = match k with
+    | `int -> [%expr EzAPI.Param.PARAM_INT]
+    | `bool -> [%expr EzAPI.Param.PARAM_BOOL]
+    | `string -> [%expr EzAPI.Param.PARAM_STRING] in
+  let options = param_options ~id:name ~typ:t ~kind ?schema ?construct ?destruct e in
+  let loc = e.pexp_loc in
+  let aux = function None -> [%expr None] | Some e -> [%expr Some [%e e]] in
+  let param_expr = [%expr {
+    EzAPI.Param.param_id = [%e estring ~loc options.id]; param_name = [%e aux options.name];
+    param_descr = [%e aux options.descr]; param_type = [%e options.kind];
+    param_required = [%e ebool ~loc options.required]; param_examples = [%e options.examples];
+    param_schema = [%e aux options.schema] }] in
+  let param_value = value_binding ~loc ~pat:(pvar ~loc name) ~expr:param_expr in
+  let cons_ident = Longident.parse (match k with `int -> "EzAPI.I" | `bool -> "EzAPI.B" | `string -> "EzAPI.S") in
+  let cons_expr =
+    let v = match options.construct with
+      | None -> [%expr p]
+      | Some f -> eapply ~loc f [ [%expr p] ] in
+    if options.required then
+      [%expr fun p -> [ [%e evar ~loc name], [%e pexp_construct ~loc {txt=cons_ident; loc} (Some v)] ]]
+    else
+      [%expr function None -> [] | Some p -> [ [%e evar ~loc name], [%e pexp_construct ~loc {txt=cons_ident; loc} (Some v)] ]] in
+  let cons_value = value_binding ~loc ~pat:(pvar ~loc (name ^ "_cons")) ~expr:cons_expr in
+  let des_expr =
+    let v some = match options.destruct with
+      | None -> if some then [%expr Ok (Some s)] else [%expr Ok s]
+      | Some f -> [%expr match [%e f] s with
+        | None -> Error [%e estring ~loc ("cannot destruct " ^ options.id ^ " parameter")]
+        | Some x -> Ok [%e if some then [%expr Some x] else [%expr x]]] in
+    if options.required then
+      [%expr fun req -> match EzAPI.Req.find_param [%e evar ~loc name] req with
+        | None -> Error [%e estring ~loc (options.id ^ " is required")]
+        | Some s -> [%e v false]]
+    else
+      [%expr fun req -> match EzAPI.Req.find_param [%e evar ~loc name] req with
+        | None -> Ok None
+        | Some s -> [%e v true]] in
+  let des_value = value_binding ~loc ~pat:(pvar ~loc (name ^ "_des")) ~expr:des_expr in
+  if options.debug then  Format.printf "%a@." Pprintast.structure [
+      pstr_value ~loc Nonrecursive [ param_value ];
+      pstr_value ~loc Nonrecursive [ cons_value ];
+      pstr_value ~loc Nonrecursive [ des_value ];
+    ];
+  param_value, (cons_value, des_value)
+
+let rec get_ident_list_expr ?(acc=[]) e = match e.pexp_desc with
+  | Pexp_construct ({txt=Lident "None"; _}, None) -> None
+  | Pexp_construct ({txt=Lident "Some"; _}, Some e) -> get_ident_list_expr ~acc e
+  | Pexp_construct ({txt=Lident "[]"; _}, None) -> Some (List.rev acc)
+  | Pexp_construct ({txt=Lident "::"; _}, Some {pexp_desc=Pexp_tuple [{pexp_desc=Pexp_ident {txt; _}; _}; e2]; _}) ->
+    get_ident_list_expr ~acc:((Longident.name txt) :: acc) e2
+  | _ -> None
+
+let service_params e = match get_ident_list_expr e with
+  | None | Some [] -> None
+  | Some l when List.exists (fun s -> not (SSet.mem s !param_set)) l -> None
+  | Some l ->
+    let loc = e.pexp_loc in
+    let fields = List.map (fun p ->
+        let des = eapply ~loc (evar ~loc (p ^ "_des")) [ evar ~loc "req" ] in
+        pcf_method ~loc ({txt=p; loc}, Public, Cfk_concrete (Fresh, des))) l in
+    let o = pexp_object ~loc @@ class_structure ~self:(ppat_any ~loc) ~fields in
+    Some [%expr fun req -> [%e o]]
+
+let service_params_item ?(debug=false) ~name e =
+  match service_params e with
+  | None -> None
+  | Some expr ->
+    let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(pvar ~loc (name ^ "_params")) ~expr ]in
+    if debug then Format.printf "%a@." Pprintast.structure_item it;
+    Some it
+
 (** main mapper *)
 
 let deprecate =
@@ -549,26 +721,35 @@ let transform ?kind () =
             let options = { (default_options loc) with register = [%expr false] } in
             let service, name, options = service_value ~options ~meth:a.attr_name.txt ~loc:a.attr_loc a.attr_payload in
             let acc = service :: acc in
-            begin match kind with
+            let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
-              | _ -> acc
-            end
+              | _ -> acc in
+            let acc = match service_params_item ~debug:options.debug ~name options.params with
+              | None -> acc
+              | Some it -> it :: acc in
+            acc
           | Pstr_extension (({txt=meth; loc}, PStr [ { pstr_desc = Pstr_value (_, [ { pvb_expr; pvb_pat= {ppat_desc=Ppat_var {txt=name; _}; _}; _} ]); _} ]), _) when List.mem meth methods ->
             let options = { (default_options loc) with register = [%expr false] } in
             let service, name, options = service_value ~name ~options ~meth ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
             let acc = service :: acc in
-            begin match kind with
+            let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
-              | _ -> acc
-            end
+              | _ -> acc in
+            let acc = match service_params_item ~debug:options.debug ~name options.params with
+              | None -> acc
+              | Some it -> it :: acc in
+            acc
           | Pstr_extension (({txt=meth; loc}, p), _) when List.mem meth methods ->
             let options = { (default_options loc) with register = [%expr false] } in
             let service, name, options = service_value ~options ~meth ~loc p in
             let acc = service :: acc in
-            begin match kind with
+            let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
-              | _ -> acc
-            end
+              | _ -> acc in
+            let acc = match service_params_item ~debug:options.debug ~name options.params with
+              | None -> acc
+              | Some it -> it :: acc in
+            acc
           (* global errors and security *)
           | Pstr_extension (({txt="service"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ]), _) ->
             let base = set_globals l in
@@ -585,9 +766,9 @@ let transform ?kind () =
                 | Ppat_var {txt="headers"; _} ->
                   set_global_headers vb.pvb_expr; acc, base
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="errors"; _}; _}, typ) ->
-                  set_global_errors ~typ [%expr errors]; acc @ [ { vb with pvb_pat = [%pat? errors]; pvb_expr=remove_constraint vb.pvb_expr } ], base
+                  set_global_errors ~typ [%expr errors]; acc @ [ { vb with pvb_pat = [%pat? errors]; pvb_expr=remove_expr_constraint vb.pvb_expr } ], base
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
-                  set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_constraint vb.pvb_expr } ], base
+                  set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_expr_constraint vb.pvb_expr } ], base
                 | _ -> acc, base) ([], None) l in
             let acc = pstr_value ~loc Nonrecursive acc_str :: acc in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
@@ -610,9 +791,13 @@ let transform ?kind () =
                 let service, _, options = service_value ~options ~name:sname ~meth ~loc a.attr_payload in
                 let enc_value = [%stri let [%p pvar ~loc enc_name] = [%e enc]] in
                 let acc = service :: enc_value :: it :: acc in
-                match kind with
-                | Some `request -> request_value ~loc ~meth ~name options :: acc
-                | _ -> acc
+                let acc = match kind with
+                  | Some `request -> request_value ~loc ~meth ~name options :: acc
+                  | _ -> acc in
+                let acc = match service_params_item ~debug:options.debug ~name options.params with
+                  | None -> acc
+                  | Some it -> it :: acc in
+                acc
             end
           | Pstr_type (_rec_flag, [ t_input; t_output ]) ->
             let loc = t_input.ptype_loc in
@@ -635,10 +820,21 @@ let transform ?kind () =
                 let output_enc_value = [%stri let [%p pvar ~loc output_enc_name] = [%e output_enc]] in
                 if options.debug then Format.printf "%a@." Pprintast.structure [ input_enc_value; output_enc_value ];
                 let acc = service :: output_enc_value :: input_enc_value :: it :: acc in
-                match kind with
-                | Some `request -> request_value ~loc ~meth ~name options :: acc
-                | _ -> acc
+                let acc = match kind with
+                  | Some `request -> request_value ~loc ~meth ~name options :: acc
+                  | _ -> acc in
+                let acc = match service_params_item ~debug:options.debug ~name options.params with
+                  | None -> acc
+                  | Some it -> it :: acc in
+                acc
             end
+          | Pstr_extension (({txt="param"; loc}, PStr [ { pstr_desc = Pstr_value (_, l); _} ]), _)  ->
+            let lp, ltr = List.split @@ List.map (fun vb -> param_value vb.pvb_pat vb.pvb_expr) l in
+            let lcons, ldes = List.split ltr in
+            let it_p = pstr_value ~loc Nonrecursive lp in
+            let it_cons = pstr_value ~loc Nonrecursive lcons in
+            let it_des = pstr_value ~loc Nonrecursive ldes in
+            it_des :: it_cons :: it_p :: acc
           | _ -> (self#structure_item it) :: acc
         ) [] str
 
@@ -651,12 +847,18 @@ let transform ?kind () =
         let options = { (default_options loc) with register = [%expr false] } in
         let name, options, pat, expr = service_expr ~name ~options ~meth ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
         let e_after = self#expression e in
+        let e_params, e_debug = match service_params options.params with
+          | None -> e_after, (if options.debug then Some [%expr ()] else None)
+          | Some f ->
+            let pat = pvar ~loc (name ^ "_params") in
+            [%expr let [%p pat] = [%e f] in [%e e_after]],
+            (if options.debug then Some [%expr let [%p pat] = [%e f] in ()] else None) in
         let e_request, e_debug = match kind with
           | Some `request ->
             let pat, expr = request_expr ~loc ~meth ~name ~sname:name options in
-            [%expr let [%p pat] = [%e expr] in [%e e_after]],
-            (if options.debug then Some [%expr let [%p pat] = [%e expr] in ()] else None)
-          | _ -> e_after, (if options.debug then Some [%expr ()] else None) in
+            [%expr let [%p pat] = [%e expr] in [%e e_params]],
+            (Option.map (fun e_debug -> [%expr let [%p pat] = [%e expr] in [%e e_debug]]) e_debug)
+          | _ -> e_params, e_debug in
         Option.iter (fun e_debug ->
             let e_debug = [%expr let [%p pat] = [%e expr] in [%e e_debug]] in
             Format.printf "%a@." Pprintast.expression e_debug) e_debug;
@@ -727,9 +929,13 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     debug; nargs;
   } in
   let s, _, options = service_value ~meth ~loc ~options ~name:sname ~parse_options:false (PStr []) in
-  match kind with
-  | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
-  | _ -> [ s ]
+  let s = match kind with
+    | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
+    | _ -> [ s ] in
+  match service_params_item ~debug ~name:tname options.params with
+  | None -> s
+  | Some it -> s @ [ it ]
+
 
 let derivers kind =
   let open Deriving in

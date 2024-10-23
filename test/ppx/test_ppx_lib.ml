@@ -15,7 +15,12 @@ type test_derive = {
   bar: int;
 } [@@get {path="/test/getter/{id: string}"; name="bla"}]
 
+type foo = [ `foo | `bar ] [@@deriving encoding {assoc}]
+
+let%param foo : foo = {assoc; required}
+
 let%post echo_input = {
   path="/echo_input"; raw_input=["text/plain"];
   output=Json_encoding.(obj1 (req "test" string));
+  params=[foo]
 }
