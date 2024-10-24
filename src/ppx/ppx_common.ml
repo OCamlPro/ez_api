@@ -43,6 +43,7 @@ let global_security_type = ref [%type: EzAPI.no_security]
 let global_headers = ref None
 let global_base = ref false
 let global_req_error = ref [%expr fun e -> Error (Failure e)]
+let global_wrapper = ref None
 let loc = ()
 
 let remove_poly c = match c.ptyp_desc with
@@ -116,7 +117,10 @@ let set_global_headers e =
 let set_global_req_error e =
   global_req_error := e
 
-let set_globals l =
+let set_global_wrapper e =
+  global_wrapper := Some e
+
+let set_service_globals l =
   List.fold_left (fun acc ({txt; _}, e) ->
       let name = Longident.name txt in
       match name with
@@ -124,8 +128,15 @@ let set_globals l =
       | "security" -> set_global_security e; acc
       | "base" -> Some (set_global_base e)
       | "headers" -> set_global_headers e; acc
-      | "req_error" -> set_global_req_error e; acc
       | _ -> acc) None l
+
+let set_handler_globals l =
+  List.iter (fun ({txt; _}, e) ->
+      let name = Longident.name txt in
+      match name with
+      | "req_error" -> set_global_req_error e
+      | "wrapper" -> set_global_wrapper e
+      | _ -> ()) l
 
 let raw e =
   let loc = e.pexp_loc in
@@ -660,21 +671,34 @@ let rec find_req_pattern_ext p =
 
 let handler_args ~name e =
   let loc = e.pexp_loc in
+  let aux p f =
+    match find_req_pattern_ext p with
+    | None -> p, f
+    | Some (p, None) ->
+      p, [%expr match [%e evar ~loc (name ^ "_req")] _req with
+        | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
+        | Ok req -> [%e f]]
+    | Some (p, Some id) ->
+      p, [%expr match [%e evar ~loc (name ^ "_req")] _req with
+        | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
+        | Ok [%p pvar ~loc id] -> [%e f]] in
   match e.pexp_desc with
-  | Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, _); _}); _}) -> e
+  | Pexp_fun (_, _, p1, {pexp_desc=Pexp_fun (_, _, p2, {pexp_desc=Pexp_fun (_, _, p3, f); _}); _}) ->
+    let f = match !global_wrapper with
+      | None -> f
+      | Some wrap -> eapply ~loc wrap [ f ] in
+    let p1, f = aux p1 f in
+    [%expr fun [%p p1] [%p p2] [%p p3] -> [%e f]]
   | Pexp_fun (_, _, p1, {pexp_desc = Pexp_fun (_, _, p2, f); _}) ->
-    let p1, f = match find_req_pattern_ext p1 with
-      | None -> p1, f
-      | Some (p1, None) ->
-        p1, [%expr match [%e evar ~loc (name ^ "_req")] _req with
-          | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
-          | Ok req -> [%e f]]
-      | Some (p1, Some id) ->
-        p1, [%expr match [%e evar ~loc (name ^ "_req")] _req with
-            | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
-            | Ok [%p pvar ~loc id] -> [%e f]] in
+    let f = match !global_wrapper with
+      | None -> f
+      | Some wrap -> eapply ~loc wrap [ f ] in
+    let p1, f = aux p1 f in
     [%expr fun [%p p1] _ [%p p2] -> [%e f]]
   | Pexp_fun (_, _, p, f) ->
+    let f = match !global_wrapper with
+      | None -> f
+      | Some wrap -> eapply ~loc wrap [ f ] in
     [%expr fun _ _ [%p p] -> [%e f]]
   | _ -> e
 
@@ -904,8 +928,11 @@ let transform ?kind () =
             acc
           (* global errors and security *)
           | Pstr_extension (({txt="service"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ]), _) ->
-            let base = set_globals l in
+            let base = set_service_globals l in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
+          | Pstr_extension (({txt="handler"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_record (l, _); _}, _); _} ]), _) ->
+            set_handler_globals l;
+            acc
           | Pstr_extension (({txt="service"; loc}, PStr [ {pstr_desc=Pstr_value (_, l); _} ]), _) ->
             let acc_str, base = List.fold_left (fun (acc, base) vb ->
                 match vb.pvb_pat.ppat_desc with
@@ -923,11 +950,18 @@ let transform ?kind () =
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
                   Option.iter (security_list "security") @@ get_list_expr (remove_expr_constraint vb.pvb_expr);
                   set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_expr_constraint vb.pvb_expr } ], base
-                | Ppat_var {txt="req_error"; _} ->
-                  set_global_req_error [%expr req_error]; acc @ [ { vb with pvb_pat = [%pat? req_error] } ], base
                 | _ -> acc, base) ([], None) l in
             let acc = pstr_value ~loc Nonrecursive acc_str :: acc in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
+          | Pstr_extension (({txt="handler"; loc}, PStr [ {pstr_desc=Pstr_value (_, l); _} ]), _) ->
+            let acc_str = List.fold_left (fun acc vb ->
+                match vb.pvb_pat.ppat_desc with
+                | Ppat_var {txt="req_error"; _} ->
+                  set_global_req_error [%expr req_error]; acc @ [ { vb with pvb_pat = [%pat? req_error] } ]
+                | Ppat_var {txt="wrapper"; _} ->
+                  set_global_wrapper [%expr handler_wrapper]; acc @ [ { vb with pvb_pat = [%pat? handler_wrapper] } ]
+                | _ -> acc) ([]) l in
+            pstr_value ~loc Nonrecursive acc_str :: acc
           (* service deriver *)
           | Pstr_type (_rec_flag, [ t ]) ->
             let loc = t.ptype_loc in
