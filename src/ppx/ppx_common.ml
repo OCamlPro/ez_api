@@ -42,6 +42,8 @@ let global_security = ref [%expr None]
 let global_security_type = ref [%type: EzAPI.no_security]
 let global_headers = ref None
 let global_base = ref false
+let global_req_wrapper = ref None
+let loc = ()
 
 let remove_poly c = match c.ptyp_desc with
   | Ptyp_poly ([], c) -> c
@@ -79,7 +81,7 @@ let security_list name l =
       | _ -> None) l in
   security_schemes_table := SMap.add name l !security_schemes_table
 
-let extract_list_type = function
+let extract_list_type ~loc = function
   | None -> [%type: _]
   | Some t ->
     let t = remove_poly t in
@@ -92,12 +94,12 @@ let extract_list_type = function
 let set_global_errors ?typ e =
   let loc = e.pexp_loc in
   global_errors := [%expr Some [%e remove_expr_constraint e]];
-  global_error_type := extract_list_type typ
+  global_error_type := extract_list_type ~loc typ
 
 let set_global_security ?typ e =
   let loc = e.pexp_loc in
   global_security := [%expr Some [%e remove_expr_constraint e]];
-  global_security_type := extract_list_type typ
+  global_security_type := extract_list_type ~loc typ
 
 let set_global_base e =
   let loc = e.pexp_loc in
@@ -111,6 +113,9 @@ let set_global_base e =
 let set_global_headers e =
   global_headers := Some e
 
+let set_global_req_wrapper e =
+  global_req_wrapper := Some e
+
 let set_globals l =
   List.fold_left (fun acc ({txt; _}, e) ->
       let name = Longident.name txt in
@@ -119,6 +124,7 @@ let set_globals l =
       | "security" -> set_global_security e; acc
       | "base" -> Some (set_global_base e)
       | "headers" -> set_global_headers e; acc
+      | "req" -> set_global_req_wrapper e; acc
       | _ -> acc) None l
 
 let raw e =
@@ -355,6 +361,7 @@ let param_options ~typ ~id ?kind ?schema ?destruct ?construct e = match e.pexp_d
   | _ -> Location.raise_errorf ~loc:e.pexp_loc "param options not understood"
 
 let param_value p e =
+  let loc = p.ppat_loc in
   let t = match p.ppat_desc, e.pexp_desc with
     | _, Pexp_constraint (_, t) | Ppat_constraint (_, t), _ -> remove_poly t
     | _ -> [%type: string] in
@@ -483,7 +490,7 @@ let rec get_ident_list_expr ?(acc=[]) e = match e.pexp_desc with
   | Pexp_construct ({txt=Lident "Some"; _}, Some e) -> get_ident_list_expr ~acc e
   | Pexp_construct ({txt=Lident "[]"; _}, None) -> Some (List.rev acc)
   | Pexp_construct ({txt=Lident "::"; _}, Some {pexp_desc=Pexp_tuple [{pexp_desc=Pexp_ident {txt; _}; _}; e2]; _}) ->
-    get_ident_list_expr ~acc:((Longident.name txt) :: acc) e2
+    get_ident_list_expr ~acc:((Longident.last_exn txt) :: acc) e2
   | _ -> None
 
 let service_params ~params ~security =
@@ -494,10 +501,14 @@ let service_params ~params ~security =
       List.filter_map (fun p ->
           if SSet.mem p !param_set then
             let des = eapply ~loc (evar ~loc (p ^ "_des")) [ evar ~loc "req" ] in
+            let des = match !global_req_wrapper with
+              | None -> des
+              | Some f -> eapply ~loc f [ des ] in
             Some (pcf_method ~loc ({txt=p; loc}, Public, Cfk_concrete (Fresh, des)))
           else None) l in
   let req_security_fields = match get_ident_list_expr security with
     | Some l ->
+      let loc = security.pexp_loc in
       List.filter_map (fun id ->
           match SMap.find_opt id !security_scheme_table with
           | None -> None
@@ -506,7 +517,9 @@ let service_params ~params ~security =
             let txt = format_ref_name ref_name in
             Some (pcf_method ~loc ({txt; loc}, Public, Cfk_concrete (Fresh, des)))
         ) l
-    | None -> match security.pexp_desc with
+    | None ->
+      let loc = security.pexp_loc in
+      match security.pexp_desc with
       | Pexp_construct ({txt=Lident "Some"; _}, Some {pexp_desc=Pexp_ident {txt; _}; _}) ->
         begin match SMap.find_opt (Longident.name txt) !security_schemes_table with
           | None -> []
@@ -520,6 +533,7 @@ let service_params ~params ~security =
   let fields = req_params_fields @ req_security_fields in
   if fields = [] then None
   else
+    let loc = params.pexp_loc in
     let o = pexp_object ~loc @@ class_structure ~self:(ppat_any ~loc) ~fields in
     Some [%expr fun req -> [%e o]]
 
@@ -527,6 +541,7 @@ let service_params_item ~name options =
   match service_params ~params:options.params ~security:options.security with
   | None -> None
   | Some expr ->
+    let loc = options.params.pexp_loc in
     let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(pvar ~loc (name ^ "_req")) ~expr ]in
     if options.debug then Format.printf "%a@." Pprintast.structure_item it;
     Some it
@@ -634,7 +649,7 @@ let process_ws ~it ~onclose react_name bg_name a =
 let rec find_req_pattern_ext p =
   match p.ppat_desc with
   | Ppat_extension ({txt="req"; loc}, PStr []) -> Some (pvar ~loc "_req", None)
-  | Ppat_extension ({txt="req"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident {txt=Lident p; _}; _}, _); _} ]) -> Some (pvar ~loc "_req", Some p)
+  | Ppat_extension ({txt="req"; loc}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident {txt=Lident p; _}; _}, _); _} ]) -> Some (pvar ~loc "_req", Some p)
   | Ppat_tuple [ p1; p2 ] ->
     begin match find_req_pattern_ext p1 with
       | None -> None
@@ -901,6 +916,8 @@ let transform ?kind () =
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
                   Option.iter (security_list "security") @@ get_list_expr (remove_expr_constraint vb.pvb_expr);
                   set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_expr_constraint vb.pvb_expr } ], base
+                | Ppat_var {txt="req"; _} ->
+                  set_global_req_wrapper [%expr req_wrapper]; acc @ [ { vb with pvb_pat = [%pat? req_wrapper] } ], base
                 | _ -> acc, base) ([], None) l in
             let acc = pstr_value ~loc Nonrecursive acc_str :: acc in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
