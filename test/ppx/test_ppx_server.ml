@@ -1,6 +1,11 @@
-let echo (_, s) () =
+let%param foo = ()
+
+let echo ([%req], s) () =
+  let () = match req#foo with
+    | Error e -> Format.eprintf "error foo: %s@." e
+    | Ok s -> Format.eprintf "foo: %s@." @@ Option.value ~default:"none" s in
   EzAPIServer.return_ok @@ "echo arg: " ^ s
-[@@get {path="/echo/{arg : string}"; raw_output=[]}]
+[@@get {path="/echo/{arg : string}"; raw_output=[]; params=[foo]}]
 
 let echo_input s =
   EzAPIServer.return_ok @@ "echo input: " ^ s

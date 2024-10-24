@@ -288,193 +288,6 @@ let service_value ?name ?options ?parse_options ~meth ~loc p =
   if options.debug then Format.printf "%a@." Pprintast.structure_item str;
   str, name, options
 
-(** register service/handler *)
-
-let first = ref true
-
-let ppx_dir ~loc dir =
-  if !first && dir = None then (
-    first := false;
-    [%str let ppx_dir = EzAPIServerUtils.empty])
-  else []
-
-let register name a =
-  let loc = a.attr_loc in
-  let _, options = get_options ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
-  match options.service with
-  | None -> Location.raise_errorf ~loc "service not defined"
-  | Some e ->
-    let register =
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
-        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            e; evar ~loc name; evar ~loc ppx_dir_name ]) in
-    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
-    if options.debug then Format.printf "%a@." Pprintast.structure str;
-    str
-
-let register_ws ~onclose react_name bg_name a =
-  let loc = a.attr_loc in
-  let _, options = get_options ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
-  let onclose = match onclose with
-    | [] -> [%expr None]
-    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
-    | _ -> Location.raise_errorf ~loc "too many value bindings" in
-  match options.service with
-  | None -> Location.raise_errorf ~loc "service not defined"
-  | Some  e ->
-    let register =
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
-        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
-            Nolabel, e;
-            Optional "onclose", onclose;
-            Labelled "react", evar ~loc react_name;
-            Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc ppx_dir_name ]) in
-    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
-    if options.debug then Format.printf "%a@." Pprintast.structure str;
-    str
-
-let process name a =
-  let loc = a.attr_loc in
-  let service_name = if name = "handler" then "service" else name ^ "_s" in
-  let service, service_name, options = service_value ~name:service_name ~meth:a.attr_name.txt ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
-  let register =
-    pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
-        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            evar ~loc service_name; evar ~loc name; evar ~loc ppx_dir_name ]) ] in
-  if options.debug then Format.printf "%a@." Pprintast.structure_item register;
-  ppx_dir @ [ service; register ]
-
-let process_ws ~onclose react_name bg_name a =
-  let loc = a.attr_loc in
-  let service_name =  react_name ^ "_s" in
-  let service, service_name, options =
-    service_value ~name:service_name ~meth:"get" ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
-  let onclose = match onclose with
-    | [] -> [%expr None]
-    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
-    | _ -> Location.raise_errorf ~loc "too many value bindings" in
-  let register =
-    pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
-        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
-            Nolabel, evar ~loc service_name;
-            Optional "onclose", onclose;
-            Labelled "react", evar ~loc react_name;
-            Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc ppx_dir_name ]) ] in
-  if options.debug then Format.printf "%a@." Pprintast.structure_item register;
-  ppx_dir @ [ service; register ]
-
-let handler_args e =
-  let loc = e.pexp_loc in
-  match e.pexp_desc with
-  | Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, _); _}); _}) -> e
-  | Pexp_fun (_, _, p1, {pexp_desc = Pexp_fun (_, _, p2, f); pexp_loc=loc2; _}) ->
-    pexp_fun ~loc Nolabel None p1 (
-      pexp_fun ~loc Nolabel None (ppat_any ~loc) (
-        pexp_fun ~loc:loc2 Nolabel None p2 f))
-  | Pexp_fun (_, _, p, f) ->
-    pexp_fun ~loc Nolabel None (ppat_any ~loc) (
-      pexp_fun ~loc Nolabel None (ppat_any ~loc) (
-        pexp_fun ~loc Nolabel None p f))
-  | _ -> e
-
-(** server *)
-
-type server_options = {
-  port: expression;
-  dir: expression;
-  catch: expression;
-  allow_headers: expression;
-  allow_origin: expression;
-  allow_methods: expression;
-  allow_credentials: expression;
-}
-
-let server_options e =
-  let loc = e.pexp_loc in
-  let dft port = {
-    port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
-    allow_origin = [%expr None]; allow_methods = [%expr None]; allow_headers = [%expr None];
-    allow_credentials = [%expr None] } in
-  match e.pexp_desc with
-  | Pexp_constant c -> dft (pexp_constant ~loc c)
-  | Pexp_record (l, _) ->
-    let l = List.filter_map (function ({txt=Lident s; _}, e) -> Some (s, e) | _ -> None) l in
-    List.fold_left (fun acc (s, e) -> match s with
-        | "port" -> { acc with port = e }
-        | "dir" -> { acc with dir = e }
-        | "catch" -> { acc with catch = [%expr Some [%e e]] }
-        | "headers" -> { acc with allow_headers = [%expr Some [%e e]] }
-        | "methods" -> { acc with allow_methods = [%expr Some [%e e]] }
-        | "origin" -> { acc with allow_origin = [%expr Some [%e e]] }
-        | "credentials" -> { acc with allow_credentials = [%expr Some [%e e]] }
-        | _ -> acc) (dft (eint ~loc 8080)) l
-  | _ -> Location.raise_errorf ~loc "server options not understood"
-
-let server_aux e =
-  let loc = e.pexp_loc in
-  let options = server_options e in
-  [%expr
-    EzAPIServer.server ?catch:[%e options.catch] ?allow_headers:[%e options.allow_headers]
-      ?allow_methods:[%e options.allow_methods] ?allow_origin:[%e options.allow_origin]
-      ?allow_credentials:[%e options.allow_credentials] [
-      ([%e options.port], EzAPIServerUtils.API [%e options.dir])
-    ]
-  ]
-
-let server ~loc p =
-  match p with
-  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
-    [%expr EzLwtSys.run (fun () -> [%e server_aux e])]
-  | _ -> Location.raise_errorf ~loc "server options not understood"
-
-(** request *)
-
-let request_expr ~meth ~name ?sname ~loc options =
-  let pat = pvar ~loc (meth ^ "_" ^ name) in
-  let f, headers_expr = match !global_headers with
-    | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
-    | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
-  let f e = f [%expr fun ?params ?msg -> [%e e]] in
-  let f, input_expr, url_encode_expr, post_expr =
-    if not (meth="get" || meth="put") then
-      (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
-    else (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
-  let service = evar ~loc (Option.value ~default:(name ^ "_s") sname) in
-  let f e =
-    if !global_base && options.nargs = 0 then f [%expr fun ?(base= !ezreq_base) () -> [%e e]]
-    else if !global_base then f [%expr fun ?(base= !ezreq_base) -> [%e e]]
-    else f [%expr fun base -> [%e e]] in
-  let rec args_pat i e =
-    if i = 0 then e
-    else [%expr fun [%p pvar ~loc ("arg" ^ string_of_int i)] -> [%e args_pat (i-1) e]] in
-  let rec args_expr i =
-    if i = 0 then [%expr EzAPI.Req.dummy]
-    else [%expr [%e args_expr (i-1)], [%e evar ~loc ("arg" ^ string_of_int i)]] in
-  let expr = f @@ args_pat options.nargs @@ [%expr
-      EzReq_lwt.wrap @@ EzReq_lwt.request ?headers:[%e headers_expr] ?params ?msg ?post:[%e post_expr]
-        ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
-        [%e service] [%e args_expr options.nargs]
-    ] in
-  pat, expr
-
-let request_value ~meth ~name ?sname ~loc options =
-  let pat, expr = request_expr ~meth ~name ?sname ~loc options in
-  let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
-  if options.debug then Format.printf "%a@." Pprintast.structure_item it;
-  it
-
 (** param *)
 
 type param_options = {
@@ -718,6 +531,217 @@ let service_params_item ~name options =
     if options.debug then Format.printf "%a@." Pprintast.structure_item it;
     Some it
 
+(** register service/handler *)
+
+let first = ref true
+
+let ppx_dir ~loc dir =
+  if !first && dir = None then (
+    first := false;
+    [%str let ppx_dir = EzAPIServerUtils.empty])
+  else []
+
+let register name a =
+  let loc = a.attr_loc in
+  let _, options = get_options ~loc a.attr_payload in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  match options.service with
+  | None -> Location.raise_errorf ~loc "service not defined"
+  | Some e ->
+    let service_name = match e.pexp_desc with
+      | Pexp_ident {txt; _} -> Some (Longident.name txt)
+      | _ -> None in
+    let register =
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
+            e; evar ~loc name; evar ~loc ppx_dir_name ]) in
+    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+    if options.debug then Format.printf "%a@." Pprintast.structure str;
+    str, service_name
+
+let register_ws ~onclose react_name bg_name a =
+  let loc = a.attr_loc in
+  let _, options = get_options ~loc a.attr_payload in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let onclose = match onclose with
+    | [] -> [%expr None]
+    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
+    | _ -> Location.raise_errorf ~loc "too many value bindings" in
+  match options.service with
+  | None -> Location.raise_errorf ~loc "service not defined"
+  | Some  e ->
+    let service_name = match e.pexp_desc with
+      | Pexp_ident {txt; _} -> Some (Longident.name txt)
+      | _ -> None in
+    let register =
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
+            Nolabel, e;
+            Optional "onclose", onclose;
+            Labelled "react", evar ~loc react_name;
+            Labelled "bg", evar ~loc bg_name;
+            Nolabel, evar ~loc ppx_dir_name ]) in
+    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+    if options.debug then Format.printf "%a@." Pprintast.structure str;
+    str, service_name
+
+let process ~it name a =
+  let loc = a.attr_loc in
+  let service_name = if name = "handler" then "service" else name ^ "_s" in
+  let service, service_name, options = service_value ~name:service_name ~meth:a.attr_name.txt ~loc a.attr_payload in
+  let req = match service_params_item ~name options with
+    | None -> []
+    | Some it -> [ it ] in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let register =
+    pstr_value ~loc Nonrecursive [
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
+            evar ~loc service_name; evar ~loc name; evar ~loc ppx_dir_name ]) ] in
+  let str = ppx_dir @ [ service ] @ req @ [ it; register ] in
+  if options.debug then Format.printf "%a@." Pprintast.structure str;
+  str
+
+let process_ws ~it ~onclose react_name bg_name a =
+  let loc = a.attr_loc in
+  let service_name =  react_name ^ "_s" in
+  let service, service_name, options =
+    service_value ~name:service_name ~meth:"get" ~loc a.attr_payload in
+  let req = match service_params_item ~name:react_name options with
+    | None -> []
+    | Some it -> [ it ] in
+  let ppx_dir = ppx_dir ~loc options.directory in
+  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let onclose = match onclose with
+    | [] -> [%expr None]
+    | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
+    | _ -> Location.raise_errorf ~loc "too many value bindings" in
+  let register =
+    pstr_value ~loc Nonrecursive [
+      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+        ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
+            Nolabel, evar ~loc service_name;
+            Optional "onclose", onclose;
+            Labelled "react", evar ~loc react_name;
+            Labelled "bg", evar ~loc bg_name;
+            Nolabel, evar ~loc ppx_dir_name ]) ] in
+  if options.debug then Format.printf "%a@." Pprintast.structure_item register;
+  ppx_dir @ [ service ] @ req @ [ it; register ]
+
+let rec find_req_pattern_ext p =
+  match p.ppat_desc with
+  | Ppat_extension ({txt="req"; loc}, PStr []) -> Some (pvar ~loc "_req", None)
+  | Ppat_extension ({txt="req"; _}, PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident {txt=Lident p; _}; _}, _); _} ]) -> Some (pvar ~loc "_req", Some p)
+  | Ppat_tuple [ p1; p2 ] ->
+    begin match find_req_pattern_ext p1 with
+      | None -> None
+      | Some (p, id) -> Some (ppat_tuple ~loc:p.ppat_loc [p; p2], id)
+    end
+  | _ -> None
+
+let handler_args ~name e =
+  let loc = e.pexp_loc in
+  match e.pexp_desc with
+  | Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, {pexp_desc=Pexp_fun (_, _, _, _); _}); _}) -> e
+  | Pexp_fun (_, _, p1, {pexp_desc = Pexp_fun (_, _, p2, f); _}) ->
+    let p1, f = match find_req_pattern_ext p1 with
+      | None -> p1, f
+      | Some (p1, None) -> p1, [%expr let req = [%e evar ~loc (name ^ "_req")] _req in [%e f]]
+      | Some (p1, Some id) -> p1, [%expr let [%p pvar ~loc id] = [%e evar ~loc (name ^ "_req")] _req in [%e f]] in
+    [%expr fun [%p p1] _ [%p p2] -> [%e f]]
+  | Pexp_fun (_, _, p, f) ->
+    [%expr fun _ _ [%p p] -> [%e f]]
+  | _ -> e
+
+(** server *)
+
+type server_options = {
+  port: expression;
+  dir: expression;
+  catch: expression;
+  allow_headers: expression;
+  allow_origin: expression;
+  allow_methods: expression;
+  allow_credentials: expression;
+}
+
+let server_options e =
+  let loc = e.pexp_loc in
+  let dft port = {
+    port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
+    allow_origin = [%expr None]; allow_methods = [%expr None]; allow_headers = [%expr None];
+    allow_credentials = [%expr None] } in
+  match e.pexp_desc with
+  | Pexp_constant c -> dft (pexp_constant ~loc c)
+  | Pexp_record (l, _) ->
+    let l = List.filter_map (function ({txt=Lident s; _}, e) -> Some (s, e) | _ -> None) l in
+    List.fold_left (fun acc (s, e) -> match s with
+        | "port" -> { acc with port = e }
+        | "dir" -> { acc with dir = e }
+        | "catch" -> { acc with catch = [%expr Some [%e e]] }
+        | "headers" -> { acc with allow_headers = [%expr Some [%e e]] }
+        | "methods" -> { acc with allow_methods = [%expr Some [%e e]] }
+        | "origin" -> { acc with allow_origin = [%expr Some [%e e]] }
+        | "credentials" -> { acc with allow_credentials = [%expr Some [%e e]] }
+        | _ -> acc) (dft (eint ~loc 8080)) l
+  | _ -> Location.raise_errorf ~loc "server options not understood"
+
+let server_aux e =
+  let loc = e.pexp_loc in
+  let options = server_options e in
+  [%expr
+    EzAPIServer.server ?catch:[%e options.catch] ?allow_headers:[%e options.allow_headers]
+      ?allow_methods:[%e options.allow_methods] ?allow_origin:[%e options.allow_origin]
+      ?allow_credentials:[%e options.allow_credentials] [
+      ([%e options.port], EzAPIServerUtils.API [%e options.dir])
+    ]
+  ]
+
+let server ~loc p =
+  match p with
+  | PStr [ {pstr_desc=Pstr_eval (e, _); _} ] ->
+    [%expr EzLwtSys.run (fun () -> [%e server_aux e])]
+  | _ -> Location.raise_errorf ~loc "server options not understood"
+
+(** request *)
+
+let request_expr ~meth ~name ?sname ~loc options =
+  let pat = pvar ~loc (meth ^ "_" ^ name) in
+  let f, headers_expr = match !global_headers with
+    | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
+    | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
+  let f e = f [%expr fun ?params ?msg -> [%e e]] in
+  let f, input_expr, url_encode_expr, post_expr =
+    if not (meth="get" || meth="put") then
+      (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
+    else (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
+  let service = evar ~loc (Option.value ~default:(name ^ "_s") sname) in
+  let f e =
+    if !global_base && options.nargs = 0 then f [%expr fun ?(base= !ezreq_base) () -> [%e e]]
+    else if !global_base then f [%expr fun ?(base= !ezreq_base) -> [%e e]]
+    else f [%expr fun base -> [%e e]] in
+  let rec args_pat i e =
+    if i = 0 then e
+    else [%expr fun [%p pvar ~loc ("arg" ^ string_of_int i)] -> [%e args_pat (i-1) e]] in
+  let rec args_expr i =
+    if i = 0 then [%expr EzAPI.Req.dummy]
+    else [%expr [%e args_expr (i-1)], [%e evar ~loc ("arg" ^ string_of_int i)]] in
+  let expr = f @@ args_pat options.nargs @@ [%expr
+      EzReq_lwt.wrap @@ EzReq_lwt.request ?headers:[%e headers_expr] ?params ?msg ?post:[%e post_expr]
+        ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
+        [%e service] [%e args_expr options.nargs]
+    ] in
+  pat, expr
+
+let request_value ~meth ~name ?sname ~loc options =
+  let pat, expr = request_expr ~meth ~name ?sname ~loc options in
+  let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
+  if options.debug then Format.printf "%a@." Pprintast.structure_item it;
+  it
+
 (** main mapper *)
 
 let deprecate =
@@ -742,9 +766,10 @@ let transform ?kind () =
               | [ a ], pvb_attributes ->
                 begin match v.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name;_} ->
-                    let pvb_expr = handler_args v.pvb_expr in
+                    let pvb_expr = handler_args ~name v.pvb_expr in
                     let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
-                    (List.rev @@ process name a) @ it :: acc
+                    let str = process ~it name a in
+                    (List.rev str) @ acc
                   | _ ->
                     (self#structure_item it) :: acc
                 end
@@ -754,9 +779,10 @@ let transform ?kind () =
                   | [ a ], pvb_attributes ->
                     begin match v.pvb_pat.ppat_desc with
                       | Ppat_var {txt=name;_} ->
-                        let pvb_expr = handler_args v.pvb_expr in
+                        let register_str, service_name = register name a in
+                        let pvb_expr = handler_args ~name:(Option.value ~default:name service_name)  v.pvb_expr in
                         let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
-                        (List.rev @@ register name a) @ it :: acc
+                        (List.rev register_str) @ it :: acc
                       | _ -> (self#structure_item it) :: acc
                     end
                   | _ -> (self#structure_item it) :: acc
@@ -772,8 +798,8 @@ let transform ?kind () =
               | [ a ], pvb_attributes ->
                 begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
-                    let pvb_expr_react = handler_args v_react.pvb_expr in
-                    let pvb_expr_bg = handler_args v_bg.pvb_expr in
+                    let pvb_expr_react = handler_args ~name:name_react v_react.pvb_expr in
+                    let pvb_expr_bg = handler_args ~name:name_react v_bg.pvb_expr in
                     let pvb_attributes, vs = match onclose with
                       | [] -> pvb_attributes, []
                       | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
@@ -781,7 +807,8 @@ let transform ?kind () =
                         {v_react with pvb_expr = pvb_expr_react } ::
                         {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
                         vs )) } in
-                    (List.rev @@ process_ws ~onclose name_react name_bg a) @ it :: acc
+                    let str = process_ws ~it ~onclose name_react name_bg a in
+                    (List.rev str) @ acc
                   | _ -> (self#structure_item it) :: acc
                 end
               (* link websocket service *)
@@ -790,8 +817,10 @@ let transform ?kind () =
                   | [ a ], pvb_attributes ->
                     begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
                       | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
-                        let pvb_expr_react = handler_args v_react.pvb_expr in
-                        let pvb_expr_bg = handler_args v_bg.pvb_expr in
+                        let str, service_name = register_ws ~onclose name_react name_bg a in
+                        let service_name = Option.value ~default:name_react service_name in
+                        let pvb_expr_react = handler_args ~name:service_name v_react.pvb_expr in
+                        let pvb_expr_bg = handler_args ~name:service_name v_bg.pvb_expr in
                         let pvb_attributes, vs = match onclose with
                           | [] -> pvb_attributes, []
                           | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
@@ -799,7 +828,7 @@ let transform ?kind () =
                             {v_react with pvb_expr = pvb_expr_react } ::
                             {v_bg with pvb_expr = pvb_expr_bg; pvb_attributes } ::
                             vs )) } in
-                        (List.rev @@ register_ws ~onclose name_react name_bg a) @ it :: acc
+                        (List.rev str) @ it :: acc
                       | _ -> (self#structure_item it) :: acc
                     end
                   | _ -> (self#structure_item it) :: acc
