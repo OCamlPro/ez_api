@@ -42,7 +42,7 @@ let global_security = ref [%expr None]
 let global_security_type = ref [%type: EzAPI.no_security]
 let global_headers = ref None
 let global_base = ref false
-let global_req_wrapper = ref None
+let global_req_error = ref [%expr fun e -> Error (Failure e)]
 let loc = ()
 
 let remove_poly c = match c.ptyp_desc with
@@ -113,8 +113,8 @@ let set_global_base e =
 let set_global_headers e =
   global_headers := Some e
 
-let set_global_req_wrapper e =
-  global_req_wrapper := Some e
+let set_global_req_error e =
+  global_req_error := e
 
 let set_globals l =
   List.fold_left (fun acc ({txt; _}, e) ->
@@ -124,7 +124,7 @@ let set_globals l =
       | "security" -> set_global_security e; acc
       | "base" -> Some (set_global_base e)
       | "headers" -> set_global_headers e; acc
-      | "req" -> set_global_req_wrapper e; acc
+      | "req_error" -> set_global_req_error e; acc
       | _ -> acc) None l
 
 let raw e =
@@ -493,55 +493,56 @@ let rec get_ident_list_expr ?(acc=[]) e = match e.pexp_desc with
     get_ident_list_expr ~acc:((Longident.last_exn txt) :: acc) e2
   | _ -> None
 
-let service_params ~params ~security =
-  let req_params_fields = match get_ident_list_expr params with
-    | None | Some [] -> []
+let service_params ~loc ~params ~security =
+  let lparams = Option.value ~default:[] (get_ident_list_expr params) in
+  let lsecurities = get_ident_list_expr security in
+  let lsecurities = match lsecurities with
     | Some l ->
-      let loc = params.pexp_loc in
-      List.filter_map (fun p ->
-          if SSet.mem p !param_set then
-            let des = eapply ~loc (evar ~loc (p ^ "_des")) [ evar ~loc "req" ] in
-            let des = match !global_req_wrapper with
-              | None -> des
-              | Some f -> eapply ~loc f [ des ] in
-            Some (pcf_method ~loc ({txt=p; loc}, Public, Cfk_concrete (Fresh, des)))
-          else None) l in
-  let req_security_fields = match get_ident_list_expr security with
-    | Some l ->
-      let loc = security.pexp_loc in
       List.filter_map (fun id ->
           match SMap.find_opt id !security_scheme_table with
           | None -> None
-          | Some ref_name ->
-            let des = [%expr EzAPI.Req.find_security [%e evar ~loc id] req] in
-            let txt = format_ref_name ref_name in
-            Some (pcf_method ~loc ({txt; loc}, Public, Cfk_concrete (Fresh, des)))
-        ) l
-    | None ->
-      let loc = security.pexp_loc in
-      match security.pexp_desc with
+          | Some ref_name -> Some (id, ref_name)) l
+    | None -> match security.pexp_desc with
       | Pexp_construct ({txt=Lident "Some"; _}, Some {pexp_desc=Pexp_ident {txt; _}; _}) ->
         begin match SMap.find_opt (Longident.name txt) !security_schemes_table with
           | None -> []
-          | Some l ->
-            List.map (fun (id, ref_name) ->
-                let des = [%expr EzAPI.Req.find_security [%e evar ~loc id] req] in
-                let txt = format_ref_name ref_name in
-                pcf_method ~loc ({txt; loc}, Public, Cfk_concrete (Fresh, des))) l
+          | Some l -> l
         end
       | _ -> [] in
-  let fields = req_params_fields @ req_security_fields in
-  if fields = [] then None
-  else
-    let loc = params.pexp_loc in
-    let o = pexp_object ~loc @@ class_structure ~self:(ppat_any ~loc) ~fields in
-    Some [%expr fun req -> [%e o]]
+  match lparams, lsecurities with
+  | [], [] -> None
+  | _ ->
+    let req_param_fields =
+      let loc = params.pexp_loc in
+      let rec aux l e = match l with
+        | [] -> e
+        | p :: tl ->
+          let des = eapply ~loc (evar ~loc (p ^ "_des")) [ evar ~loc "req" ] in
+          [%expr Result.bind [%e des] (fun [%p pvar ~loc (p ^ "_r")] -> [%e aux tl e])] in
+      aux lparams in
+    let req_security_fields =
+      let loc = security.pexp_loc in
+      let rec aux l e = match l with
+        | [] -> e
+        | (id, ref_name) :: tl ->
+          let ref_name = format_ref_name ref_name in
+          [%expr let [%p pvar ~loc (ref_name ^ "_r")] = EzAPI.Req.find_security [%e evar ~loc id] req in
+            [%e aux tl e]] in
+      aux lsecurities in
+    let fields =
+      List.map (fun (_id, ref_name) ->
+          let ref_name = format_ref_name ref_name in
+          pcf_method ~loc ({txt=ref_name; loc}, Public, Cfk_concrete (Fresh, evar ~loc (ref_name ^ "_r")))) lsecurities @
+      List.map (fun p ->
+          pcf_method ~loc ({txt=p; loc}, Public, Cfk_concrete (Fresh, evar ~loc (p ^ "_r")))) lparams in
+    let obj_e = pexp_object ~loc @@ class_structure ~self:(ppat_any ~loc) ~fields in
+    let e = req_security_fields @@ req_param_fields @@ [%expr Ok [%e obj_e]] in
+    Some [%expr fun req -> [%e e]]
 
-let service_params_item ~name options =
-  match service_params ~params:options.params ~security:options.security with
+let service_params_item ~loc ~name options =
+  match service_params ~loc ~params:options.params ~security:options.security with
   | None -> None
   | Some expr ->
-    let loc = options.params.pexp_loc in
     let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat:(pvar ~loc (name ^ "_req")) ~expr ]in
     if options.debug then Format.printf "%a@." Pprintast.structure_item it;
     Some it
@@ -606,7 +607,7 @@ let process ~it name a =
   let loc = a.attr_loc in
   let service_name = if name = "handler" then "service" else name ^ "_s" in
   let service, service_name, options = service_value ~name:service_name ~meth:a.attr_name.txt ~loc a.attr_payload in
-  let req = match service_params_item ~name options with
+  let req = match service_params_item ~loc ~name options with
     | None -> []
     | Some it -> [ it ] in
   let ppx_dir = ppx_dir ~loc options.directory in
@@ -625,7 +626,7 @@ let process_ws ~it ~onclose react_name bg_name a =
   let service_name =  react_name ^ "_s" in
   let service, service_name, options =
     service_value ~name:service_name ~meth:"get" ~loc a.attr_payload in
-  let req = match service_params_item ~name:react_name options with
+  let req = match service_params_item ~loc ~name:react_name options with
     | None -> []
     | Some it -> [ it ] in
   let ppx_dir = ppx_dir ~loc options.directory in
@@ -664,8 +665,14 @@ let handler_args ~name e =
   | Pexp_fun (_, _, p1, {pexp_desc = Pexp_fun (_, _, p2, f); _}) ->
     let p1, f = match find_req_pattern_ext p1 with
       | None -> p1, f
-      | Some (p1, None) -> p1, [%expr let req = [%e evar ~loc (name ^ "_req")] _req in [%e f]]
-      | Some (p1, Some id) -> p1, [%expr let [%p pvar ~loc id] = [%e evar ~loc (name ^ "_req")] _req in [%e f]] in
+      | Some (p1, None) ->
+        p1, [%expr match [%e evar ~loc (name ^ "_req")] _req with
+          | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
+          | Ok req -> [%e f]]
+      | Some (p1, Some id) ->
+        p1, [%expr match [%e evar ~loc (name ^ "_req")] _req with
+            | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
+            | Ok [%p pvar ~loc id] -> [%e f]] in
     [%expr fun [%p p1] _ [%p p2] -> [%e f]]
   | Pexp_fun (_, _, p, f) ->
     [%expr fun _ _ [%p p] -> [%e f]]
@@ -869,7 +876,7 @@ let transform ?kind () =
             let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
               | _ -> acc in
-            let acc = match service_params_item ~name options with
+            let acc = match service_params_item ~loc ~name options with
               | None -> acc
               | Some it -> it :: acc in
             acc
@@ -880,7 +887,7 @@ let transform ?kind () =
             let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
               | _ -> acc in
-            let acc = match service_params_item ~name options with
+            let acc = match service_params_item ~loc ~name options with
               | None -> acc
               | Some it -> it :: acc in
             acc
@@ -891,7 +898,7 @@ let transform ?kind () =
             let acc = match kind with
               | Some `request -> request_value ~loc ~meth ~name ~sname:name options :: acc
               | _ -> acc in
-            let acc = match service_params_item ~name options with
+            let acc = match service_params_item ~loc ~name options with
               | None -> acc
               | Some it -> it :: acc in
             acc
@@ -916,8 +923,8 @@ let transform ?kind () =
                 | Ppat_constraint ({ppat_desc = Ppat_var {txt="security"; _}; _}, typ) ->
                   Option.iter (security_list "security") @@ get_list_expr (remove_expr_constraint vb.pvb_expr);
                   set_global_security ~typ [%expr security]; acc @ [ { vb with pvb_pat = [%pat? security]; pvb_expr=remove_expr_constraint vb.pvb_expr } ], base
-                | Ppat_var {txt="req"; _} ->
-                  set_global_req_wrapper [%expr req_wrapper]; acc @ [ { vb with pvb_pat = [%pat? req_wrapper] } ], base
+                | Ppat_var {txt="req_error"; _} ->
+                  set_global_req_error [%expr req_error]; acc @ [ { vb with pvb_pat = [%pat? req_error] } ], base
                 | _ -> acc, base) ([], None) l in
             let acc = pstr_value ~loc Nonrecursive acc_str :: acc in
             begin match base, kind with Some it, Some `request -> it :: acc | _ -> acc end
@@ -943,7 +950,7 @@ let transform ?kind () =
                 let acc = match kind with
                   | Some `request -> request_value ~loc ~meth ~name options :: acc
                   | _ -> acc in
-                let acc = match service_params_item ~name options with
+                let acc = match service_params_item ~loc ~name options with
                   | None -> acc
                   | Some it -> it :: acc in
                 acc
@@ -972,7 +979,7 @@ let transform ?kind () =
                 let acc = match kind with
                   | Some `request -> request_value ~loc ~meth ~name options :: acc
                   | _ -> acc in
-                let acc = match service_params_item ~name options with
+                let acc = match service_params_item ~loc ~name options with
                   | None -> acc
                   | Some it -> it :: acc in
                 acc
@@ -1002,7 +1009,7 @@ let transform ?kind () =
         let options = { (default_options loc) with register = [%expr false] } in
         let name, options, pat, expr = service_expr ~name ~options ~meth ~loc @@ PStr [ pstr_eval ~loc pvb_expr [] ] in
         let e_after = self#expression e in
-        let e_params, e_debug = match service_params ~params:options.params ~security:options.security with
+        let e_params, e_debug = match service_params ~loc ~params:options.params ~security:options.security with
           | None -> e_after, (if options.debug then Some [%expr ()] else None)
           | Some f ->
             let pat = pvar ~loc (name ^ "_params") in
@@ -1087,7 +1094,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
   let s = match kind with
     | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
     | _ -> [ s ] in
-  match service_params_item ~name:tname options with
+  match service_params_item ~loc ~name:tname options with
   | None -> s
   | Some it -> s @ [ it ]
 
