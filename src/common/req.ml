@@ -51,5 +51,29 @@ let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) uri =
 let find_params p req = StringMap.find_opt p.Param.param_id req.req_params
 
 let find_param p req = match find_params p req with
-  | None -> None
+  | None | Some [] -> None
   | Some values -> Some (String.concat "," values)
+
+let find_header_security key headers =
+  let key = String.uncapitalize_ascii key in
+  match StringMap.fold (fun k v acc -> match acc with
+      | Some _ -> acc
+      | None -> if String.uncapitalize_ascii k = key then Some v else acc) headers None with
+  | None | Some [] -> None
+  | Some l -> Some (String.concat "," l)
+
+let find_authorization_security kind headers =
+  match find_header_security "authorization" headers with
+  | None -> None
+  | Some v -> match String.split_on_char ' ' v with
+    | [ k; token] when String.uncapitalize_ascii k = kind -> Some token
+    | _ -> None
+
+let find_security (sec: [< Security.scheme]) req = match sec with
+  | `Nosecurity _ -> None
+  | `Bearer _ -> find_authorization_security "bearer" req.req_headers
+  | `Basic _ -> find_authorization_security "basic" req.req_headers
+  | `Header {Security.name; _} | `Cookie ({Security.name; _}, _) -> find_header_security name req.req_headers
+  | `Query {Security.name; _} -> find_param name req
+
+let find_securities secs req = List.find_map (fun sec -> find_security sec req) secs

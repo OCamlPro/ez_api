@@ -24,12 +24,7 @@ module IO = Service.IO
 
 module TYPES = struct
   include Url.TYPES
-
-  type param_value =
-    | I of int
-    | S of string
-    | B of bool
-    | LS of string list
+  include Param.TYPES
 
   type ip_info = {
     ip_ip : string;

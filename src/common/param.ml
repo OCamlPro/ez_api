@@ -8,6 +8,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module TYPES = struct
+  type param_value =
+    | I of int
+    | S of string
+    | B of bool
+    | LS of string list
+end
+
 type kind = PARAM_INT | PARAM_STRING | PARAM_BOOL
 
 type t = {

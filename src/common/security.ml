@@ -59,3 +59,13 @@ let header s =
   match StringSet.elements s with
   | [] -> []
   | l -> ["access-control-allow-headers", String.concat ", " l]
+
+let make_authorization_headers ~kind s =
+  [ "authorization", kind ^ " " ^ s ]
+
+let make_security (sec: scheme) s = match sec with
+  | `Nosecurity _ -> [], []
+  | `Bearer _ -> make_authorization_headers ~kind:"bearer" s, []
+  | `Basic _ -> make_authorization_headers ~kind:"basic" s, []
+  | `Header {name; _} | `Cookie ({name; _}, _) -> [ name, s ], []
+  | `Query {name; _} -> [], [ name, Param.TYPES.S s ]
