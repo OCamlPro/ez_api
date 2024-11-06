@@ -506,6 +506,7 @@ let rec get_ident_list_expr ?(acc=[]) e = match e.pexp_desc with
 
 let service_params ~loc ~params ~security =
   let lparams = Option.value ~default:[] (get_ident_list_expr params) in
+  let lparams = List.filter (fun p -> SSet.mem p !param_set) lparams in
   let lsecurities = get_ident_list_expr security in
   let lsecurities = match lsecurities with
     | Some l ->
