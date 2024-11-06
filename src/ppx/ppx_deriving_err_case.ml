@@ -97,6 +97,11 @@ let attribute_code ~code attrs =
       | _ -> None) attrs in
   match c, code with Some c, _ | _, Some c -> c | _ -> 500
 
+let attribute_nowrap attrs =
+  List.find_map (fun a -> match a.attr_name.txt with
+      | "nowrap" -> Some false
+      | _ -> None) attrs
+
 let str_type_ext ~loc:_ ~path:_ t debug code =
   let loc = t.ptyext_loc in
   let name = Longident.name t.ptyext_path.txt in
@@ -105,7 +110,8 @@ let str_type_ext ~loc:_ ~path:_ t debug code =
       match pext.pext_kind with
       | Pext_decl ([], args, None) ->
         let code = attribute_code ~code pext.pext_attributes in
-        let case = Encoding.resolve_case ~loc @@ Encoding.constructor_label ~wrap:true ~case:`snake
+        let wrap = attribute_nowrap pext.pext_attributes in
+        let case = Encoding.resolve_case ~loc @@ Encoding.constructor_label ?wrap ~case:`snake
             ~loc ~name:pext.pext_name.txt ~attrs:pext.pext_attributes args in
         let select = pext.pext_name.txt, (match args with Pcstr_tuple [] -> false | _ -> true) in
         Some (code, case, select)
