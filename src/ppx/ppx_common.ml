@@ -318,24 +318,25 @@ type param_options = {
   kind: expression;
   destruct: expression option;
   construct: expression option;
+  json_kind: [`float | `bool | `string | `obj];
 }
 
-let default_param ?(id="") ?kind ?schema ?destruct ?construct loc =
+let default_param ?(id="") ?kind ?schema ?destruct ?construct ?(json_kind=`string) loc =
   let kind = Option.value ~default:[%expr EzAPI.Param.PARAM_STRING] kind in
   let name = if id = "" then None else Some (estring ~loc id) in {
     id; debug=false; name; descr=None; required=false; examples=[%expr []];
-    schema; kind; destruct; construct;
+    schema; kind; destruct; construct; json_kind;
   }
 
 module SSet = Set.Make(String)
 
 let param_set = ref SSet.empty
 
-let param_options ~typ ~id ?kind ?schema ?destruct ?construct e = match e.pexp_desc with
+let param_options ~typ ~id ?kind ?schema ?destruct ?construct ?json_kind e = match e.pexp_desc with
   | Pexp_construct ({txt=Lident "()"; _}, None) -> default_param ~id ?kind ?schema ?destruct ?construct e.pexp_loc
   | Pexp_constant Pconst_string (id, _, _) -> default_param ~id ?kind ?schema ?destruct ?construct e.pexp_loc
   | Pexp_record (l, None) ->
-    let param = default_param ~id ?kind ?destruct ?construct ?schema e.pexp_loc in
+    let param = default_param ~id ?kind ?destruct ?construct ?schema ?json_kind e.pexp_loc in
     List.fold_left (fun acc ({txt; _}, e) ->
         let loc = e.pexp_loc in
         match Longident.name txt, e.pexp_desc with
@@ -349,14 +350,28 @@ let param_options ~typ ~id ?kind ?schema ?destruct ?construct e = match e.pexp_d
         | "kind", _ -> { acc with kind = e }
         | ("des" | "destruct"), _ -> { acc with destruct = Some e }
         | ("cons" | "construct"), _ -> { acc with construct = Some e }
-        | "int", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_INT] }
-        | "bool", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_BOOL] }
+        | "int", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_INT]; json_kind=`float }
+        | "bool", _ -> { acc with kind = [%expr EzAPI.Param.PARAM_BOOL]; json_kind=`bool }
+        | "obj", _ -> { acc with json_kind=`obj }
         | "enc", _ ->
           let enc = Ppx_deriving_encoding_lib.Encoding.core typ in
-          let construct = Some [%expr fun x -> match Json_encoding.construct [%e enc] x with
-              | `String s -> s
-              | _ -> failwith [%e estring ~loc ("parameter " ^ acc.id ^ " should be constructed with a json string")]] in
-          let destruct = Some [%expr fun s -> try Some (Json_encoding.destruct [%e enc] (`String s)) with _ -> None] in
+          let construct_case = match acc.json_kind with
+            | `string -> case ~guard:None ~lhs:[%pat? `String s] ~rhs:[%expr s]
+            | `bool -> case ~guard:None ~lhs:[%pat? `Bool b] ~rhs:[%expr string_of_bool b]
+            | `float -> case ~guard:None ~lhs:[%pat? `Float f] ~rhs:[%expr string_of_float f]
+            | `obj -> case ~guard:None ~lhs:[%pat? x] ~rhs:[%expr Ezjsonm_interface.to_string x] in
+          let construct_failwith_case = case ~guard:None ~lhs:(ppat_any ~loc) ~rhs:[%expr
+              failwith [%e estring ~loc ("parameter " ^ acc.id ^ " should be constructed with a json string")]
+            ] in
+          let construct = Some [%expr fun x -> [%e pexp_match ~loc [%expr Json_encoding.construct [%e enc] x] [
+              construct_case; construct_failwith_case
+            ]]] in
+          let destruct_json = match acc.json_kind with
+            | `string -> [%expr `String s]
+            | `bool -> [%expr `Bool (bool_of_string s)]
+            | `float -> [%expr `Float (float_of_string s)]
+            | `obj -> [%expr Ezjsonm_interface.from_string s] in
+          let destruct = Some [%expr fun s -> try Some (Json_encoding.destruct [%e enc] [%e destruct_json]) with _ -> None] in
           { acc with construct; destruct }
         | "assoc", _ ->
           begin match typ.ptyp_desc with
@@ -388,13 +403,13 @@ let param_value p e =
       let n = Longident.name txt in
       begin match n with
         | "int" | "Int.t" ->
-          None, None, Some [%expr int_of_string_opt], `int
+          None, None, Some [%expr int_of_string_opt], `float
         | "int32" | "Int32.t" ->
-          None, Some [%expr Int32.to_int], Some [%expr Int32.of_string_opt], `int
+          None, Some [%expr Int32.to_int], Some [%expr Int32.of_string_opt], `float
         | "int64" | "Int64.t" ->
-          None, Some [%expr Int64.to_int], Some [%expr Int64.of_string_opt], `int
+          None, Some [%expr Int64.to_int], Some [%expr Int64.of_string_opt], `float
         | "nativeint" | "Nativeint.t" ->
-          None, Some [%expr Nativeint.to_int], Some [%expr Nativeint.of_string_opt], `int
+          None, Some [%expr Nativeint.to_int], Some [%expr Nativeint.of_string_opt], `float
         | "bool" | "Bool.t" ->
           None, None, Some [%expr bool_of_string_opt], `bool
         | "string" | "String.t" ->
@@ -403,10 +418,10 @@ let param_value p e =
       end
     | _ -> (try Some (enc_schema t) with _ -> None), None, None, `string in
   let kind = match k with
-    | `int -> [%expr EzAPI.Param.PARAM_INT]
+    | `float -> [%expr EzAPI.Param.PARAM_INT]
     | `bool -> [%expr EzAPI.Param.PARAM_BOOL]
     | `string -> [%expr EzAPI.Param.PARAM_STRING] in
-  let options = param_options ~id:name ~typ:t ~kind ?schema ?construct ?destruct e in
+  let options = param_options ~id:name ~typ:t ~kind ?schema ?construct ?destruct ~json_kind:k e in
   let loc = e.pexp_loc in
   let aux = function None -> [%expr None] | Some e -> [%expr Some [%e e]] in
   let param_expr = [%expr {
@@ -415,7 +430,7 @@ let param_value p e =
     param_required = [%e ebool ~loc options.required]; param_examples = [%e options.examples];
     param_schema = [%e aux options.schema] }] in
   let param_value = value_binding ~loc ~pat:(pvar ~loc name) ~expr:param_expr in
-  let cons_ident = Longident.parse (match k with `int -> "EzAPI.I" | `bool -> "EzAPI.B" | `string -> "EzAPI.S") in
+  let cons_ident = Longident.parse (match k with `float -> "EzAPI.I" | `bool -> "EzAPI.B" | `string -> "EzAPI.S") in
   let cons_expr =
     let v = match options.construct with
       | None -> [%expr p]
