@@ -159,7 +159,7 @@ let methods = [ "get"; "post"; "put"; "patch"; "delete" ]
 let parse_arg ~loc s = match String.index_opt s ':' with
   | None -> evar ~loc (String.trim s)
   | Some i ->
-    let name = String.(trim @@ sub s 0 (i-1)) in
+    let name = String.(trim @@ sub s 0 i) in
     let typ = String.(trim @@ sub s (i+1) (length s - i - 1)) in
     match typ with
     | "int" | "float" | "int32" | "int64" | "string" ->
