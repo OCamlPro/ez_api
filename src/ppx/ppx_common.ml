@@ -785,13 +785,13 @@ let request_expr ~meth ~name ?sname ~loc options =
     if !global_base && options.nargs = 0 then f [%expr fun ?(base= !ezreq_base) () -> [%e e]]
     else if !global_base then f [%expr fun ?(base= !ezreq_base) -> [%e e]]
     else f [%expr fun base -> [%e e]] in
-  let rec args_pat i e =
+  let rec args_pat n i e =
     if i = 0 then e
-    else [%expr fun [%p pvar ~loc ("arg" ^ string_of_int i)] -> [%e args_pat (i-1) e]] in
+    else [%expr fun [%p pvar ~loc ("arg" ^ string_of_int (n-i+1))] -> [%e args_pat n (i-1) e]] in
   let rec args_expr i =
     if i = 0 then [%expr EzAPI.Req.dummy]
     else [%expr [%e args_expr (i-1)], [%e evar ~loc ("arg" ^ string_of_int i)]] in
-  let expr = f @@ args_pat options.nargs @@ [%expr
+  let expr = f @@ args_pat options.nargs options.nargs @@ [%expr
       EzReq_lwt.wrap @@ EzReq_lwt.request ?headers:[%e headers_expr] ?params ?msg ?post:[%e post_expr]
         ?url_encode:[%e url_encode_expr] ~input:[%e input_expr] base
         [%e service] [%e args_expr options.nargs]

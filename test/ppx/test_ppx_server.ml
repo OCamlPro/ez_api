@@ -3,7 +3,7 @@ let%param foo = ()
 let echo ([%req], s) () =
   Format.eprintf "foo: %s@." @@ Option.value ~default:"none" req#foo;
   EzAPIServer.return_ok @@ "echo arg: " ^ s
-[@@get {path="/echo/{arg : string}"; raw_output=[]; params=[foo]; debug}]
+[@@get {path="/echo/{arg : string}"; raw_output=[]; params=[foo]}]
 
 let echo_input s =
   EzAPIServer.return_ok @@ "echo input: " ^ s
