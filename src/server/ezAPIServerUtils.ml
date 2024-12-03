@@ -49,11 +49,16 @@ let pp_time () =
   GMTime.(date_of_tm @@ Unix.gmtime @@ time ())
 
 let debug ?(v=0) fmt =
-  if !verbose > v then EzDebug.printf fmt
+  let mask_version = !verbose >= 8 in
+  if (not mask_version && !verbose > v) ||
+     (mask_version && (v = 0 || ((!verbose/8) land v) <> 0))  then
+    EzDebug.printf fmt
   else Printf.ifprintf () fmt
 
 let debugf ?(v=0) f =
-  if !verbose > v then f ()
+  let mask_version = !verbose >= 8 in
+  if (not mask_version && !verbose > v) ||
+     (mask_version && ((!verbose/8) land v) <> 0) then f ()
 
 (** Register Handler *)
 
