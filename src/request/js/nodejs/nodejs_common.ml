@@ -60,14 +60,13 @@ let handle f (m : message t) =
     m##on_data (string "data") (wrap_callback (fun chunk ->
         s := !s ^ (Typed_array.String.of_arrayBuffer chunk)));
     m##on_end (string "end") (wrap_callback (fun () ->
-        if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." !s;
+        if !Verbose.v land 1 <> 0 && !s <> "" then Format.printf "[ez_api] received:\n%s@." !s;
         f (Ok !s)))
   else (
     if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." (to_string m##.statusMessage);
     f (Error (m##.statusCode, Some (to_string m##.statusMessage))))
 
 let get ?(protocol=http) ?options url f =
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n@.";
   let o = optdef options_to_jsoo options in
   let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
@@ -75,7 +74,7 @@ let get ?(protocol=http) ?options url f =
   req##end_ undefined
 
 let post ?(protocol=http) ?options url ~content f =
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." content;
+  if !Verbose.v land 2 <> 0 && content <> "" then Format.printf "[ez_api] sent:\n%s@." content;
   let o = optdef options_to_jsoo options in
   let req = protocol##request (string url) o (def @@ wrap_callback (handle f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->

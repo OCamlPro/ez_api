@@ -20,7 +20,10 @@ let log ?(meth="GET") url = function
 
 let make ?msg ?content ?content_type ~meth ~headers url f =
   log ~meth url msg;
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (Option.value ~default:"" content);
+  if !Verbose.v land 2 <> 0 then (
+    match content with
+    | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
+    | _ -> ());
   let xhr = XmlHttpRequest.create () in
   xhr##_open (string meth) (string url) _true ;
   Option.iter (fun ct -> xhr##setRequestHeader (string "Content-Type") (string ct)) content_type;

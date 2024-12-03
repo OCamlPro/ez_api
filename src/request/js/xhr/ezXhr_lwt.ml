@@ -32,12 +32,15 @@ let log ?(meth="GET") ?msg url = match msg with
 
 let make ?msg ?content ?content_type ~meth ~headers url =
   log ~meth ?msg url;
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (Option.value ~default:"" content);
+  if !Verbose.v land 2 <> 0 then (
+    match content with
+    | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
+    | _ -> ());
   let contents = Option.map (fun s -> `String s) content in
   perform_raw_url ?headers ?content_type ?contents
     ~override_method:(meth_of_str ~default:`POST meth) url >|= fun frame ->
   log ~meth:("RECV " ^ string_of_int frame.code) ?msg url;
-  if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." frame.content;
+  if !Verbose.v land 1 <> 0 && frame.content <> "" then Format.printf "[ez_api] received:\n%s@." frame.content;
   if frame.code >= 200 && frame.code < 300 then Ok frame.content
   else Result.Error (frame.code, Some frame.content)
 

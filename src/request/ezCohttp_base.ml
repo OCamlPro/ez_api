@@ -32,7 +32,10 @@ module Make(Client:Cohttp_lwt.S.Client) = struct
 
   let make ?msg ?content ?content_type ~meth ~headers url =
     log ~meth url msg;
-    if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (Option.value ~default:"" content);
+    if !Verbose.v land 2 <> 0 then (
+      match content with
+      | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
+      | _ -> ());
     let r () =
       let body = Option.map Cohttp_lwt.Body.of_string content in
       let headers = Option.fold ~none:Cohttp.Header.(add_list (init ()) headers)
@@ -43,7 +46,7 @@ module Make(Client:Cohttp_lwt.S.Client) = struct
       let code = resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
       Cohttp_lwt.Body.to_string body >|= fun body ->
       log ~meth:("RECV " ^ string_of_int code) url msg;
-      if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." body;
+      if !Verbose.v land 1 <> 0 && body <> "" then Format.printf "[ez_api] received:\n%s@." body;
       if code >= 200 && code < 300 then Ok body
       else Error (code, Some body)
     in

@@ -24,13 +24,16 @@ let handle_response ?msg url r =
   | Error e -> Error (0, Some (Ezjs_min.to_string e##toString))
   | Ok r ->
     log ~meth:("RECV " ^ string_of_int r.status) ?msg url;
-    if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." r.body;
+    if !Verbose.v land 1 <> 0 && r.body <> "" then Format.printf "[ez_api] received:\n%s@." r.body;
     if r.status >= 200 && r.status < 300 then Ok r.body
     else Error (r.status, Some r.body)
 
 let make ?msg ?content ?content_type ~meth ~headers url =
   log ~meth ?msg url;
-  if !Verbose.v land 2 <> 0 then Format.printf "[ez_api] sent:\n%s@." (Option.value ~default:"" content);
+  if !Verbose.v land 2 <> 0 then (
+    match content with
+    | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
+    | _ -> ());
   let headers = Option.fold ~none:headers ~some:(fun ct -> ("Content-Type", ct) :: headers) content_type in
   let body = Option.map (fun s -> RString s) content in
   fetch ~headers ~meth ?body url to_text >|= (handle_response ?msg url)
