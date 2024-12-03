@@ -23,8 +23,10 @@ let meth_of_str = function
   | s -> `Other s
 
 let log ?(meth="GET") url = function
-  | None -> ()
-  | Some msg -> Printf.printf "[>%s %s %s ]\n%!" msg meth url
+  | None ->
+    if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
+    else ()
+  | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
 
 module Make(Client:Cohttp_lwt.S.Client) = struct
 

@@ -12,7 +12,9 @@ open Js_of_ocaml
 open Js
 
 let log ?(meth="GET") url = function
-  | None -> ()
+  | None ->
+    if !Verbose.v <> 0 then Firebug.console##log (Js.string (Format.sprintf "[ez_api] %s %s@." meth url))
+    else ()
   | Some msg ->
     Firebug.console##log (string ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]"))
 

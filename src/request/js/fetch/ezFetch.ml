@@ -12,7 +12,9 @@ open EzRequest
 open Ezjs_fetch
 
 let log ?(meth="GET") url = function
-  | None -> ()
+  | None ->
+    if !Verbose.v <> 0 then Ezjs_min.log "[ez_api] %s %s@." meth url
+    else ()
   | Some msg -> Ezjs_min.log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
 let handle_response ?msg url f r =

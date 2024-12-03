@@ -44,7 +44,9 @@ class type http = object
 end
 
 let log ?(meth="GET") url = function
-  | None -> ()
+  | None ->
+    if !Verbose.v <> 0 then log "[ez_api] %s %s@." meth url
+    else ()
   | Some msg -> log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
 let require s = Unsafe.(fun_call (pure_js_expr "require") [|inject @@ string s|])

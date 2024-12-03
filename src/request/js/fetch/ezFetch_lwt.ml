@@ -14,7 +14,9 @@ open Ezjs_fetch_lwt
 let (>|=) = Lwt.(>|=)
 
 let log ?(meth="GET") ?msg url = match msg with
-  | None -> ()
+  | None ->
+    if !Verbose.v <> 0 then Ezjs_min.log "[ez_api] %s %s@." meth url
+    else ()
   | Some msg -> Ezjs_min.log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
 let handle_response ?msg url r =
