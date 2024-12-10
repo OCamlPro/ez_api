@@ -20,7 +20,7 @@
  (public_name ez_api.cohttp_base)
  (optional)
  (modules ezCohttp_base)
- (libraries verbose cohttp-lwt))
+ (libraries verbose ezAPI cohttp-lwt))
 
 (library
  (name ezReq_default)

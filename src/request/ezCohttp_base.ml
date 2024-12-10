@@ -10,18 +10,6 @@
 
 open Lwt.Infix
 
-let meth_of_str = function
-  | "GET" -> `GET
-  | "HEAD" -> `HEAD
-  | "PUT" -> `PUT
-  | "POST" -> `POST
-  | "CONNECT" -> `CONNECT
-  | "PATCH" -> `PATCH
-  | "TRACE" -> `TRACE
-  | "DELETE" -> `DELETE
-  | "OPTIONS" -> `OPTIONS
-  | s -> `Other s
-
 let log ?(meth="GET") url = function
   | None ->
     if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
@@ -41,7 +29,7 @@ module Make(Client:Cohttp_lwt.S.Client) = struct
       let headers = Option.fold ~none:Cohttp.Header.(add_list (init ()) headers)
           ~some:(fun ct -> Cohttp.Header.(add_list (init_with "Content-Type" ct) headers))
           content_type in
-      Client.call ?body ~headers (meth_of_str meth)
+      Client.call ?body ~headers (EzAPI.Meth.of_string meth)
         (Uri.of_string url) >>= fun (resp, body) ->
       let code = resp |> Cohttp.Response.status |> Cohttp.Code.code_of_status in
       Cohttp_lwt.Body.to_string body >|= fun body ->
