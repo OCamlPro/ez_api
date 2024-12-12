@@ -1,0 +1,21 @@
+(library
+ (name httpun_client)
+ (public_name ez_api.httpun_client)
+ (optional)
+ (modules httpun_client)
+ (libraries uri httpun-lwt-unix))
+
+(library
+ (name ezHttpun_lwt)
+ (public_name ez_api.httpun_lwt)
+ (optional)
+ (modules ezHttpun_lwt)
+ (libraries httpun_client ez_api.request_lwt))
+
+(library
+ (name ezHttpun_lwt_i)
+ (public_name ez_api.ihttpun_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ez_api.req_lwt)
+ (libraries ezHttpun_lwt))
