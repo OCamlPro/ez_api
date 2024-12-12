@@ -36,7 +36,10 @@
   ppxlib
   ppx_deriving_encoding
   digestif
-  yaml)
+  yaml
+  httpun-lwt-unix
+  httpun-ws-lwt-unix
+ )
  (conflicts
   (js_of_ocaml-lwt (< 4.0.0))
   (cohttp-lwt-unix (< 5.0.0))

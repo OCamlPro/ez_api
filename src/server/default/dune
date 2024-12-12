@@ -7,4 +7,5 @@
   (select ezServer.ml from
    (ezAPIServerCohttp -> ezServer.cohttp.ml)
    (ezAPIServerHttpAf -> ezServer.httpaf.ml)
+   (ezAPIServerHttpun -> ezServer.httpun.ml)
    (-> ezServer.dummy.ml))))

@@ -8,6 +8,14 @@
    (-> ip.dummy.ml))))
 
 (library
+ (name server_common)
+ (modules server_common)
+ (optional)
+ (package ez_api)
+ (libraries ezAPIServerUtils lwt.unix bigstringaf)
+ (foreign_stubs (language c) (names rlimit_no_file)))
+
+(library
  (name ezOpenAPI)
  (public_name ez_api.openAPI)
  (modules ezOpenAPI)

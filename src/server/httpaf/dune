@@ -3,8 +3,7 @@
  (public_name ez_api.server_httpaf)
  (optional)
  (modules ezAPIServerHttpAf)
- (libraries httpaf-lwt-unix wsHttpaf)
- (foreign_stubs (language c) (names rlimit_no_file)))
+ (libraries httpaf-lwt-unix wsHttpaf server_common))
 
 (library
  (name ezServerHttpaf)

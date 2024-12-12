@@ -1,0 +1,6 @@
+(library
+ (name wsHttpun)
+ (public_name ez_api.ws_server_httpun)
+ (optional)
+ (modules wsHttpun)
+ (libraries calendar ezAPIServerUtils httpun-ws-lwt-unix))
