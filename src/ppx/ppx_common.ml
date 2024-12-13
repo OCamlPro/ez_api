@@ -1135,7 +1135,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     errors; error_type;
     params = Option.fold ~none:options.params ~some params;
     section = Option.fold ~none:options.section ~some section;
-    name = Option.fold ~none:options.name ~some (Option.map (evar ~loc) name);
+    name = Option.fold ~none:options.name ~some (Option.map (estring ~loc) name);
     descr = Option.fold ~none:options.descr ~some descr;
     security; security_type;
     register = Option.value ~default:[%expr false] register;
