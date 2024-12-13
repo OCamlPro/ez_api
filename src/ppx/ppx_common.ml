@@ -1103,8 +1103,14 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
       (Option.value ~default:t.ptype_name.txt name)
     |  _, t :: _ ->
-      [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
-      Option.fold ~none:options.output ~some:aux output,
+      let input, output = match input, output with
+        | Some input, Some output -> aux input, aux output
+        | Some input, _ -> aux input, [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]]
+        | _, Some output -> [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]], aux output
+        | _ ->
+          [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
+          Option.fold ~none:options.output ~some:aux output in
+      input, output,
       (Option.value ~default:t.ptype_name.txt name)
     | _ ->
       Option.fold ~none:options.input ~some:aux input,
