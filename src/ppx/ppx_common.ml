@@ -776,10 +776,11 @@ let request_expr ~meth ~name ?sname ~loc options =
     | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
     | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
   let f e = f [%expr fun ?params ?msg -> [%e e]] in
-  let f, input_expr, url_encode_expr, post_expr =
-    if not (meth="get" || meth="put") then
+  let f, input_expr, url_encode_expr, post_expr = match meth with
+    | "post" | "patch" ->
       (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
-    else (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
+    | _ ->
+      (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
   let service = evar ~loc (Option.value ~default:(name ^ "_s") sname) in
   let f e =
     if !global_base && options.nargs = 0 then f [%expr fun ?(base= !ezreq_base) () -> [%e e]]
@@ -989,7 +990,7 @@ let transform ?kind () =
                 let {enc; _} = expressions t in
                 let enc_name = t.ptype_name.txt ^ "_enc" in
                 let input, output = match meth with
-                  | "get" | "put" -> [%expr EzAPI.Empty], [%expr EzAPI.Json [%e evar ~loc enc_name]]
+                  | "get" | "put" | "delete" -> [%expr EzAPI.Empty], [%expr EzAPI.Json [%e evar ~loc enc_name]]
                   | _ -> [%expr EzAPI.Json [%e evar ~loc enc_name]], [%expr EzAPI.Empty] in
                 let options = { (default_options loc) with register = [%expr false]; input; output } in
                 let name = Option.value ~default:t.ptype_name.txt @@ get_name a.attr_payload in
@@ -1098,7 +1099,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
       [%expr EzAPI.Json [%e evar ~loc (t_input.ptype_name.txt ^ "_enc")]],
       [%expr EzAPI.Json [%e evar ~loc (t_output.ptype_name.txt ^ "_enc")]],
       (Option.value ~default:t_input.ptype_name.txt name)
-    | ("get" | "put"), t :: _ ->
+    | ("get" | "put" | "delete"), t :: _ ->
       Option.fold ~none:options.input ~some:aux input,
       [%expr EzAPI.Json [%e evar ~loc (t.ptype_name.txt ^ "_enc")]],
       (Option.value ~default:t.ptype_name.txt name)
