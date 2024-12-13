@@ -770,8 +770,8 @@ let server ~loc p =
 
 (** request *)
 
-let request_expr ~meth ~name ?sname ~loc options =
-  let pat = pvar ~loc (meth ^ "_" ^ name) in
+let request_expr ~meth ~name ?sname ?req ~loc options =
+  let pat = pvar ~loc (match req with Some s -> s | None -> meth ^ "_" ^ name) in
   let f, headers_expr = match !global_headers with
     | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
     | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
@@ -799,8 +799,8 @@ let request_expr ~meth ~name ?sname ~loc options =
     ] in
   pat, expr
 
-let request_value ~meth ~name ?sname ~loc options =
-  let pat, expr = request_expr ~meth ~name ?sname ~loc options in
+let request_value ~meth ~name ?sname ?req ~loc options =
+  let pat, expr = request_expr ~meth ~name ?sname ?req ~loc options in
   let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
   if options.debug then Format.printf "%a@." Pprintast.structure_item it;
   it
@@ -1081,12 +1081,9 @@ let transform ?kind () =
 
 let impl ?kind str = (transform ?kind ())#structure str
 
-let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output errors params section ename
-    descr security register hide input_example output_example debug =
+let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output errors params section name
+    descr security register hide input_example output_example debug req_name =
   let options = default_options loc in
-  let name = match ename with
-    | Some {pexp_desc=Pexp_constant Pconst_string (s, _, _); _} -> Some s
-    | _ -> None in
   let aux e = match e.pexp_desc with
     | Pexp_construct ({txt=Lident "::"; _}, _) -> raw e
     | _ -> [%expr EzAPI.Json [%e e]] in
@@ -1138,7 +1135,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     errors; error_type;
     params = Option.fold ~none:options.params ~some params;
     section = Option.fold ~none:options.section ~some section;
-    name = Option.fold ~none:options.name ~some ename;
+    name = Option.fold ~none:options.name ~some (Option.map (evar ~loc) name);
     descr = Option.fold ~none:options.descr ~some descr;
     security; security_type;
     register = Option.value ~default:[%expr false] register;
@@ -1149,7 +1146,7 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
   } in
   let s, _, options = service_value ~meth ~loc ~options ~name:sname ~parse_options:false (PStr []) in
   let s = match kind with
-    | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
+    | Some `request -> [ s; request_value ~loc ~meth ~name:tname ?req:req_name options ]
     | _ -> [ s ] in
   match service_params_item ~loc ~name:tname options with
   | None -> s
@@ -1167,7 +1164,7 @@ let derivers kind =
           +> arg "errors" __
           +> arg "params" __
           +> arg "section" __
-          +> arg "name" __
+          +> arg "name" (estring __)
           +> arg "descr" __
           +> arg "security" __
           +> arg "register" __
@@ -1175,6 +1172,7 @@ let derivers kind =
           +> arg "input_example" __
           +> arg "output_example" __
           +> flag "debug"
+          +> arg "req" (estring __)
         ) in
       let str_type_decl = Generator.make args_str (deriver_str_gen kind meth) in
       ignore @@ add meth ~str_type_decl) methods
