@@ -3,7 +3,7 @@
  (public_name ez_api.httpun_client)
  (optional)
  (modules httpun_client)
- (libraries uri httpun-lwt-unix))
+ (libraries verbose ez_api httpun-lwt-unix))
 
 (library
  (name ezHttpun_lwt)

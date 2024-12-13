@@ -1,7 +1,14 @@
 open Httpun
 open Httpun_lwt_unix
 
+let encryption : [ `SSL | `TLS ] ref = ref `SSL
+
 let (let>) = Lwt.bind
+let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
+
+let log ?(meth="GET") url = function
+  | None -> if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
+  | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
 
 let error_handler cb error =
   let s = match error with
@@ -10,12 +17,16 @@ let error_handler cb error =
     | `Exn exn -> Format.sprintf "Exn raised: %s" (Printexc.to_string exn) in
   cb @@ Error (-1, Some s)
 
-let response_handler cb response body =
+let response_handler ?msg ~url cb response body =
   let b = Buffer.create 0x1000 in
   let open Response in
   match response with
   | { status = `OK; _ } ->
-    let on_eof () = cb @@ Ok (Buffer.contents b) in
+    log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
+    let on_eof () =
+      let data = Buffer.contents b in
+      if !Verbose.v land 1 <> 0 && data <> "" then Format.printf "[ez_api] received:\n%s@." data;
+      cb @@ Ok data in
     let rec on_read bs ~off ~len =
       Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
       Body.Reader.schedule_read body ~on_read ~on_eof in
@@ -37,17 +48,22 @@ let stream_handler_lwt handler finish acc response body =
 
 let parse url =
   let uri = Uri.of_string url in
-  let p = Option.value ~default:80 (Uri.port uri) in
   match Uri.host uri, Uri.scheme uri with
-  | Some h, Some sch -> Ok (h, sch, p, Uri.path_and_query uri)
+  | Some h, Some sch ->
+    let p = Option.value ~default:(if sch = "https" then 443 else 80) (Uri.port uri) in
+    Ok (h, sch, p, Uri.path_and_query uri)
   | _ -> Error (-1, Some "invalid url")
 
-let perform ?meth ?content ?content_type ?(headers=[]) handler url =
+let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
   let meth = match meth, content with
     | Some `PATCH, _ -> `Other "PATCH"
     | Some (#Method.t as m), _ -> m
     | _, None -> `GET
     | _ -> `POST in
+  log ~meth:(Method.to_string meth) url msg;
+  (match !Verbose.v land 2 <> 0, content with
+   | true, Some content when content <> "" -> Format.printf "[ez_api] sent:\n%s@." content;
+   | _ -> ());
   match parse url with
   | Error e -> Lwt.return_error e
   | Ok (host, scheme, port, path) ->
@@ -61,22 +77,29 @@ let perform ?meth ?content ?content_type ?(headers=[]) handler url =
       Option.fold ~none:[] ~some:(fun c -> [ "content-type", c]) content_type in
     let req = Request.create ~headers meth path in
     let error_handler = error_handler (Lwt.wakeup notify) in
-    let response_handler = handler notify in
-    let> body =
-      if scheme = "https" then
-        let> connection = Client.TLS.create_connection_with_default socket in
-        Lwt.return @@ Client.TLS.request connection req ~error_handler ~response_handler
-      else
-        let> connection = Client.create_connection socket in
-        Lwt.return @@ Client.request connection req ~error_handler ~response_handler in
+    let response_handler = handler ?msg ~url notify in
+    let>? body =
+      Lwt.catch (fun () ->
+          if scheme = "https" then
+            match !encryption with
+            | `TLS ->
+              let> connection = Client.TLS.create_connection_with_default socket in
+              Lwt.return_ok @@ Client.TLS.request connection req ~error_handler ~response_handler
+            | `SSL ->
+              let> connection = Client.SSL.create_connection_with_default socket in
+              Lwt.return_ok @@ Client.SSL.request connection req ~error_handler ~response_handler
+          else
+            let> connection = Client.create_connection socket in
+            Lwt.return_ok @@ Client.request connection req ~error_handler ~response_handler)
+        (fun exn -> Lwt.return_error (-1, Some (Printexc.to_string exn))) in
     Option.iter (fun c -> Body.Writer.write_string body c) content;
     Body.Writer.close body;
     w
 
 let call ?meth ?content ?content_type ?headers url =
-  let handler n = response_handler (Lwt.wakeup n) in
+  let handler ?msg ~url n = response_handler ?msg ~url (Lwt.wakeup n) in
   perform ?meth ?content ?content_type ?headers handler url
 
 let stream ?meth ?content ?content_type ?headers ~url cb acc =
-  let handler n = stream_handler_lwt cb (Lwt.wakeup n) acc in
+  let handler ?msg:_ ~url:_ n = stream_handler_lwt cb (Lwt.wakeup n) acc in
   perform ?meth ?content ?content_type ?headers handler url
