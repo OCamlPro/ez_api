@@ -21,7 +21,7 @@ let mk_uri { Request.meth ; Request.target ; Request.headers ; _ } =
 let meth_from_httpun req = Server_common.meth_from_ext req.Request.meth
 
 let headers_from_httpun req =
-  Headers.fold ~f:(fun k v acc -> StringMap.add (String.lowercase_ascii k) [v] acc)
+  Headers.fold ~f:(fun k v acc -> StringMap.add (String.lowercase_ascii k) (String.split_on_char ',' v) acc)
     ~init:StringMap.empty req.Request.headers
 
 let version_from_httpun req =
