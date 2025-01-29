@@ -21,10 +21,11 @@ let send ?encoding ~api_key input =
     sendgrid_host
     (send encoding)
 
-let send_one ~api_key ~dst ~from ~subject content =
+let send_one ?reply_to ~api_key ~dst ~from ~subject content =
   let person = {
     dst = [ {email = fst dst; name = snd dst} ];
     cc = None; bcc = None; psubject = None; data = None } in
+  let reply_to = Option.map (fun (email, name) -> {email; name}) reply_to in
   let content =
     List.map
       (fun (content_type, content_value) ->
@@ -35,18 +36,21 @@ let send_one ~api_key ~dst ~from ~subject content =
     subject = Some subject;
     content = Some content;
     template_id = None;
+    reply_to;
     more_fields = None;
   } in
   send ~api_key mail
 
-let send_template ~api_key ~dst ~from template_id data =
+let send_template ?reply_to ~api_key ~dst ~from template_id data =
   let person = {
     dst = List.map (fun (email, name) -> {email; name}) dst;
     cc = None; bcc = None; psubject = None;
     data = Some (EzEncoding.destruct Json_encoding.any_value data) } in
+  let reply_to = Option.map (fun (email, name) -> {email; name}) reply_to in
   let mail = {
     person = [ person ];
     from = {email = fst from; name = snd from};
+    reply_to;
     subject = None;
     content = None;
     template_id = Some template_id;

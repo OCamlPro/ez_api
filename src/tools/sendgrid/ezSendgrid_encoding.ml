@@ -43,17 +43,18 @@ let person = conv
 
 let mail more_encoding =
   conv
-    (fun {person; from; subject; content; template_id; more_fields}
-      -> (person, from, subject, content, template_id), more_fields)
-    (fun ((person, from, subject, content, template_id), more_fields)
-      -> {person; from; subject; content; template_id; more_fields}) @@
+    (fun {person; from; subject; content; template_id; reply_to; more_fields}
+      -> (person, from, subject, content, template_id, reply_to), more_fields)
+    (fun ((person, from, subject, content, template_id, reply_to), more_fields)
+      -> {person; from; subject; content; template_id; reply_to; more_fields}) @@
   merge_objs
-    (obj5
+    (obj6
        (req "personalizations" (list person))
        (req "from" email_address)
        (opt "subject" string)
        (opt "content" (list content_element))
-       (opt "template_id" string))
+       (opt "template_id" string)
+       (opt "reply_to" email_address))
     (opt_encoding more_encoding)
 
 let contact = conv

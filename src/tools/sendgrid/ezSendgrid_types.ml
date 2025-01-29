@@ -32,6 +32,7 @@ type 'a mail = {
   subject : string option;
   content: content_element list option;
   template_id : string option;
+  reply_to: email_address option;
   more_fields : 'a option;
 }
 
