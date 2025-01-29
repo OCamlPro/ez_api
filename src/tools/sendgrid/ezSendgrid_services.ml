@@ -22,11 +22,11 @@ let contact_ids_param = Param.string ~descr:"Sendgrid contact ids" ~name:"contac
 let delete_all_param = Param.bool ~descr:"Sendgrid delete all contacts" ~name:"delete_all_contacts" "delete_all_contacts"
 
 let send encoding : ('a mail, unit, string option, Security.bearer) post_service0 =
-  post_service
+  raw_service
     ~section:sendgrid_section
     ~name:"sendgrid_send"
-    ~input:(mail encoding)
-    ~output:Json_encoding.empty
+    ~input:(Json (mail encoding))
+    ~output:Empty
     EzAPI.Path.(root // "mail" // "send")
 
 let add_contacts : (string list option * contact list, string, string option, EzAPI.Security.bearer) EzAPI.post_service0 =
