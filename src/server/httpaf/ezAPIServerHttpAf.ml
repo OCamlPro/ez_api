@@ -52,7 +52,9 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     Lwt.async @@ fun () ->
     read_body (Reqd.request_body reqd) >>= fun body ->
     let ws = WsHttpaf.ws reqd fd in
-    if body <> "" then debug ~v:2 "Request content:\n%s" body;
+    debugf ~v:2 (fun () ->
+        if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
+          EzDebug.printf "Request content:\n%s" body);
     Lwt.catch
       (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
       (fun exn ->
@@ -74,7 +76,10 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     | `http {Answer.code; body; headers=resp_headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      if body <> "" then debug ~v:3 "Reply content:\n%s" body;
+      debugf ~v:3 (fun () ->
+          let content_type = List.assoc_opt "content-type" resp_headers in
+          if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
+            EzDebug.printf "Reply content:\n%s" body);
       let origin = match allow_origin with
         | Some `origin -> StringMap.find_opt "origin" headers
         | _ -> None in

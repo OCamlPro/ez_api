@@ -72,7 +72,9 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
   let meth = meth_from_cohttp req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = WsCohttp.ws req in
-  if body <> "" then debug ~v:2 "Request content:\n%s" body;
+  debugf ~v:2 (fun () ->
+      if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
+        EzDebug.printf "Request content:\n%s" body);
   Lwt.catch (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
     (fun exn ->
        EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
@@ -96,7 +98,10 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
         ?allow_methods ?allow_credentials ?origin resp_headers in
     let status = Code.status_of_code code in
     debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    if body <> "" then debug ~v:3 "Reply content:\n%s" body;
+    debugf ~v:3 (fun () ->
+        let content_type = List.assoc_opt "content-type" resp_headers in
+        if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
+          EzDebug.printf "Reply content:\n%s" body);
     let headers = Header.of_list headers in
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
     `Response (r, b)
