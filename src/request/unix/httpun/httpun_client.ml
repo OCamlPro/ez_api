@@ -1,7 +1,4 @@
 open Httpun
-open Httpun_lwt_unix
-
-let encryption : [ `SSL | `TLS ] ref = ref `SSL
 
 let (let>) = Lwt.bind
 let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
@@ -31,7 +28,8 @@ let response_handler ?msg ~url cb response body =
       Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
       Body.Reader.schedule_read body ~on_read ~on_eof in
     Body.Reader.schedule_read body ~on_read ~on_eof;
-  | r -> cb @@ Error (Status.to_code r.status, Some r.reason)
+  | r ->
+    cb @@ Error (Status.to_code r.status, Some r.reason)
 
 let stream_handler_lwt handler finish acc response body =
   let open Response in
@@ -66,13 +64,13 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
    | _ -> ());
   match parse url with
   | Error e -> Lwt.return_error e
-  | Ok (host, scheme, port, path) ->
+  | Ok (hostname, scheme, port, path) ->
     let w, notify = Lwt.wait () in
-    let> addresses = Lwt_unix.getaddrinfo host (Int.to_string port) [Unix.(AI_FAMILY PF_INET)] in
+    let> addresses = Lwt_unix.getaddrinfo hostname (Int.to_string port) [Unix.(AI_FAMILY PF_INET)] in
     let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     let> () = Lwt_unix.connect socket (List.hd addresses).Unix.ai_addr in
     let headers = Headers.of_list @@
-      [ "host", host ] @ headers @
+      [ "host", hostname ] @ headers @
       Option.fold ~none:[] ~some:(fun c -> [ "content-length", string_of_int (String.length c)]) content @
       Option.fold ~none:[] ~some:(fun c -> [ "content-type", c]) content_type in
     let req = Request.create ~headers meth path in
@@ -81,16 +79,10 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
     let>? body =
       Lwt.catch (fun () ->
           if scheme = "https" then
-            match !encryption with
-            | `TLS ->
-              let> connection = Client.TLS.create_connection_with_default socket in
-              Lwt.return_ok @@ Client.TLS.request connection req ~error_handler ~response_handler
-            | `SSL ->
-              let> connection = Client.SSL.create_connection_with_default socket in
-              Lwt.return_ok @@ Client.SSL.request connection req ~error_handler ~response_handler
+            Httpun_tls.request ~hostname ~socket ~error_handler ~response_handler req
           else
-            let> connection = Client.create_connection socket in
-            Lwt.return_ok @@ Client.request connection req ~error_handler ~response_handler)
+            let> connection = Httpun_lwt_unix.Client.create_connection socket in
+            Lwt.return_ok @@ Httpun_lwt_unix.Client.request connection req ~error_handler ~response_handler)
         (fun exn -> Lwt.return_error (-1, Some (Printexc.to_string exn))) in
     Option.iter (fun c -> Body.Writer.write_string body c) content;
     Body.Writer.close body;

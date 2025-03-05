@@ -1,7 +1,9 @@
 (lang dune 2.8)
+(generate_opam_files true)
 (name ez_api)
 (version 2.0.0)
 (source (github ocamlpro/ez_api))
+(license LGPL-2.1-only)
 (authors
  "Cagdas Bozman <cagdas.bozman@ocamlpro.com>"
  "Michael Laporte <michael.laporte@ocamlpro.com>"
@@ -26,14 +28,11 @@
   calendar
   cohttp-lwt-unix
   cohttp-lwt-jsoo
-  lwt_log
-  tls
   httpaf-lwt-unix
   ocurl
   ezjs_fetch
   websocket-lwt-unix
   websocket-httpaf-lwt
-  ppxlib
   ppx_deriving_encoding
   digestif
   yaml
@@ -49,7 +48,5 @@
   (ezjs_fetch (< 0.2))
   (ocurl (< 0.8.0))
   (digestif (< 1.0.0))
-  (ppxlib (< 0.26.0))
   (ppx_deriving_encoding (< 0.4.0))
-  (result (< 1.5))
 ))

@@ -1,9 +1,21 @@
 (library
+ (name httpun_tls)
+ (public_name ez_api.httpun_tls)
+ (optional)
+ (modules httpun_tls)
+ (libraries httpun-lwt-unix
+  (select httpun_tls.ml from
+   (tls-lwt lwt_ssl -> httpun_tls.both.ml)
+   (tls-lwt -> httpun_tls.tls.ml)
+   (lwt_ssl -> httpun_tls.ssl.ml)
+   (-> httpun_tls.none.ml))))
+
+(library
  (name httpun_client)
  (public_name ez_api.httpun_client)
  (optional)
  (modules httpun_client)
- (libraries verbose ez_api httpun-lwt-unix))
+ (libraries verbose ez_api httpun_tls))
 
 (library
  (name ezHttpun_lwt)
