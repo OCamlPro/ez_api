@@ -38,7 +38,7 @@ let add_params req params =
   { req with req_params }
 
 let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) uri =
-  let path_str = Uri.path uri in
+  let path_str = Url.decode (Uri.path uri) in
   let path = List.filter (fun s -> s <> "") @@ String.split_on_char '/' path_str in
   let req_id = Uuidm.v4_gen (Random.get_state ()) () in
   let req = { req_params = StringMap.empty; req_headers = headers;
