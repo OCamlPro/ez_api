@@ -37,8 +37,6 @@ let debug_httpun req =
 
 let register_ip req time addr = Server_common.register_ip ~header:(Headers.get req.Request.headers) time addr
 
-let sha1 s = s |> Digestif.SHA1.digest_string |> Digestif.SHA1.to_raw_string
-
 let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     ?allow_credentials s sockaddr fd =
 
