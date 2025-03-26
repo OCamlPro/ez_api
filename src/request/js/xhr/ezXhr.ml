@@ -13,10 +13,9 @@ open Js
 
 let log ?(meth="GET") url = function
   | None ->
-    if !Verbose.v <> 0 then Firebug.console##log (Js.string (Format.sprintf "[ez_api] %s %s@." meth url))
+    if !Verbose.v <> 0 then EzDebug.log (Format.sprintf "[ez_api] %s %s@." meth url)
     else ()
-  | Some msg ->
-    Firebug.console##log (string ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]"))
+  | Some msg -> EzDebug.log ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
 let make ?msg ?content ?content_type ~meth ~headers url f =
   log ~meth url msg;

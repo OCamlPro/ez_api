@@ -26,9 +26,9 @@ let meth_of_str ?(default=`GET) = function
 
 let log ?(meth="GET") ?msg url = match msg with
   | None ->
-    if !Verbose.v <> 0 then Firebug.console##log (Js.string (Format.sprintf "[ez_api] %s %s@." meth url))
+    if !Verbose.v <> 0 then EzDebug.log (Format.sprintf "[ez_api] %s %s@." meth url)
     else ()
-  | Some msg -> Firebug.console##log (Js.string ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]"))
+  | Some msg -> EzDebug.log ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
 
 let make ?msg ?content ?content_type ~meth ~headers url =
   log ~meth ?msg url;
