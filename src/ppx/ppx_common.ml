@@ -776,8 +776,10 @@ let request_expr ~meth ~name ?sname ?req ~loc options =
     | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
     | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
   let f e = f [%expr fun ?params ?msg -> [%e e]] in
-  let f, input_expr, url_encode_expr, post_expr = match meth with
-    | "post" | "patch" ->
+  let f, input_expr, url_encode_expr, post_expr = match meth, options.input with
+    | ("post" | "patch"), _ ->
+        (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
+    | _, {pexp_desc=Pexp_construct ({txt; _}, _); _} when Longident.name txt <> "EzAPI.Empty" ->
       (fun e -> f [%expr fun ?url_encode ~input -> [%e e]]), [%expr input], [%expr url_encode], [%expr None]
     | _ ->
       (fun e -> f [%expr fun ?post -> [%e e]]), [%expr ()], [%expr None], [%expr post] in
