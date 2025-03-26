@@ -41,7 +41,7 @@ depopts: [
   "httpun-ws-lwt-unix"
 ]
 conflicts: [
-  "js_of_ocaml-lwt" {< "4.0.0"}
+  "js_of_ocaml-lwt" {< "6.0.0"}
   "cohttp-lwt-unix" {< "5.0.0"}
   "cohttp-lwt-jsoo" {< "5.0.0"}
   "calendar" {< "2.03.0"}
