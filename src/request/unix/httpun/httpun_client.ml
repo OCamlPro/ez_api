@@ -1,5 +1,11 @@
 open Httpun
 
+type 'content with_headers = { content: 'content; headers: (string * string) list }
+
+type _ response =
+  | Simple : string response
+  | WithHeaders : string with_headers response
+
 let (let>) = Lwt.bind
 let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
 
@@ -14,16 +20,23 @@ let error_handler cb error =
     | `Exn exn -> Format.sprintf "Exn raised: %s" (Printexc.to_string exn) in
   cb @@ Error (-1, Some s)
 
-let response_handler ?msg ~url cb response body =
+let response_handler :
+  type r. ?msg:string -> res:r response -> url:string -> ((r, _) result -> 'a) ->
+  Response.t -> Body.Reader.t -> 'a = fun ?msg ~res ~url cb response body ->
   let b = Buffer.create 0x1000 in
   let open Response in
   match response with
-  | { status = `OK; _ } ->
+  | { status = `OK; headers; _ } ->
     log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
     let on_eof () =
-      let data = Buffer.contents b in
-      if !Verbose.v land 1 <> 0 && data <> "" then Format.printf "[ez_api] received:\n%s@." data;
-      cb @@ Ok data in
+      let content = Buffer.contents b in
+      if !Verbose.v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content;
+      let res: r = match res with
+        | Simple -> content
+        | WithHeaders ->
+          let headers = Headers.to_list headers in
+          { content; headers } in
+      cb @@ Ok res in
     let rec on_read bs ~off ~len =
       Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
       Body.Reader.schedule_read body ~on_read ~on_eof in
@@ -89,7 +102,7 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
     w
 
 let call ?meth ?content ?content_type ?headers url =
-  let handler ?msg ~url n = response_handler ?msg ~url (Lwt.wakeup n) in
+  let handler ?msg ~url n = response_handler ?msg ~url ~res:Simple (Lwt.wakeup n) in
   perform ?meth ?content ?content_type ?headers handler url
 
 let stream ?meth ?content ?content_type ?headers ~url cb acc =
