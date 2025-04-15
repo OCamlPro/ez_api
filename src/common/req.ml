@@ -77,3 +77,18 @@ let find_security (sec: [< Security.scheme]) req = match sec with
   | `Query {Security.name; _} -> find_param name req
 
 let find_securities secs req = List.find_map (fun sec -> find_security sec req) secs
+
+let header_params ?(debug=false) s =
+  match String.split_on_char ';' s with
+  | [] -> "", []
+  | v :: l ->
+    let value = String.trim v in
+    let params = List.rev @@ List.fold_left (fun acc s ->
+        let s = String.trim s in
+        match String.split_on_char '=' s with
+        | [ k; v ] -> (k, v) :: acc
+        | _ ->
+          if debug then Format.eprintf "malformed header parameters for %s@." value;
+          acc
+      ) [] l in
+    value, params

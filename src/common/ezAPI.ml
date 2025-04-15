@@ -21,6 +21,7 @@ module Doc = Doc
 module Error_codes = Error_codes
 module Req = Req
 module IO = Service.IO
+module Multipart = Multipart
 
 module TYPES = struct
   include Url.TYPES

@@ -1,7 +1,7 @@
 (library
  (name ezAPI)
  (public_name ez_api)
- (modules arg param req path mime meth err security service doc url error_codes ezAPI)
+ (modules arg param req path mime meth err security service doc url error_codes multipart ezAPI)
  (libraries lwt ezEncoding ezDebug ezLwtSys uuidm))
 
 (library
