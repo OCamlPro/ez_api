@@ -5,7 +5,7 @@
  (modules ezServer)
  (libraries
   (select ezServer.ml from
-   (ezAPIServerCohttp -> ezServer.cohttp.ml)
-   (ezAPIServerHttpAf -> ezServer.httpaf.ml)
    (ezAPIServerHttpun -> ezServer.httpun.ml)
+   (ezAPIServerHttpAf -> ezServer.httpaf.ml)
+   (ezAPIServerCohttp -> ezServer.cohttp.ml)
    (-> ezServer.dummy.ml))))
