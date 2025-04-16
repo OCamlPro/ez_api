@@ -1,0 +1,21 @@
+(library
+ (name ezReq_default)
+ (public_name ez_api.req_default)
+ (implements ezReq)
+ (modules ezReq)
+ (libraries ezRequest
+  (select ezReq.ml from
+   (ezCurl -> ezReq.curl.ml)
+   (-> ezReq.dummy.ml))))
+
+(library
+ (name ezReq_lwt_default)
+ (public_name ez_api.req_lwt_default)
+ (implements ezReq_lwt)
+ (modules ezReq_lwt)
+ (libraries ezRequest_lwt
+  (select ezReq_lwt.ml from
+   (ezHttpun_lwt -> ezReq_lwt.httpun.ml)
+   (ezCohttp_lwt -> ezReq_lwt.cohttp.ml)
+   (ezCurl_lwt -> ezReq_lwt.curl.ml)
+   (-> ezReq_lwt.dummy.ml))))
