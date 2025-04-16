@@ -25,8 +25,8 @@ let response_handler :
   Response.t -> Body.Reader.t -> 'a = fun ?msg ~res ~url cb response body ->
   let b = Buffer.create 0x1000 in
   let open Response in
-  match response with
-  | { status = `OK; headers; _ } ->
+  match response.status with
+  | #Status.successful ->
     log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
     let on_eof () =
       let content = Buffer.contents b in
@@ -34,20 +34,20 @@ let response_handler :
       let res: r = match res with
         | Simple -> content
         | WithHeaders ->
-          let headers = Headers.to_list headers in
+          let headers = Headers.to_list response.headers in
           { content; headers } in
       cb @@ Ok res in
     let rec on_read bs ~off ~len =
       Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
       Body.Reader.schedule_read body ~on_read ~on_eof in
     Body.Reader.schedule_read body ~on_read ~on_eof;
-  | r ->
-    cb @@ Error (Status.to_code r.status, Some r.reason)
+  | _ ->
+    cb @@ Error (Status.to_code response.status, Some response.reason)
 
 let stream_handler_lwt handler finish acc response body =
   let open Response in
-  match response with
-  | { status = `OK; _ } ->
+  match response.status with
+  | #Status.successful ->
     let on_eof acc = finish @@ Ok acc in
     let rec on_read acc bs ~off ~len =
       Fun.flip Lwt.dont_wait (fun exn -> finish (Error (-1, Some (Printexc.to_string exn)))) @@ fun () ->
@@ -55,7 +55,7 @@ let stream_handler_lwt handler finish acc response body =
       | `continue acc -> Body.Reader.schedule_read body ~on_read:(on_read acc) ~on_eof:(fun () -> on_eof acc)
       | `stop x -> finish x in
     Body.Reader.schedule_read body ~on_read:(on_read acc) ~on_eof:(fun () -> on_eof acc);
-  | r -> finish @@ Error (Status.to_code r.status, Some r.reason)
+  | _ -> finish @@ Error (Status.to_code response.status, Some response.reason)
 
 let parse url =
   let uri = Uri.of_string url in
