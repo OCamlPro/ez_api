@@ -547,14 +547,16 @@ let merge_definitions ?(definitions=Json_schema.any) sd =
       let sc, def =
         Json_schema.merge_definitions (Lazy.force sc, definitions) in
       Some (Json_schema.simplify sc), def in
-  let output_schema, definitions = match sd.Doc.doc_output with
-    | None -> [], definitions
-    | Some sc ->
+  let output_schema, definitions = match sd.Doc.doc_output, sd.Doc.doc_output_mime with
+    | None, [] -> [204, None], definitions
+    | None, (m :: _) -> [200, Some (Mime.to_string m, None)], definitions
+    | Some sc, lm ->
+      let m = match lm with [] -> Mime.to_string Mime.json | h :: _ -> Mime.to_string h in
       let sc, def = Json_schema.merge_definitions (Lazy.force sc, definitions) in
-      [200, Json_schema.simplify sc], def in
+      [200, Some (m, Some (Json_schema.simplify sc))], def in
   let output_schemas, definitions = List.fold_left (fun (acc, definitions) (code, sch) ->
       let sch, definitions = Json_schema.merge_definitions (Lazy.force sch, definitions) in
-      (code, Json_schema.simplify sch) :: acc, definitions)
+      (code, Some (Mime.to_string Mime.json, Some (Json_schema.simplify sch))) :: acc, definitions)
       (output_schema, definitions) sd.Doc.doc_errors in
   input_schema, output_schemas, definitions
 
@@ -581,14 +583,17 @@ let make_path ?(docs=[]) ~definitions (path, l) =
           ~tags:[sd.doc_section.section_name] ~id
           ~params:(params @ make_path_params sd.doc_args)
           ~security:sd.doc_security
-          ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_mime) input_schema) @@
-        List.map (fun (code, schema) ->
+          ?request:(make_request ?example:input_ex (List.map Mime.to_string sd.doc_input_mime) input_schema) @@
+        List.map (fun (code, x) ->
             let example = if code = 200 then output_ex else None in
             let code_str = string_of_int code in
-            let content =
-              empty_schema ~none:[ "application/json", Makers.mk_media ?example ()] schema (fun schema ->
-                  [ "application/json", Makers.mk_media ?example ~schema () ]) in
-            code_str, Makers.mk_response ~content
+            let content = Option.map (fun (mime, schema) ->
+                match schema with
+                | None -> [mime, Makers.mk_media ?example ()]
+                | Some schema ->
+                  empty_schema ~none:[mime, Makers.mk_media ?example ()] schema (fun schema ->
+                      [ mime, Makers.mk_media ?example ~schema () ])) x in
+            code_str, Makers.mk_response ?content
               (Option.value ~default:code_str @@ Error_codes.error code)) output_schemas in
       definitions, (String.lowercase_ascii (Meth.to_string sd.doc_meth), op) :: acc) (definitions, []) l in
   (path, Makers.mk_path (List.rev operations)), definitions

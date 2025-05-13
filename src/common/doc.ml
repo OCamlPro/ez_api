@@ -18,7 +18,8 @@ type t = {
   doc_section : section;
   doc_input : Json_schema.schema Lazy.t option;
   doc_output : Json_schema.schema Lazy.t option;
-  doc_mime : Mime.t list;
+  doc_input_mime : Mime.t list;
+  doc_output_mime : Mime.t list;
   doc_errors : (int * Json_schema.schema Lazy.t) list;
   doc_meth : Meth.t;
   doc_security : Security.scheme list;
@@ -39,8 +40,8 @@ let sections = ref [ default_section ]
 let definitions_path = "/components/schemas/"
 
 let make :
-  type i. ?name:string -> ?descr:string -> ?register:bool -> ?hide:bool -> ?section:section ->
-  ?input_example:i -> ?output_example:'o -> (_, i, 'o, _, _) Service.t -> t =
+  type i o. ?name:string -> ?descr:string -> ?register:bool -> ?hide:bool -> ?section:section ->
+  ?input_example:i -> ?output_example:o -> (_, i, o, _, _) Service.t -> t =
   fun ?name ?descr ?(register=true) ?(hide=false) ?(section=default_section) ?input_example ?output_example s ->
   let path = Service.path s in
   let input = Service.input s in
@@ -51,7 +52,11 @@ let make :
   let doc_output = match output with
     | Service.IO.Json enc -> Some (lazy (Json_encoding.schema ~definitions_path enc ))
     | _ -> None in
-  let doc_mime = match input with
+  let doc_input_mime = match input with
+    | Service.IO.Raw l -> l
+    | Service.IO.Empty -> []
+    | Service.IO.Json _ -> [ Mime.json ] in
+  let doc_output_mime = match output with
     | Service.IO.Raw l -> l
     | Service.IO.Empty -> []
     | Service.IO.Json _ -> [ Mime.json ] in
@@ -67,7 +72,7 @@ let make :
     doc_params = Service.params s;
     doc_name = name; doc_descr = descr; doc_id = -1;
     doc_section = section;
-    doc_input; doc_mime;
+    doc_input; doc_input_mime; doc_output_mime;
     doc_output;
     doc_errors = Err.merge_errs_same_code ~definitions_path (Service.errors s);
     doc_meth = Service.meth s;
