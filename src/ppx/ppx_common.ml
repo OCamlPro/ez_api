@@ -358,7 +358,7 @@ let param_options ~typ ~id ?kind ?schema ?destruct ?construct ?json_kind e = mat
           let construct_case = match acc.json_kind with
             | `string -> case ~guard:None ~lhs:[%pat? `String s] ~rhs:[%expr s]
             | `bool -> case ~guard:None ~lhs:[%pat? `Bool b] ~rhs:[%expr string_of_bool b]
-            | `float -> case ~guard:None ~lhs:[%pat? `Float f] ~rhs:[%expr string_of_float f]
+            | `float -> case ~guard:None ~lhs:[%pat? `Float f] ~rhs:[%expr if Float.is_integer f then string_of_int (Float.to_int f) else string_of_float f]
             | `obj -> case ~guard:None ~lhs:[%pat? x] ~rhs:[%expr Ezjsonm_interface.to_string x] in
           let construct_failwith_case = case ~guard:None ~lhs:(ppat_any ~loc) ~rhs:[%expr
               failwith [%e estring ~loc ("parameter " ^ acc.id ^ " should be constructed with a json string")]
