@@ -40,21 +40,35 @@ let response_handler :
     let rec on_read bs ~off ~len =
       Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
       Body.Reader.schedule_read body ~on_read ~on_eof in
-    Body.Reader.schedule_read body ~on_read ~on_eof;
+    Body.Reader.schedule_read body ~on_read ~on_eof
   | _ ->
     cb @@ Error (Status.to_code response.status, Some response.reason)
 
-let stream_handler_lwt handler finish acc response body =
+let timeout_fail cb = function
+  | None -> Lwt.return_unit
+  | Some timeout ->
+    let> () = EzLwtSys.sleep timeout in
+    cb (Error (408, Some (Format.sprintf "client interval timeout %.1fs" timeout)));
+    Lwt.return_unit
+
+let stream_handler_lwt ?timeout handler finish acc response body =
   let open Response in
   match response.status with
   | #Status.successful ->
     let on_eof acc = finish @@ Ok acc in
-    let rec on_read acc bs ~off ~len =
-      Fun.flip Lwt.dont_wait (fun exn -> finish (Error (-1, Some (Printexc.to_string exn)))) @@ fun () ->
-      Fun.flip Lwt.map (handler acc (Bigstringaf.substring ~off ~len bs)) @@ function
-      | `continue acc -> Body.Reader.schedule_read body ~on_read:(on_read acc) ~on_eof:(fun () -> on_eof acc)
-      | `stop x -> finish x in
-    Body.Reader.schedule_read body ~on_read:(on_read acc) ~on_eof:(fun () -> on_eof acc);
+    let stop = timeout_fail finish timeout in
+    let rec on_read stop acc bs ~off ~len =
+      Fun.flip Lwt.dont_wait (function
+          | Lwt.Canceled -> ()
+          | exn -> finish (Error (-1, Some (Printexc.to_string exn)))) @@ fun () ->
+      Lwt.bind (handler acc (Bigstringaf.substring ~off ~len bs)) @@ function
+      | `continue acc ->
+        Lwt.cancel stop;
+        let stop = timeout_fail finish timeout in
+        Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc);
+        stop
+      | `stop x -> finish x; Lwt.return_unit in
+    Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc)
   | _ -> finish @@ Error (Status.to_code response.status, Some response.reason)
 
 let parse url =
@@ -65,7 +79,7 @@ let parse url =
     Ok (h, sch, p, Uri.path_and_query uri)
   | _ -> Error (-1, Some "invalid url")
 
-let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
+let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url =
   let meth = match meth, content with
     | Some `PATCH, _ -> `Other "PATCH"
     | Some (#Method.t as m), _ -> m
@@ -99,12 +113,18 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) handler url =
         (fun exn -> Lwt.return_error (-1, Some (Printexc.to_string exn))) in
     Option.iter (fun c -> Body.Writer.write_string body c) content;
     Body.Writer.close body;
-    w
+    match timeout with
+    | None -> w
+    | Some timeout ->
+      let timeout () =
+        let> () = EzLwtSys.sleep timeout in
+        Lwt.return_error (408, Some (Format.sprintf "client timeout %.1fs" timeout)) in
+      Lwt.pick [ w; timeout () ]
 
-let call ?meth ?content ?content_type ?headers url =
+let call ?meth ?content ?content_type ?headers ?timeout url =
   let handler ?msg ~url n = response_handler ?msg ~url ~res:Simple (Lwt.wakeup n) in
-  perform ?meth ?content ?content_type ?headers handler url
+  perform ?meth ?content ?content_type ?headers ?timeout handler url
 
-let stream ?meth ?content ?content_type ?headers ~url cb acc =
-  let handler ?msg:_ ~url:_ n = stream_handler_lwt cb (Lwt.wakeup n) acc in
-  perform ?meth ?content ?content_type ?headers handler url
+let stream ?meth ?content ?content_type ?headers ?timeout ?interval_timeout ~url cb acc =
+  let handler ?msg:_ ~url:_ n = stream_handler_lwt ?timeout:interval_timeout cb (Lwt.wakeup n) acc in
+  perform ?meth ?content ?content_type ?headers ?timeout handler url
