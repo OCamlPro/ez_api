@@ -13,12 +13,22 @@ let log ?(meth="GET") url = function
   | None -> if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
   | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
 
+let pp_error fmt ?unknown = function
+  | `msg s -> Format.fprintf fmt "%s" s
+  | `exn exn -> Format.fprintf fmt "exn: %s" (Printexc.to_string exn)
+  | `timeout f -> Format.fprintf fmt "timeout %.1fs" f
+  | `interval_timeout f -> Format.fprintf fmt "interval timeout %.1fs" f
+  | `http (code, content) -> Format.fprintf fmt "http error %d: %s" code content
+  | `invalid_url url -> Format.fprintf fmt "invalid url: %s" url
+  | e -> match unknown with
+    | None -> Format.fprintf fmt "unknown error"
+    | Some pp -> Format.fprintf fmt "%a" pp e
+
 let error_handler cb error =
-  let s = match error with
-    | `Malformed_response err -> Format.sprintf "Malformed response: %s" err
-    | `Invalid_response_body_length _ -> "Invalid body length"
-    | `Exn exn -> Format.sprintf "Exn raised: %s" (Printexc.to_string exn) in
-  cb @@ Error (-1, Some s)
+  cb (Error (match error with
+      | `Malformed_response err -> `msg (Format.sprintf "malformed response: %s" err)
+      | `Invalid_response_body_length _ -> `msg "invalid body length"
+      | `Exn exn -> `exn exn))
 
 let response_handler :
   type r. ?msg:string -> res:r response -> url:string -> ((r, _) result -> 'a) ->
@@ -42,13 +52,13 @@ let response_handler :
       Body.Reader.schedule_read body ~on_read ~on_eof in
     Body.Reader.schedule_read body ~on_read ~on_eof
   | _ ->
-    cb @@ Error (Status.to_code response.status, Some response.reason)
+    cb @@ Error (`http (Status.to_code response.status, response.reason))
 
 let timeout_fail cb = function
   | None -> Lwt.return_unit
   | Some timeout ->
     let> () = EzLwtSys.sleep timeout in
-    cb (Error (408, Some (Format.sprintf "client interval timeout %.1fs" timeout)));
+    cb @@ Error (`interval_timeout timeout);
     Lwt.return_unit
 
 let stream_handler_lwt ?timeout handler finish acc response body =
@@ -60,7 +70,7 @@ let stream_handler_lwt ?timeout handler finish acc response body =
     let rec on_read stop acc bs ~off ~len =
       Fun.flip Lwt.dont_wait (function
           | Lwt.Canceled -> ()
-          | exn -> finish (Error (-1, Some (Printexc.to_string exn)))) @@ fun () ->
+          | exn -> finish (Error (`exn exn))) @@ fun () ->
       Lwt.bind (handler acc (Bigstringaf.substring ~off ~len bs)) @@ function
       | `continue acc ->
         Lwt.cancel stop;
@@ -69,7 +79,7 @@ let stream_handler_lwt ?timeout handler finish acc response body =
         stop
       | `stop x -> finish x; Lwt.return_unit in
     Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc)
-  | _ -> finish @@ Error (Status.to_code response.status, Some response.reason)
+  | _ -> finish @@ Error (`http (Status.to_code response.status, response.reason))
 
 let parse url =
   let uri = Uri.of_string url in
@@ -77,7 +87,7 @@ let parse url =
   | Some h, Some sch ->
     let p = Option.value ~default:(if sch = "https" then 443 else 80) (Uri.port uri) in
     Ok (h, sch, p, Uri.path_and_query uri)
-  | _ -> Error (-1, Some "invalid url")
+  | _ -> Error (`invalid_url url)
 
 let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url =
   let meth = match meth, content with
@@ -102,7 +112,7 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
       Option.fold ~none:[] ~some:(fun c -> [ "content-type", c]) content_type in
     let req = Request.create ~headers meth path in
     let error_handler = error_handler (Lwt.wakeup notify) in
-    let response_handler = handler ?msg ~url notify in
+    let response_handler = handler (Lwt.wakeup notify) in
     let>? body =
       Lwt.catch (fun () ->
           if scheme = "https" then
@@ -110,7 +120,7 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
           else
             let> connection = Httpun_lwt_unix.Client.create_connection socket in
             Lwt.return_ok @@ Httpun_lwt_unix.Client.request connection req ~error_handler ~response_handler)
-        (fun exn -> Lwt.return_error (-1, Some (Printexc.to_string exn))) in
+        (fun exn -> Lwt.return_error (`exn exn)) in
     Option.iter (fun c -> Body.Writer.write_string body c) content;
     Body.Writer.close body;
     match timeout with
@@ -118,13 +128,13 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
     | Some timeout ->
       let timeout () =
         let> () = EzLwtSys.sleep timeout in
-        Lwt.return_error (408, Some (Format.sprintf "client timeout %.1fs" timeout)) in
+        Lwt.return_error (`timeout timeout) in
       Lwt.pick [ w; timeout () ]
 
-let call ?meth ?content ?content_type ?headers ?timeout url =
-  let handler ?msg ~url n = response_handler ?msg ~url ~res:Simple (Lwt.wakeup n) in
+let call ?msg ?meth ?content ?content_type ?headers ?timeout url =
+  let handler n = response_handler ?msg ~url ~res:Simple n in
   perform ?meth ?content ?content_type ?headers ?timeout handler url
 
 let stream ?meth ?content ?content_type ?headers ?timeout ?interval_timeout ~url cb acc =
-  let handler ?msg:_ ~url:_ n = stream_handler_lwt ?timeout:interval_timeout cb (Lwt.wakeup n) acc in
+  let handler n = stream_handler_lwt ?timeout:interval_timeout cb n acc in
   perform ?meth ?content ?content_type ?headers ?timeout handler url
