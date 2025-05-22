@@ -6,6 +6,17 @@ type _ response =
   | Simple : string response
   | WithHeaders : string with_headers response
 
+type http_error = [ `http of (int * string) ]
+type perform_error = [
+  | `msg of string
+  | `exn of exn
+  | `timeout of float
+  | `invalid_url of string
+]
+type stream_error_base = [ `interval_timeout of float | `exn of exn | http_error ]
+type 'e stream_error = [ stream_error_base | `cb of 'e ]
+type error = [ http_error | perform_error | stream_error_base ]
+
 let (let>) = Lwt.bind
 let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
 
@@ -13,16 +24,13 @@ let log ?(meth="GET") url = function
   | None -> if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
   | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
 
-let pp_error fmt ?unknown = function
+let pp_error fmt (e: [< error]) = match e with
   | `msg s -> Format.fprintf fmt "%s" s
   | `exn exn -> Format.fprintf fmt "exn: %s" (Printexc.to_string exn)
   | `timeout f -> Format.fprintf fmt "timeout %.1fs" f
   | `interval_timeout f -> Format.fprintf fmt "interval timeout %.1fs" f
   | `http (code, content) -> Format.fprintf fmt "http error %d: %s" code content
   | `invalid_url url -> Format.fprintf fmt "invalid url: %s" url
-  | e -> match unknown with
-    | None -> Format.fprintf fmt "unknown error"
-    | Some pp -> Format.fprintf fmt "%a" pp e
 
 let error_handler cb error =
   cb (Error (match error with
@@ -31,7 +39,7 @@ let error_handler cb error =
       | `Exn exn -> `exn exn))
 
 let response_handler :
-  type r. ?msg:string -> res:r response -> url:string -> ((r, _) result -> 'a) ->
+  type r. ?msg:string -> res:r response -> url:string -> ((r, [> http_error]) result -> 'a) ->
   Response.t -> Body.Reader.t -> 'a = fun ?msg ~res ~url cb response body ->
   let b = Buffer.create 0x1000 in
   let open Response in
@@ -61,7 +69,7 @@ let timeout_fail cb = function
     cb @@ Error (`interval_timeout timeout);
     Lwt.return_unit
 
-let stream_handler_lwt ?timeout handler finish acc response body =
+let stream_handler_lwt ?timeout handler (finish: (_, [> _ stream_error]) result -> unit) acc response body =
   let open Response in
   match response.status with
   | #Status.successful ->
@@ -77,7 +85,9 @@ let stream_handler_lwt ?timeout handler finish acc response body =
         let stop = timeout_fail finish timeout in
         Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc);
         stop
-      | `stop x -> finish x; Lwt.return_unit in
+      | `stop r ->
+        let r = Result.map_error (fun e -> `cb e) r in
+        finish r; Lwt.return_unit in
     Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc)
   | _ -> finish @@ Error (`http (Status.to_code response.status, response.reason))
 
@@ -131,10 +141,11 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
         Lwt.return_error (`timeout timeout) in
       Lwt.pick [ w; timeout () ]
 
-let call ?msg ?meth ?content ?content_type ?headers ?timeout url =
+let call ?msg ?meth ?content ?content_type ?headers ?timeout url : (_, [> perform_error | http_error ]) result Lwt.t =
   let handler n = response_handler ?msg ~url ~res:Simple n in
   perform ?meth ?content ?content_type ?headers ?timeout handler url
 
-let stream ?meth ?content ?content_type ?headers ?timeout ?interval_timeout ~url cb acc =
+let stream ?meth ?content ?content_type ?headers ?timeout ?interval_timeout ~url cb acc :
+  (_, [> error | `cb of _]) result Lwt.t =
   let handler n = stream_handler_lwt ?timeout:interval_timeout cb n acc in
   perform ?meth ?content ?content_type ?headers ?timeout handler url

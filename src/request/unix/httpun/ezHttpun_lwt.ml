@@ -1,8 +1,8 @@
 let wrap_error e =
-  let aux () = Format.asprintf "%a" (Httpun_client.pp_error ?unknown:None) e in
+  let aux () = Format.asprintf "%a" Httpun_client.pp_error e in
   match e with
   | `http (code, content) -> code, Some content
-  | `timeout _ | `interval_timeout _ -> 408, Some (aux ())
+  | `timeout _ -> 408, Some (aux ())
   | `invalid_url _ -> 400, Some (aux ())
   | _ -> -1, Some (aux ())
 
