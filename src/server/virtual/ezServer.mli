@@ -12,7 +12,7 @@ open EzAPIServerUtils
 
 val server : ?catch:(string -> exn -> string Answer.t Lwt.t) ->
   ?allow_origin:[ allow_kind | `origin ] -> ?allow_headers:allow_kind ->
-  ?allow_methods:allow_kind -> ?allow_credentials:bool ->
+  ?allow_methods:allow_kind -> ?allow_credentials:bool -> ?footer:string ->
   (int * server_kind) list -> unit Lwt.t
 
 val set_debug : unit -> unit

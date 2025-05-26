@@ -38,7 +38,7 @@ let debug_httpun req =
 let register_ip req time addr = Server_common.register_ip ~header:(Headers.get req.Request.headers) time addr
 
 let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
-    ?allow_credentials s sockaddr fd =
+    ?allow_credentials ?footer s sockaddr fd =
 
   let request_handler sockaddr { Gluten.reqd; _ } =
     let req = Reqd.request reqd in
@@ -87,6 +87,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
       let headers = merge_headers_with_default ?allow_origin ?allow_headers
           ?allow_methods ?allow_credentials ?origin resp_headers in
       let headers = Headers.of_list headers in
+      let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
       let len = String.length body in
       let headers = Headers.add headers "content-length" (string_of_int len) in
       let response = Response.create ~headers status in
@@ -98,7 +99,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     begin match error with
       | `Exn exn ->
         Body.Writer.write_string response_body (Printexc.to_string exn);
-        Body.Writer.write_string response_body "\n";
+        Option.iter (Body.Writer.write_string response_body) footer
       | #Status.standard as error ->
         Body.Writer.write_string response_body (Status.default_reason_phrase error)
     end;
@@ -106,5 +107,5 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
 
   Httpun_lwt_unix.Server.create_connection_handler ~request_handler ~error_handler sockaddr  fd
 
-let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials servers =
-  Server_common.server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials connection_handler servers
+let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
+  Server_common.server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer connection_handler servers

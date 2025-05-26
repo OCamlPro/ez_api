@@ -61,7 +61,7 @@ let debug_cohttp req =
         (Request.headers req))
 
 let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
-    ?catch s io req body =
+    ?catch ?footer s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
   debug_cohttp req;
@@ -103,16 +103,17 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Reply content:\n%s" body);
     let headers = Header.of_list headers in
+    let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
     `Response (r, b)
 
 let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
-    ?allow_credentials server_port server_kind =
+    ?allow_credentials ?footer server_port server_kind =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
   let callback conn req body = dispatch ?allow_origin ?allow_headers
-      ?allow_methods ?allow_credentials ?catch s (fst conn) req body in
+      ?allow_methods ?allow_credentials ?catch ?footer s (fst conn) req body in
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
@@ -122,7 +123,7 @@ let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
     ~mode:(`TCP (`Port server_port))
     (Server.make_response_action ~callback ())
 
-let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials servers =
+let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
   Lwt.join (List.map (fun (port,kind) ->
-      create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
+      create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer
         port kind) servers)
