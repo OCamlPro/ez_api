@@ -156,7 +156,9 @@ let handle ?meth ?content_type ?ws s r path body =
     | Ok (`ws (react, bg, onclose, step)) ->
       begin match ws with
         | None -> assert false
-        | Some ws -> ws ?onclose ?step ~react ~bg r.Req.req_id
+        | Some ws ->
+          let body = if body = "" then None else Some body in
+          ws ?onclose ?step ?body ~react ~bg r.Req.req_id
       end >|= fun ra -> `ws ra
 
 type allow_kind_without_none = [ `all | `default | `custom of string list ]

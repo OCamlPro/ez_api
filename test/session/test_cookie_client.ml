@@ -182,7 +182,7 @@ open Js_of_ocaml
 let auth_state = ref None
 
 let update_button login =
-  Firebug.console##log (if login then "LOGIN" else "LOGOUT") ;
+  Console.console##log (if login then "LOGIN" else "LOGOUT") ;
   let login_button =
     Option.get
     @@ Dom_html.getElementById_coerce "submit-connection"
@@ -191,24 +191,24 @@ let update_button login =
   login_button##.value := Js.string (if login then "Login" else "Logout")
 
 let update_connection_status status =
-  Firebug.console##log (Js.string status) ;
+  Console.console##log (Js.string status) ;
   let elt = Dom_html.getElementById "connection-status" in
   elt##.innerHTML := Js.string status
 
 let connect () =
-  Firebug.console##log "1" ;
+  Console.console##log "1" ;
   Session.connect (EzAPI.BASE api_host) (function
     | Ok (Some auth) ->
-        Firebug.console##log "2" ;
+        Console.console##log "2" ;
         update_connection_status @@ "Connected using cookie; (login = "
         ^ auth.EzSession.TYPES.auth_login ^ ")" ;
         update_button false ;
         auth_state := Some auth
     | Ok None ->
-        Firebug.console##log "3" ;
+        Console.console##log "3" ;
         update_connection_status "Not connected (needs authentication)"
     | Error _ ->
-        Firebug.console##log "4" ;
+        Console.console##log "4" ;
         update_connection_status "Not connected (connect error)" )
 
 let setup_connection () =

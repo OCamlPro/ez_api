@@ -12,43 +12,36 @@ open Lwt.Infix
 open Websocket.Frame
 open EzAPIServerUtils.Directory
 
-let ws_react ?onclose f pong rsend fr =
+let ws_react_content react send content =
+  Lwt.async @@ fun () ->
+  react content >|= function
+  | Ok `none -> send None
+  | Ok (`binary content) -> send @@ Some (create ~opcode:Opcode.Binary ~content ())
+  | Ok (`text content) -> send @@ Some (create ~opcode:Opcode.Text ~content ())
+  | Error (`handler_error content) -> send @@ Some (create ~opcode:Opcode.Text ~content ())
+  | Error _ -> send @@ Some (close 1011)
+
+let ws_react react pong rclose rsend notify_close fr =
   match fr.opcode with
-  | Opcode.Ping ->
-    !rsend @@ Some (create ~opcode:Opcode.Pong ~content:fr.content ())
+  | Opcode.Ping -> !rsend @@ Some (create ~opcode:Opcode.Pong ~content:fr.content ())
   | Opcode.Close ->
     if String.length fr.content >= 2 then
       let content = String.sub fr.content 0 2 in
       !rsend @@ Some (create ~opcode:Opcode.Close ~content ())
-    else
-      !rsend @@ Some (close 1000);
-    (match onclose with
-     | None -> ()
-     | Some f -> Lwt.async f)
+    else !rsend @@ Some (close 1000);
+    Option.iter (Lwt.async) (snd !rclose);
+    rclose := true, None;
+    Lwt.wakeup notify_close ()
   | Opcode.Pong -> pong fr.content
-  | Opcode.Text | Opcode.Binary ->
-    Lwt.async (fun () ->
-        f fr.content >|= function
-        | Ok `none -> !rsend None
-        | Ok (`binary content) ->
-          !rsend @@ Some (create ~opcode:Opcode.Binary ~content ())
-        | Ok (`text content) ->
-          !rsend @@ Some (create ~opcode:Opcode.Text ~content ())
-        | Error (`handler_error content) ->
-          !rsend @@ Some (create ~opcode:Opcode.Text ~content ())
-        | Error _ ->
-          !rsend @@ Some (close 1011))
-  | _ ->
-    !rsend @@ Some (close 1002)
+  | Opcode.Text | Opcode.Binary -> ws_react_content react !rsend fr.content
+  | _ -> !rsend @@ Some (close 1002)
 
 let ws_loop bg send =
   let send : (ws_frame, handler_error) result -> unit = function
     | Error _ -> send (Some (close 1000))
     | Ok `none -> send None
-    | Ok (`binary content) ->
-      send @@ Some (create ~opcode:Opcode.Binary ~content ())
-    | Ok (`text content) ->
-      send @@ Some (create ~opcode:Opcode.Text ~content ()) in
+    | Ok (`binary content) -> send @@ Some (create ~opcode:Opcode.Binary ~content ())
+    | Ok (`text content) -> send @@ Some (create ~opcode:Opcode.Text ~content ()) in
   bg send
 
 let ping_table : (string, CalendarLib.Fcalendar.Precise.t) Hashtbl.t = Hashtbl.create 1024

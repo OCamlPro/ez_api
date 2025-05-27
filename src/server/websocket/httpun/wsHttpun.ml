@@ -10,7 +10,7 @@
 
 let first = ref true
 
-let ws _fd _req ?onclose:_ ?step:_ ~react:_ ~bg:_ _id =
+let ws _fd _req ?onclose:_ ?step:_ ?body:_ ~react:_ ~bg:_ _id =
   (if !first then (
       first := false;
       Format.eprintf "\027[0;31merror: websocket are not yet implemented for httpup@."));
