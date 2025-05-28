@@ -40,7 +40,7 @@ let register_ip req time addr = Server_common.register_ip ~header:(Headers.get r
 let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     ?allow_credentials ?footer s sockaddr fd =
 
-  let request_handler sockaddr { Gluten.reqd; _ } =
+  let request_handler sockaddr { Gluten.reqd; upgrade; _ } =
     let req = Reqd.request reqd in
     let time = GMTime.time () in
     register_ip req time sockaddr;
@@ -52,7 +52,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     debug_httpun req;
     Lwt.async @@ fun () ->
     let> body = read_body (Reqd.request_body reqd) in
-    let ws = WsHttpun.ws reqd fd in
+    let ws = WsHttpun.ws reqd upgrade in
     debugf ~v:2 (fun () ->
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Request content:\n%s" body);
@@ -73,7 +73,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
       let response = Response.create ~headers status in
       Reqd.respond_with_string reqd response "";
       Lwt.return_unit
-    | `ws (Ok (_response, _b)) -> Lwt.return_unit
+    | `ws (Ok ()) -> Lwt.return_unit
     | `http {Answer.code; body; headers=resp_headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;

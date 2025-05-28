@@ -36,8 +36,6 @@ jobs:
 
       - name: Install opam packages
         run: |
-          opam pin add websocket-httpaf.~dev https://github.com/anmonteiro/websocket-httpaf.git
-          opam pin add websocket-httpaf-lwt.~dev https://github.com/anmonteiro/websocket-httpaf.git
           opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
           opam install . --deps-only --with-doc --with-test
 

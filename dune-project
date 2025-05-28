@@ -32,12 +32,11 @@
   ocurl
   ezjs_fetch
   websocket-lwt-unix
-  websocket-httpaf-lwt
   ppx_deriving_encoding
   digestif
   yaml
   httpun-lwt-unix
-  httpun-ws-lwt-unix
+  httpun-ws
  )
  (conflicts
   (js_of_ocaml-lwt (< 6.0.0))

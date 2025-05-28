@@ -10,7 +10,6 @@
 
 open Lwt.Infix
 open Websocket.Frame
-open EzAPIServerUtils.Directory
 
 let ws_react_content react send content =
   Lwt.async @@ fun () ->
@@ -29,7 +28,7 @@ let ws_react react pong rclose rsend notify_close fr =
       let content = String.sub fr.content 0 2 in
       !rsend @@ Some (create ~opcode:Opcode.Close ~content ())
     else !rsend @@ Some (close 1000);
-    Option.iter (Lwt.async) (snd !rclose);
+    Option.iter Lwt.async (snd !rclose);
     rclose := true, None;
     Lwt.wakeup notify_close ()
   | Opcode.Pong -> pong fr.content
@@ -37,7 +36,7 @@ let ws_react react pong rclose rsend notify_close fr =
   | _ -> !rsend @@ Some (close 1002)
 
 let ws_loop bg send =
-  let send : (ws_frame, handler_error) result -> unit = function
+  let send : (EzAPIServerUtils.Directory.ws_frame, EzAPIServerUtils.Directory.handler_error) result -> unit = function
     | Error _ -> send (Some (close 1000))
     | Ok `none -> send None
     | Ok (`binary content) -> send @@ Some (create ~opcode:Opcode.Binary ~content ())
