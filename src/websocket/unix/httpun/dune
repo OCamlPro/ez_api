@@ -1,0 +1,7 @@
+(library
+ (name ezWs_httpun)
+ (public_name ez_api.ws_httpun)
+ (optional)
+ (modules ezWs)
+ (implements ezWs)
+ (libraries httpun-ws-lwt-unix))

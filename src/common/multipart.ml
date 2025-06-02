@@ -84,11 +84,14 @@ let parse ?debug ~headers s =
   let$ boundary = get_boundary ?debug headers in
   parse_content ?debug ~boundary s
 
-let make_boundary ?(length=16) () =
-  "ezAPI" ^ String.init length (fun _ ->
+let random_string ?(length=16) () =
+  String.init length (fun _ ->
       let i = Random.int 62 in
       let code = if i < 10 then i+48 else if i < 36 then i+55 else i+61 in
       Char.chr code)
+
+let make_boundary ?length () =
+  "ezAPI" ^ random_string ?length ()
 
 let produce_form_data ~boundary b data =
   Buffer.add_string b ("--" ^ boundary ^ "\r\n");

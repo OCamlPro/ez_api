@@ -11,4 +11,4 @@
 (executable
  (name test_ws_client)
  (modules test_ws_client)
- (libraries test_ws_lib ez_api.ws_cohttp))
+ (libraries test_ws_lib ez_api.ws))

@@ -1,0 +1,10 @@
+(library
+ (name ezWs_default)
+ (public_name ez_api.ws_default)
+ (modules ezWs)
+ (implements ezWs)
+ (libraries
+  (select ezWs.ml from
+   (httpun-ws-lwt-unix -> ezWs.httpun.ml)
+   (websocket-lwt-unix -> ezWs.cohttp.ml)
+   (-> ezWs.dummy.ml))))

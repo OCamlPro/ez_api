@@ -36,7 +36,7 @@
   digestif
   yaml
   httpun-lwt-unix
-  httpun-ws
+  httpun-ws-lwt-unix
  )
  (conflicts
   (js_of_ocaml-lwt (< 6.0.0))
