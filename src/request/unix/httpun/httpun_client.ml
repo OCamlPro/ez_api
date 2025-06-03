@@ -43,24 +43,27 @@ let response_handler :
   Response.t -> Body.Reader.t -> 'a = fun ?msg ~res ~url cb response body ->
   let b = Buffer.create 0x1000 in
   let open Response in
+  log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
+  let on_eof f () =
+    let content = Buffer.contents b in
+    if !Verbose.v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content;
+    cb @@ f res response content in
+  let rec on_read f bs ~off ~len =
+    Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
+    Body.Reader.schedule_read body ~on_read:(on_read f) ~on_eof:(on_eof f) in
   match response.status with
   | #Status.successful ->
-    log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
-    let on_eof () =
-      let content = Buffer.contents b in
-      if !Verbose.v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content;
-      let res: r = match res with
-        | Simple -> content
-        | WithHeaders ->
-          let headers = Headers.to_list response.headers in
-          { content; headers } in
-      cb @@ Ok res in
-    let rec on_read bs ~off ~len =
-      Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
-      Body.Reader.schedule_read body ~on_read ~on_eof in
+    let f : type r. r response -> _ -> string -> (r, _) result = fun res response content -> match res with
+      | Simple -> Ok content
+      | WithHeaders ->
+        let headers = Headers.to_list response.headers in
+        (Ok { content; headers }) in
+    let on_eof, on_read = on_eof f, on_read f in
     Body.Reader.schedule_read body ~on_read ~on_eof
   | _ ->
-    cb @@ Error (`http (Status.to_code response.status, response.reason))
+    let f _ _ content = Error (`http (Status.to_code response.status, content)) in
+    let on_eof, on_read = on_eof f, on_read f in
+    Body.Reader.schedule_read body ~on_read ~on_eof
 
 let timeout_fail cb = function
   | None -> Lwt.return_unit
@@ -89,7 +92,13 @@ let stream_handler_lwt ?timeout handler (finish: (_, [> _ stream_error]) result 
         let r = Result.map_error (fun e -> `cb e) r in
         finish r; Lwt.return_unit in
     Body.Reader.schedule_read body ~on_read:(on_read stop acc) ~on_eof:(fun () -> on_eof acc)
-  | _ -> finish @@ Error (`http (Status.to_code response.status, response.reason))
+  | _ ->
+    let b = Buffer.create 0x1000 in
+    let on_eof () = finish @@ Error (`http (Status.to_code response.status, Buffer.contents b)) in
+    let rec on_read bs ~off ~len =
+      Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
+      Body.Reader.schedule_read body ~on_read ~on_eof in
+    Body.Reader.schedule_read body ~on_read ~on_eof
 
 let parse url =
   let uri = Uri.of_string url in
