@@ -8,6 +8,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+include EzWsCommon.Types
+
 let err = "ezWs not implemented, either install httpun-ws-lwt-unix or websocket-lwt-unix"
 
 let connect ?msg:_ ?protocols:_ ?error:_ ~react:_ _url = Lwt.return_error err
