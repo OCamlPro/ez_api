@@ -105,7 +105,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     end;
     Body.Writer.flush response_body (function `Written -> Body.Writer.close response_body | _ -> ()) in
 
-  Httpun_lwt_unix.Server.create_connection_handler ~request_handler ~error_handler sockaddr  fd
+  Httpun_lwt_unix.Server.create_connection_handler ~request_handler ~error_handler sockaddr fd
 
 let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
   Server_common.server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer connection_handler servers

@@ -37,6 +37,8 @@
   yaml
   httpun-lwt-unix
   httpun-ws-lwt-unix
+  tls-lwt
+  lwt_ssl
  )
  (conflicts
   (js_of_ocaml-lwt (< 6.0.0))
