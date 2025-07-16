@@ -30,7 +30,7 @@ type options = {
   error_type : core_type;
   security_type : core_type;
   debug : bool;
-  directory : string option;
+  directory : expression option;
   service : expression option;
   nargs : int;
 }
@@ -247,14 +247,7 @@ let get_options ~loc ?(options=default_options loc) ?name p =
         | "input_example" -> name, { acc with input_example = [%expr Some [%e e]] }
         | "output_example" -> name, { acc with output_example = [%expr Some [%e e]] }
         | "debug" -> name, { acc with debug = true }
-        | "dir" -> begin match e.pexp_desc with
-            | Pexp_constant cst ->
-              begin match string_literal cst with
-                | Some s -> name, { acc with directory = Some s }
-                | _ -> Format.eprintf "directory should be a string literal"; name, acc
-              end
-            | _ -> Format.eprintf "directory should be a literal"; name, acc
-          end
+        | "dir" -> name, { acc with directory = Some e }
         | "service" ->
           name, { acc with service = Some e; error_type = [%type: _]; security_type = [%type: _] }
         | _ -> name, acc) (name, options) l
@@ -579,16 +572,15 @@ let service_params_item ~loc ~name options =
 let first = ref true
 
 let ppx_dir ~loc dir =
-  if !first && dir = None then (
-    first := false;
-    [%str let ppx_dir = EzAPIServerUtils.empty])
+  first := false;
+  if !first && dir = None then [%str let ppx_dir = EzAPIServerUtils.empty]
   else []
 
 let register name a =
   let loc = a.attr_loc in
   let _, options = get_options ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let ppx_dir_str = ppx_dir ~loc options.directory in
+  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
   match options.service with
   | None -> Location.raise_errorf ~loc "service not defined"
   | Some e ->
@@ -596,18 +588,17 @@ let register name a =
       | Pexp_ident {txt; _} -> Some (Longident.name txt)
       | _ -> None in
     let register =
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
-        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            e; evar ~loc name; evar ~loc ppx_dir_name ]) in
-    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+      value_binding ~loc ~pat:[%pat? ppx_dir]
+        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [ e; evar ~loc name; ppx_dir ]) in
+    let str = ppx_dir_str @ [ pstr_value ~loc Nonrecursive [ register ] ] in
     if options.debug then Format.printf "%a@." Pprintast.structure str;
     str, service_name
 
 let register_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let _, options = get_options ~loc a.attr_payload in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let ppx_dir_str = ppx_dir ~loc options.directory in
+  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
   let onclose = match onclose with
     | [] -> [%expr None]
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
@@ -619,14 +610,14 @@ let register_ws ~onclose react_name bg_name a =
       | Pexp_ident {txt; _} -> Some (Longident.name txt)
       | _ -> None in
     let register =
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+      value_binding ~loc ~pat:[%pat? ppx_dir]
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, e;
             Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc ppx_dir_name ]) in
-    let str = ppx_dir @ [ pstr_value ~loc Nonrecursive [ register ] ] in
+            Nolabel, ppx_dir ]) in
+    let str = ppx_dir_str @ [ pstr_value ~loc Nonrecursive [ register ] ] in
     if options.debug then Format.printf "%a@." Pprintast.structure str;
     str, service_name
 
@@ -637,14 +628,14 @@ let process ~it name a =
   let req = match service_params_item ~loc ~name options with
     | None -> []
     | Some it -> [ it ] in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let ppx_dir_str = ppx_dir ~loc options.directory in
+  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
   let register =
     pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+      value_binding ~loc ~pat:[%pat? ppx_dir]
         ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [
-            evar ~loc service_name; evar ~loc name; evar ~loc ppx_dir_name ]) ] in
-  let str = ppx_dir @ [ service ] @ req @ [ it; register ] in
+            evar ~loc service_name; evar ~loc name; ppx_dir ]) ] in
+  let str = ppx_dir_str @ [ service ] @ req @ [ it; register ] in
   if options.debug then Format.printf "%a@." Pprintast.structure str;
   str
 
@@ -656,23 +647,23 @@ let process_ws ~it ~onclose react_name bg_name a =
   let req = match service_params_item ~loc ~name:react_name options with
     | None -> []
     | Some it -> [ it ] in
-  let ppx_dir = ppx_dir ~loc options.directory in
-  let ppx_dir_name = match options.directory with None -> "ppx_dir" | Some s -> s in
+  let ppx_dir_str = ppx_dir ~loc options.directory in
+  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
   let onclose = match onclose with
     | [] -> [%expr None]
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
     | _ -> Location.raise_errorf ~loc "too many value bindings" in
   let register =
     pstr_value ~loc Nonrecursive [
-      value_binding ~loc ~pat:(pvar ~loc ppx_dir_name)
+      value_binding ~loc ~pat:[%pat? ppx_dir]
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, evar ~loc service_name;
             Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
-            Nolabel, evar ~loc ppx_dir_name ]) ] in
+            Nolabel, ppx_dir ]) ] in
   if options.debug then Format.printf "%a@." Pprintast.structure_item register;
-  ppx_dir @ [ service ] @ req @ [ it; register ]
+  ppx_dir_str @ [ service ] @ req @ [ it; register ]
 
 let rec find_req_pattern_ext p =
   match p.ppat_desc with
