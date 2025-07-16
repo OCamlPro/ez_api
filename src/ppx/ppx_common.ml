@@ -572,9 +572,11 @@ let service_params_item ~loc ~name options =
 let first = ref true
 
 let ppx_dir ~loc dir =
+  let str =
+    if !first && dir = None then [%str let ppx_dir = EzAPIServerUtils.empty]
+    else [] in
   first := false;
-  if !first && dir = None then [%str let ppx_dir = EzAPIServerUtils.empty]
-  else []
+  str
 
 let register name a =
   let loc = a.attr_loc in
