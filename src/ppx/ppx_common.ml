@@ -33,6 +33,7 @@ type options = {
   directory : expression option;
   service : expression option;
   nargs : int;
+  req: string option;
 }
 
 let loc = !Ast_helper.default_loc
@@ -151,7 +152,7 @@ let default_options loc = {
   security = !global_security; register=[%expr true]; input_example = [%expr None];
   hide = [%expr None]; output_example = [%expr None]; error_type = !global_error_type;
   security_type = !global_security_type;
-  debug = false; directory = None; service = None; nargs=0;
+  debug = false; directory = None; service = None; nargs=0; req=None;
 }
 
 let methods = [ "get"; "post"; "put"; "patch"; "delete" ]
@@ -250,6 +251,11 @@ let get_options ~loc ?(options=default_options loc) ?name p =
         | "dir" -> name, { acc with directory = Some e }
         | "service" ->
           name, { acc with service = Some e; error_type = [%type: _]; security_type = [%type: _] }
+        | "req" ->
+          begin match e.pexp_desc with
+            | Pexp_constant cst -> name, { acc with req = string_literal cst }
+            | _ -> name, acc
+          end
         | _ -> name, acc) (name, options) l
   | PStr [ {pstr_desc=Pstr_eval ({pexp_desc=Pexp_ident _; _} as e, _); _} ] ->
     name, { options with service = Some e; error_type = [%type: _]; security_type = [%type: _] }
@@ -763,8 +769,8 @@ let server ~loc p =
 
 (** request *)
 
-let request_expr ~meth ~name ?sname ?req ~loc options =
-  let pat = pvar ~loc (match req with Some s -> s | None -> meth ^ "_" ^ name) in
+let request_expr ~meth ~name ?sname ~loc options =
+  let pat = pvar ~loc (match options.req with Some s -> s | None -> meth ^ "_" ^ name) in
   let f, headers_expr = match !global_headers with
     | None -> (fun e -> [%expr fun ?headers -> [%e e]]), [%expr headers]
     | Some h -> (fun e -> [%expr fun ?(headers=[%e h]) -> [%e e]]), [%expr Some headers] in
@@ -794,8 +800,8 @@ let request_expr ~meth ~name ?sname ?req ~loc options =
     ] in
   pat, expr
 
-let request_value ~meth ~name ?sname ?req ~loc options =
-  let pat, expr = request_expr ~meth ~name ?sname ?req ~loc options in
+let request_value ~meth ~name ?sname ~loc options =
+  let pat, expr = request_expr ~meth ~name ?sname ~loc options in
   let it = pstr_value ~loc Nonrecursive [ value_binding ~loc ~pat ~expr ] in
   if options.debug then Format.printf "%a@." Pprintast.structure_item it;
   it
@@ -1137,11 +1143,11 @@ let deriver_str_gen kind meth ~loc ~path:_ (rec_flag, l) path input output error
     hide = Option.value ~default:options.hide hide;
     input_example = Option.fold ~none:options.input_example ~some input_example;
     output_example = Option.fold ~none:options.output_example ~some output_example;
-    debug; nargs;
+    debug; nargs; req = req_name;
   } in
   let s, _, options = service_value ~meth ~loc ~options ~name:sname ~parse_options:false (PStr []) in
   let s = match kind with
-    | Some `request -> [ s; request_value ~loc ~meth ~name:tname ?req:req_name options ]
+    | Some `request -> [ s; request_value ~loc ~meth ~name:tname options ]
     | _ -> [ s ] in
   match service_params_item ~loc ~name:tname options with
   | None -> s
