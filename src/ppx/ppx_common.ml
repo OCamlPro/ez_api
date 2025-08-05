@@ -697,20 +697,20 @@ let handler_args ~name e =
       p, [%expr match [%e evar ~loc (name ^ "_req")] _req with
         | Error e -> EzAPIServerUtils.return ([%e !global_req_error] e)
         | Ok [%p pvar ~loc id] -> [%e f]] in
-  match e.pexp_desc with
-  | Pexp_fun (_, _, p1, {pexp_desc=Pexp_fun (_, _, p2, {pexp_desc=Pexp_fun (_, _, p3, f); _}); _}) ->
+  match e with
+  | [%expr fun [%p? p1] [%p? p2] [%p? p3] -> [%e? f]] ->
     let f = match !global_wrapper with
       | None -> f
       | Some wrap -> eapply ~loc wrap [ f ] in
     let p1, f = aux p1 f in
     [%expr fun [%p p1] [%p p2] [%p p3] -> [%e f]]
-  | Pexp_fun (_, _, p1, {pexp_desc = Pexp_fun (_, _, p2, f); _}) ->
+  | [%expr fun [%p? p1] [%p? p2] -> [%e? f]] ->
     let f = match !global_wrapper with
       | None -> f
       | Some wrap -> eapply ~loc wrap [ f ] in
     let p1, f = aux p1 f in
     [%expr fun [%p p1] _ [%p p2] -> [%e f]]
-  | Pexp_fun (_, _, p, f) ->
+  | [%expr fun [%p? p] -> [%e? f]] ->
     let f = match !global_wrapper with
       | None -> f
       | Some wrap -> eapply ~loc wrap [ f ] in

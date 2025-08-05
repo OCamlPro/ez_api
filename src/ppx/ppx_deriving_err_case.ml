@@ -12,6 +12,14 @@ open Ppxlib
 open Ast_builder.Default
 open Ppx_deriving_encoding_lib
 
+let pexp_function ~loc l =
+  pexp_function ~loc l
+[@@if ast_version < 502]
+
+let pexp_function ~loc l =
+  pexp_function ~loc [] None @@ Pfunction_cases (l, loc, [])
+[@@if ast_version >= 502]
+
 let mk ~loc ?enc ?(kind_label="kind") ~title name code =
   let kind_enc = Utils.(enc_apply ~loc "obj1" [
       enc_apply ~loc "req" [
@@ -23,11 +31,10 @@ let mk ~loc ?enc ?(kind_label="kind") ~title name code =
   let encoding =
     if title then Utils.enc_apply ~loc "def" [ estring ~loc name; encoding ]
     else encoding in
-  let select = pexp_function ~loc [
-      case ~guard:None
-        ~lhs:(ppat_variant ~loc name (Option.map (fun _ -> [%pat? x]) enc))
-        ~rhs:(Option.fold ~none:[%expr Some ()] ~some:(fun _ -> [%expr Some ((), x)]) enc);
-      case ~guard:None ~lhs:[%pat? _] ~rhs:[%expr None] ] in
+  let select = [%expr function
+    | [%p ppat_variant ~loc name (Option.map (fun _ -> [%pat? x]) enc)] ->
+      [%e Option.fold ~none:[%expr Some ()] ~some:(fun _ -> [%expr Some ((), x)]) enc]
+    | _ -> None] in
   let deselect = Utils.pexp_fun
       (Option.fold ~none:[%pat? ()] ~some:(fun _ -> [%pat? ((), x)]) enc)
       (pexp_variant ~loc name (Option.map (fun _ -> [%expr x]) enc)) in

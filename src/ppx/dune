@@ -3,7 +3,7 @@
  (public_name ez_api.ppx_common)
  (optional)
  (modules ppx_common)
- (preprocess (pps ppxlib.metaquot))
+ (preprocess (pps ppxlib.metaquot ppxlib_optcomp))
  (libraries ppx_deriving_encoding.lib))
 
 (library
@@ -43,11 +43,17 @@
  (ppx_runtime_libraries ezReq_lwt))
 
 (library
+ (name ppxlib_optcomp)
+ (modules ppxlib_optcomp)
+ (libraries compiler-libs.common ppxlib)
+ (kind ppx_rewriter))
+
+(library
  (name ppx_deriving_err_case)
  (public_name ez_api.ppx_err_case)
  (optional)
  (modules ppx_deriving_err_case)
- (preprocess (pps ppxlib.metaquot))
+ (preprocess (pps ppxlib.metaquot ppxlib_optcomp))
  (kind ppx_rewriter)
  (ppx_runtime_libraries ez_api)
  (libraries ppx_deriving_encoding.lib ez_api))
