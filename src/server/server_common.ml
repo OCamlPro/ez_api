@@ -145,7 +145,7 @@ let establish_server_with_client_socket
 let read_body ~read body =
   let w, n = Lwt.wait () in
   let b = Buffer.create 100 in
-  let on_eof () = Lwt.wakeup n (Buffer.contents b) in
+  let on_eof () = Lwt.wakeup_later n (Buffer.contents b) in
   let rec on_read bs ~off ~len =
     Buffer.add_string b (Bigstringaf.substring bs ~off ~len);
     read body ~on_eof ~on_read in

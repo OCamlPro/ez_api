@@ -28,7 +28,7 @@ let ws_react_content react notify_close wsd content =
   | Error (`handler_error content) -> send ~kind:`Text ~content wsd
   | Error _ ->
     close ~code:`Internal_server_error wsd;
-    Lwt.wakeup notify_close ()
+    Lwt.wakeup_later notify_close ()
 
 let read_payload ~payload f =
   let b = Buffer.create 100 in
@@ -48,14 +48,14 @@ let ws_react react pong notify_close ~opcode ~payload wsd = match opcode with
     read_payload ~payload @@ fun content ->
     let application_data = make_data content in
     Wsd.send_pong ~application_data wsd
-  | `Connection_close -> Wsd.close wsd; Lwt.wakeup notify_close ()
+  | `Connection_close -> Wsd.close wsd; Lwt.wakeup_later notify_close ()
   | `Pong -> read_payload ~payload pong
   | `Text | `Binary -> read_payload ~payload (ws_react_content react notify_close wsd)
   | _ -> close ~code:`Protocol_error wsd
 
 let ws_loop bg notify_close wsd =
   let send : (EzAPIServerUtils.Directory.ws_frame, EzAPIServerUtils.Directory.handler_error) result -> unit = function
-    | Error _ -> close wsd; Lwt.wakeup notify_close ()
+    | Error _ -> close wsd; Lwt.wakeup_later notify_close ()
     | Ok `none -> ()
     | Ok (`binary content) -> send ~kind:`Binary ~content wsd
     | Ok (`text content) -> send ~kind:`Text ~content wsd in

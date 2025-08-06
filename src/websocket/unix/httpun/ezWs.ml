@@ -28,7 +28,7 @@ let error_handler notifier e =
     | `Malformed_response err -> Format.sprintf "malformed response: %s" err
     | `Invalid_response_body_length _ -> "invalid body length"
     | `Exn exn -> Printexc.to_string exn in
-  Lwt.wakeup notifier (Error e)
+  Lwt.wakeup_later notifier (Error e)
 
 let send ~content wsd =
   let len, off = String.length content, 0 in
@@ -55,7 +55,7 @@ let websocket_handler ?error ~react notifier action_notifier wsd =
     Wsd.close ?code wsd; Lwt.return_ok () in
   let send content = send ~content wsd; Lwt.return_ok () in
   let action = { send; close } in
-  Lwt.wakeup action_notifier action;
+  Lwt.wakeup_later action_notifier action;
   let frame ~opcode ~is_fin ~len:_ payload = match opcode with
     | `Ping ->
       read_payload ~payload @@ fun content ->
@@ -74,10 +74,10 @@ let websocket_handler ?error ~react notifier action_notifier wsd =
         Lwt.return_unit)
     | `Connection_close ->
       Wsd.close wsd;
-      Lwt.wakeup notifier (Ok ())
+      Lwt.wakeup_later notifier (Ok ())
     | _ ->
       Wsd.close ~code:`Protocol_error wsd;
-      Lwt.wakeup notifier (Error "protocol error") in
+      Lwt.wakeup_later notifier (Error "protocol error") in
   let eof ?error () =
     Option.iter (function `Exn exn -> Format.eprintf "websocket eof error: %s@." (Printexc.to_string exn)) error;
     Wsd.close wsd in

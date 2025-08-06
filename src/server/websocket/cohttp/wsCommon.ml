@@ -30,7 +30,7 @@ let ws_react react pong rclose rsend notify_close fr =
     else !rsend @@ Some (close 1000);
     Option.iter Lwt.async (snd !rclose);
     rclose := true, None;
-    Lwt.wakeup notify_close ()
+    Lwt.wakeup_later notify_close ()
   | Opcode.Pong -> pong fr.content
   | Opcode.Text | Opcode.Binary -> ws_react_content react !rsend fr.content
   | _ -> !rsend @@ Some (close 1002)

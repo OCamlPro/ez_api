@@ -12,7 +12,7 @@ open Nodejs_common
 
 let to_lwt f =
   let w, n = Lwt.wait () in
-  f (Lwt.wakeup n);
+  f (Lwt.wakeup_later n);
   w
 
 module Interface = struct

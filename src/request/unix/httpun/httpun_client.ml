@@ -130,8 +130,8 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
       Option.fold ~none:[] ~some:(fun c -> [ "content-length", string_of_int (String.length c)]) content @
       Option.fold ~none:[] ~some:(fun c -> [ "content-type", c]) content_type in
     let req = Request.create ~headers meth path in
-    let error_handler = error_handler (Lwt.wakeup notify) in
-    let response_handler = handler (Lwt.wakeup notify) in
+    let error_handler = error_handler (Lwt.wakeup_later notify) in
+    let response_handler = handler (Lwt.wakeup_later notify) in
     let>? body =
       Lwt.catch (fun () ->
           if scheme = "https" then

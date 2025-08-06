@@ -60,9 +60,9 @@ let connect ?msg ?protocols ?error ~react url =
            | None -> (); Js._true);
        let conn, n = Lwt.wait () in
        socket##.onclose := Dom.handler @@ (fun _e ->
-           Lwt.wakeup n @@ Ok (); Js._true);
+           Lwt.wakeup_later n @@ Ok (); Js._true);
        socket##.onopen := Dom.handler @@ (fun _e ->
-           Lwt.wakeup n0 (Ok {action; conn}); Js._true);
+           Lwt.wakeup_later n0 (Ok {action; conn}); Js._true);
        w0)
     (fun exn -> Lwt.return_error (Printexc.to_string exn))
 
