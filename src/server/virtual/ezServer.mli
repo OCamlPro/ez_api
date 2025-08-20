@@ -15,4 +15,6 @@ val server : ?catch:(string -> exn -> string Answer.t Lwt.t) ->
   ?allow_methods:allow_kind -> ?allow_credentials:bool -> ?footer:string ->
   (int * server_kind) list -> unit Lwt.t
 
+val shutdown : unit -> unit Lwt.t
+
 val set_debug : unit -> unit

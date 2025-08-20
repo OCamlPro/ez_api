@@ -113,6 +113,8 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     sockaddr
     fd
 
+let shutdown = Server_common.shutdown
+
 let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
   Server_common.server ~name:"HTTPAF" ?catch ?allow_origin ?allow_headers
     ?allow_methods ?allow_credentials ?footer connection_handler servers

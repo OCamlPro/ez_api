@@ -211,6 +211,8 @@ let mk_uri ~meth ~target ~header =
         uri
     end
 
+let server = ref None
+
 let create_server ?(name="HTTPUN") ~max_connections server_port server_kind handler =
   let open EzAPIServerUtils in
   let s = { server_port; server_kind } in
@@ -222,8 +224,13 @@ let create_server ?(name="HTTPUN") ~max_connections server_port server_kind hand
     ~nb_max_connections:max_connections
     listen_address (handler s)(* fun sockaddr fd -> *)
         (* handler ?catch ?allow_origin ?allow_headers ?allow_methods *)
-        (*   ?allow_credentials s sockaddr fd) *) >>= fun _server ->
+  (*   ?allow_credentials s sockaddr fd) *) >>= fun s ->
+  server := Some s;
   Lwt.return_unit
+
+let shutdown () = match !server with
+  | None -> Lwt.return_unit
+  | Some server -> Lazy.force server.shutdown
 
 let server ?name ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer handler servers =
   let max_connections =
