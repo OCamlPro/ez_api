@@ -69,6 +69,10 @@ type ('arg, 'input, 'output, 'error, 'security) ws_service1 =
 type ('arg1, 'arg2, 'input, 'output, 'error, 'security) ws_service2 =
   ((Req.t * 'arg1) * 'arg2, 'input, 'output, 'error, 'security) service
 
+type 'e api_error =
+  | KnownError of { code : int ; error : 'e }
+  | UnknownError of { code : int ; msg : string option }
+
 let warnings = ref []
 let warning s = warnings := s :: !warnings
 let warnings f =

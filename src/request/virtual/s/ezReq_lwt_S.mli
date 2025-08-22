@@ -10,7 +10,7 @@
 
 open EzAPI
 
-type 'e api_error =
+type 'e api_error = 'e EzAPI.api_error =
   | KnownError of { code : int ; error : 'e }
   | UnknownError of { code : int ; msg : string option }
 
