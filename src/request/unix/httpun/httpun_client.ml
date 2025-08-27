@@ -132,23 +132,26 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
     let req = Request.create ~headers meth path in
     let error_handler = error_handler (Lwt.wakeup_later notify) in
     let response_handler = handler (Lwt.wakeup_later notify) in
-    let>? body =
+    let>? body, shutdown =
       Lwt.catch (fun () ->
           if scheme = "https" then
             Httpun_tls.request ~hostname ~socket ~error_handler ~response_handler req
           else
             let> connection = Httpun_lwt_unix.Client.create_connection socket in
-            Lwt.return_ok @@ Httpun_lwt_unix.Client.request connection req ~error_handler ~response_handler)
+            let shutdown () = Httpun_lwt_unix.Client.shutdown connection in
+            Lwt.return_ok (Httpun_lwt_unix.Client.request connection req ~error_handler ~response_handler, shutdown))
         (fun exn -> Lwt.return_error (`exn exn)) in
     Option.iter (fun c -> Body.Writer.write_string body c) content;
     Body.Writer.close body;
-    match timeout with
-    | None -> w
-    | Some timeout ->
-      let timeout () =
-        let> () = EzLwtSys.sleep timeout in
-        Lwt.return_error (`timeout timeout) in
-      Lwt.pick [ w; timeout () ]
+    let> r = match timeout with
+      | None -> w
+      | Some timeout ->
+        let timeout () =
+          let> () = EzLwtSys.sleep timeout in
+          Lwt.return_error (`timeout timeout) in
+        Lwt.pick [ w; timeout () ] in
+    let> () = shutdown () in
+    Lwt.return r
 
 let call ?msg ?meth ?content ?content_type ?headers ?timeout url : (_, [> perform_error | http_error ]) result Lwt.t =
   let handler n = response_handler ?msg ~url ~res:Simple n in

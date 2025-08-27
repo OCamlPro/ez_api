@@ -8,7 +8,8 @@ let request ?(alpn_protocols=["http/1.1"]) ~hostname ~socket ~error_handler ~res
     let config = Result.get_ok @@ Tls.Config.client ~alpn_protocols ~authenticator ~peer_name () in
     Lwt.bind (Tls_lwt.Unix.client_of_fd config socket) @@ fun tls_client ->
     Lwt.bind (Httpun_lwt_unix.Client.TLS.create_connection tls_client) @@ fun connection ->
-    Lwt.return_ok @@ Httpun_lwt_unix.Client.TLS.request connection req ~error_handler ~response_handler
+    let shutdown () = Httpun_lwt_unix.Client.TLS.shutdown connection in
+    Lwt.return_ok (Httpun_lwt_unix.Client.TLS.request connection req ~error_handler ~response_handler, shutdown)
   | `SSL ->
     let client_ctx = Ssl.create_context Ssl.TLSv1_3 Ssl.Client_context in
     Ssl.honor_cipher_order client_ctx;
@@ -19,4 +20,5 @@ let request ?(alpn_protocols=["http/1.1"]) ~hostname ~socket ~error_handler ~res
     Ssl.set_host ssl_socket hostname;
     Lwt.bind (Lwt_ssl.ssl_perform_handshake uninitialized_socket) @@ fun ssl_client ->
     Lwt.bind (Httpun_lwt_unix.Client.SSL.create_connection ssl_client) @@ fun connection ->
-    Lwt.return_ok @@ Httpun_lwt_unix.Client.SSL.request connection req ~error_handler ~response_handler
+    let shutdown () = Httpun_lwt_unix.Client.SSL.shutdown connection in
+    Lwt.return_ok (Httpun_lwt_unix.Client.SSL.request connection req ~error_handler ~response_handler, shutdown)

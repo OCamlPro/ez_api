@@ -8,4 +8,5 @@ let request ?(alpn_protocols=["http/1.1"]) ~hostname ~socket ~error_handler ~res
   Ssl.set_host ssl_socket hostname;
   Lwt.bind (Lwt_ssl.ssl_perform_handshake uninitialized_socket) @@ fun ssl_client ->
   Lwt.bind (Httpun_lwt_unix.Client.SSL.create_connection ssl_client) @@ fun connection ->
-  Lwt.return_ok @@ Httpun_lwt_unix.Client.SSL.request connection req ~error_handler ~response_handler
+  let shutdown () = Httpun_lwt_unix.Client.SSL.shutdown connection in
+  Lwt.return_ok (Httpun_lwt_unix.Client.SSL.request connection req ~error_handler ~response_handler, shutdown)
