@@ -29,7 +29,7 @@
   cohttp-lwt-unix
   cohttp-lwt-jsoo
   httpaf-lwt-unix
-  ocurl
+  curl_lwt
   ezjs_fetch
   websocket-lwt-unix
   ppx_deriving_encoding
@@ -47,7 +47,6 @@
   (calendar (< 2.03.0))
   (httpaf-lwt-unix (< 0.6.0))
   (ezjs_fetch (< 0.2))
-  (ocurl (< 0.8.0))
   (digestif (< 1.0.0))
   (ppx_deriving_encoding (< 0.4.0))
 ))
