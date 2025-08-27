@@ -15,4 +15,6 @@ let server ?catch:_ ?allow_origin:_ ?allow_headers:_ ?allow_methods:_ ?allow_cre
      or:  `opam install httpaf-lwt-unix`@.";
   Lwt.return_unit
 
+let shutdown () = Lwt.return_unit
+
 let set_debug () = ()
