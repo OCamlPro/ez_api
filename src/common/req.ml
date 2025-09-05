@@ -28,11 +28,9 @@ let dummy = {
   req_id = Uuidm.nil
 }
 
-let add_params ?(decode=false) req params =
+let add_params req params =
   let req_params =
     List.fold_left (fun map (arg, l1) ->
-        let arg = if decode then Url.decode arg else arg in
-        let l1 = if decode then List.map Url.decode l1 else l1 in
         match StringMap.find_opt arg map with
         | Some l0 -> StringMap.add arg (l0 @ l1) map
         | None -> StringMap.add arg l1 map
@@ -48,7 +46,7 @@ let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) uri =
   let content_type = match StringMap.find_opt "content-type" headers with
     | Some (c :: _) -> Some c
     | _ -> None in
-  path_str, path, content_type, add_params ~decode:true req (Uri.query uri)
+  path_str, path, content_type, add_params req (Uri.query uri)
 
 let find_params p req = StringMap.find_opt p.Param.param_id req.req_params
 
