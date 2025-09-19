@@ -92,3 +92,5 @@ let header_params ?(debug=false) s =
           acc
       ) [] l in
     value, params
+
+let user_agent_header = ref (Some ("user-agent", "ez_api/2.1.1"))

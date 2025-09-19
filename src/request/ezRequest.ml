@@ -119,6 +119,12 @@ module Make(S : Interface) : S = struct
       let meth = Service.meth service.s in
       let input_encoding = Service.input service.s in
       let url = forge api service arg params in
+      let headers = match !Req.user_agent_header, headers with
+        | None, _ -> headers
+        | Some h, None -> Some [ h ]
+        | Some h, Some l ->
+          if List.exists (fun (k, _) -> String.lowercase_ascii k = "user-agent") l then Some l
+          else Some (h :: l) in
       match input_encoding with
       | Empty ->
         if post then

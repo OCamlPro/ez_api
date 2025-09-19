@@ -125,9 +125,10 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
     let> addresses = Lwt_unix.getaddrinfo hostname (Int.to_string port) [Unix.(AI_FAMILY PF_INET)] in
     let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     let> () = Lwt_unix.connect socket (List.hd addresses).Unix.ai_addr in
+    let host = if (port <> 80 && port <> 443) then Format.sprintf "%s:%d" hostname port else hostname in
     let headers = Headers.of_list @@
-      [ "host", hostname ] @ headers @
-      Option.fold ~none:[] ~some:(fun c -> [ "content-length", string_of_int (String.length c)]) content @
+      [ "host", host ] @ headers @
+      Option.fold ~none:[ "content-length", "0" ] ~some:(fun c -> [ "content-length", string_of_int (String.length c)]) content @
       Option.fold ~none:[] ~some:(fun c -> [ "content-type", c]) content_type in
     let req = Request.create ~headers meth path in
     let error_handler = error_handler (Lwt.wakeup_later notify) in
