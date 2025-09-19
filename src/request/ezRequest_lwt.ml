@@ -34,12 +34,21 @@ module Make(S : Interface) : S = struct
     any_get := S.get;
     any_post := S.post
 
+  let add_user_agent ?headers () =
+    match !Req.user_agent_header, headers with
+    | None, _ -> headers
+    | Some h, None -> Some [ h ]
+    | Some h, Some l ->
+      if List.exists (fun (k, _) -> String.lowercase_ascii k = "user-agent") l then Some l
+      else Some (h :: l)
+
   (* print warnings generated when building the URL before
    sending the request *)
   let internal_get ?meth ?headers ?msg (URL url) =
     EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ Meth.to_string m) in
+    let headers = add_user_agent ?headers () in
     S.get ?meth ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
@@ -48,6 +57,7 @@ module Make(S : Interface) : S = struct
     EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ Meth.to_string m) in
+    let headers = add_user_agent ?headers () in
     S.post ?meth ?content_type ?content ?headers ?msg url >|= fun code ->
     !request_reply_hook ();
     code
@@ -113,12 +123,6 @@ module Make(S : Interface) : S = struct
       let meth = Service.meth service.s in
       let input_encoding = Service.input service.s in
       let url = forge api service arg params in
-      let headers = match !Req.user_agent_header, headers with
-        | None, _ -> headers
-        | Some h, None -> Some [ h ]
-        | Some h, Some l ->
-          if List.exists (fun (k, _) -> String.lowercase_ascii k = "user-agent") l then Some l
-          else Some (h :: l) in
       begin match input_encoding with
         | Empty ->
           if post then
