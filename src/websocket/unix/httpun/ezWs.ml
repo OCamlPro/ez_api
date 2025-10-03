@@ -109,7 +109,7 @@ let connect0 ?msg ?protocols ?error ~react base service =
     let action = {send; close = action.close} in
     match EzAPI.IO.res_from_string output (res_encoding errors) (react action) s with
     | Ok r -> r
-    | Error (`destruct_exn exn) -> Lwt.return_error (Printexc.to_string exn) in
+    | Error (`destruct_exn exn) -> Lwt.return_error (Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn) in
   let+ r = connect ?msg ?protocols ?error ~react url in
   match r with
   | Error e -> Error e

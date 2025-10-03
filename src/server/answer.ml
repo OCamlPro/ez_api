@@ -32,7 +32,7 @@ let method_not_allowed () = return ~code:405 ""
 let destruct_exception exn =
   let body = EzEncoding.construct Json_encoding.any_ezjson_value @@
     `O [ "error", `String "Destruct exception";
-         "exception", `String (Printexc.to_string exn) ] in
+         "exception", `String (Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn) ] in
   return ~code:400 ~headers body
 
 let unsupported_media_type c =
