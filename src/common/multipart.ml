@@ -35,7 +35,7 @@ let make_form_data ?debug ?(index=0) ~headers contents =
     let n = String.length s in
     if n > 1 && String.get s 0 = '"' && String.get s (n-1) = '"' then String.sub s 1 (n-2)
     else s in
-  let fo_content = String.concat "/r/n" contents in
+  let fo_content = String.concat "\r\n" contents in
   let default = Format.sprintf "part%d" index in
   let fo_name, fo_filename, fo_headers = match Req.StringMap.find_opt "content-disposition" headers with
     | Some [ cd ] ->
