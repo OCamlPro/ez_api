@@ -115,6 +115,9 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout handler url
     | _, None -> `GET
     | _ -> `POST in
   log ~meth:(Method.to_string meth) url msg;
+  (if !Verbose.v land 4 <> 0 then
+     Format.printf "[ez_api] headers\n  %s@." @@
+     String.concat "\n  " @@ List.map (fun (k, v) -> k ^ " : " ^ v) headers);
   (match !Verbose.v land 2 <> 0, content with
    | true, Some content when content <> "" -> Format.printf "[ez_api] sent:\n%s@." content;
    | _ -> ());

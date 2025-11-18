@@ -12,7 +12,7 @@
   verbose binary flag
   1: string received over http
   2: string sent over http
-  4: library logs
+  4: library logs or headers
 *)
 
 let v = match Sys.getenv_opt "EZAPICLIENT" with
