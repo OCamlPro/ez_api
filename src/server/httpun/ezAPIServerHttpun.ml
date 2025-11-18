@@ -76,7 +76,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     | `ws (Ok ()) -> Lwt.return_unit
     | `http {Answer.code; body; headers=resp_headers} ->
       let status = Status.unsafe_of_code code in
-      debug ~v:(if code = 200 then 1 else 0) "Reply computed to %S: %d" path_str code;
+      debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
       debugf ~v:3 (fun () ->
           let content_type = List.assoc_opt "content-type" resp_headers in
           if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
