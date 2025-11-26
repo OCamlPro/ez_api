@@ -191,7 +191,7 @@ let get_err_case_options ~loc l =
 
 let transform =
   object
-    inherit Ast_traverse.map
+    inherit Ast_traverse.map as super
     method! structure_item it = match it.pstr_desc with
       | Pstr_extension (({txt="err_case"; _}, PStr [{pstr_desc=Pstr_value (_, l); pstr_loc=loc; _}]), _) ->
         let l, debug = List.fold_left (fun (acc, acc_debug) vb ->
@@ -217,7 +217,7 @@ let transform =
         let it = pstr_value ~loc Nonrecursive l in
         if debug then Format.printf "%a@." Pprintast.structure_item it;
         it
-      | _ -> it
+      | _ -> super#structure_item it
   end
 
 let () =
