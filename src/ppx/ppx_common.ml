@@ -684,7 +684,7 @@ let rec find_req_pattern_ext p =
     end
   | _ -> None
 
-let handler_args ~name e =
+let handler_args ~name ?(wrap=true) e =
   let loc = e.pexp_loc in
   let aux p f =
     match find_req_pattern_ext p with
@@ -699,21 +699,21 @@ let handler_args ~name e =
         | Ok [%p pvar ~loc id] -> [%e f]] in
   match e with
   | [%expr fun [%p? p1] [%p? p2] [%p? p3] -> [%e? f]] ->
-    let f = match !global_wrapper with
-      | None -> f
-      | Some wrap -> eapply ~loc wrap [ f ] in
+    let f = match !global_wrapper, wrap with
+      | None, _ | _, false -> f
+      | Some wrap, true -> eapply ~loc wrap [ f ] in
     let p1, f = aux p1 f in
     [%expr fun [%p p1] [%p p2] [%p p3] -> [%e f]]
   | [%expr fun [%p? p1] [%p? p2] -> [%e? f]] ->
-    let f = match !global_wrapper with
-      | None -> f
-      | Some wrap -> eapply ~loc wrap [ f ] in
+    let f = match !global_wrapper, wrap with
+      | None, _ | _, false -> f
+      | Some wrap, true -> eapply ~loc wrap [ f ] in
     let p1, f = aux p1 f in
     [%expr fun [%p p1] _ [%p p2] -> [%e f]]
   | [%expr fun [%p? p] -> [%e? f]] ->
-    let f = match !global_wrapper with
-      | None -> f
-      | Some wrap -> eapply ~loc wrap [ f ] in
+    let f = match !global_wrapper, wrap with
+      | None, _ | _, false -> f
+      | Some wrap, true -> eapply ~loc wrap [ f ] in
     [%expr fun _ _ [%p p] -> [%e f]]
   | _ -> e
 
@@ -830,7 +830,8 @@ let transform ?kind () =
               | [ a ], pvb_attributes ->
                 begin match v.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name;_} ->
-                    let pvb_expr = handler_args ~name v.pvb_expr in
+                    let wrap = not (List.exists (fun a -> a.attr_name.txt = "nowrap") pvb_attributes) in
+                    let pvb_expr = handler_args ~name ~wrap v.pvb_expr in
                     let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
                     let str = process ~it name a in
                     (List.rev str) @ acc
@@ -844,7 +845,8 @@ let transform ?kind () =
                     begin match v.pvb_pat.ppat_desc with
                       | Ppat_var {txt=name;_} ->
                         let register_str, service_name = register name a in
-                        let pvb_expr = handler_args ~name:(Option.value ~default:name service_name)  v.pvb_expr in
+                        let wrap = not (List.exists (fun a -> a.attr_name.txt = "nowrap") pvb_attributes) in
+                        let pvb_expr = handler_args ~name:(Option.value ~default:name service_name) ~wrap v.pvb_expr in
                         let it = {it with pstr_desc = Pstr_value (rflag, [ {v with pvb_expr; pvb_attributes }])} in
                         (List.rev register_str) @ it :: acc
                       | _ -> (self#structure_item it) :: acc
@@ -862,8 +864,10 @@ let transform ?kind () =
               | [ a ], pvb_attributes ->
                 begin match v_react.pvb_pat.ppat_desc, v_bg.pvb_pat.ppat_desc with
                   | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
-                    let pvb_expr_react = handler_args ~name:name_react v_react.pvb_expr in
-                    let pvb_expr_bg = handler_args ~name:name_react v_bg.pvb_expr in
+                    let wrap_react = not (List.exists (fun a -> a.attr_name.txt = "nowrap") v_react.pvb_attributes) in
+                    let pvb_expr_react = handler_args ~name:name_react ~wrap:wrap_react v_react.pvb_expr in
+                    let wrap_bg = not (List.exists (fun a -> a.attr_name.txt = "nowrap") v_bg.pvb_attributes) in
+                    let pvb_expr_bg = handler_args ~name:name_react ~wrap:wrap_bg v_bg.pvb_expr in
                     let pvb_attributes, vs = match onclose with
                       | [] -> pvb_attributes, []
                       | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
@@ -883,8 +887,10 @@ let transform ?kind () =
                       | Ppat_var {txt=name_react;_}, Ppat_var {txt=name_bg;_} ->
                         let str, service_name = register_ws ~onclose name_react name_bg a in
                         let service_name = Option.value ~default:name_react service_name in
-                        let pvb_expr_react = handler_args ~name:service_name v_react.pvb_expr in
-                        let pvb_expr_bg = handler_args ~name:service_name v_bg.pvb_expr in
+                        let wrap_react = not (List.exists (fun a -> a.attr_name.txt = "nowrap") v_react.pvb_attributes) in
+                        let pvb_expr_react = handler_args ~name:service_name ~wrap:wrap_react v_react.pvb_expr in
+                        let wrap_bg = not (List.exists (fun a -> a.attr_name.txt = "nowrap") v_bg.pvb_attributes) in
+                        let pvb_expr_bg = handler_args ~name:service_name ~wrap:wrap_bg v_bg.pvb_expr in
                         let pvb_attributes, vs = match onclose with
                           | [] -> pvb_attributes, []
                           | v :: t -> v_bg.pvb_attributes, {v with pvb_attributes} :: t in
