@@ -98,6 +98,9 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
         ?allow_methods ?allow_credentials ?origin resp_headers in
     let status = Code.status_of_code code in
     debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
+    debugf ~v:4 (fun () ->
+        List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
+      );
     debugf ~v:3 (fun () ->
         let content_type = List.assoc_opt "content-type" resp_headers in
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then

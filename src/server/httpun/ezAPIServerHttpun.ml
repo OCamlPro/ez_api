@@ -77,15 +77,18 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
     | `http {Answer.code; body; headers=resp_headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      debugf ~v:3 (fun () ->
-          let content_type = List.assoc_opt "content-type" resp_headers in
-          if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-            EzDebug.printf "Reply content:\n%s" body);
       let origin = match allow_origin with
         | Some `origin -> StringMap.find_opt "origin" headers
         | _ -> None in
       let headers = merge_headers_with_default ?allow_origin ?allow_headers
           ?allow_methods ?allow_credentials ?origin resp_headers in
+      debugf ~v:4 (fun () ->
+          List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
+        );
+      debugf ~v:3 (fun () ->
+          let content_type = List.assoc_opt "content-type" resp_headers in
+          if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
+            EzDebug.printf "Reply content:\n%s" body);
       let headers = Headers.of_list headers in
       let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
       let len = String.length body in
