@@ -195,11 +195,13 @@ let transform =
     method! structure_item it = match it.pstr_desc with
       | Pstr_extension (({txt="err_case"; _}, PStr [{pstr_desc=Pstr_value (_, l); pstr_loc=loc; _}]), _) ->
         let l, debug = List.fold_left (fun (acc, acc_debug) vb ->
-            let typ, e, pat = match vb.pvb_expr.pexp_desc, vb.pvb_pat.ppat_desc with
-              | Pexp_constraint (e, typ), (Ppat_constraint ({ppat_desc=p; _}, _) | p) ->
+            let typ, e, pat = match vb with
+              | {pvb_expr={pexp_desc=Pexp_constraint (e, typ); _}; pvb_pat={ppat_desc=(Ppat_constraint ({ppat_desc=p; _}, _) | p); _}; _} ->
                 remove_poly typ, e, { vb.pvb_pat with ppat_desc=p }
-              | _, Ppat_constraint (p, typ) ->
-                remove_poly typ, vb.pvb_expr, p
+              | {pvb_expr; pvb_pat={ppat_desc=Ppat_constraint (p, typ); _}; _} ->
+                remove_poly typ, pvb_expr, p
+              | {pvb_expr; pvb_pat; pvb_constraint=Some Pvc_constraint { typ; _ }; _} [@if ast_version >=502] ->
+                remove_poly typ, pvb_expr, pvb_pat
               | _ -> Location.raise_errorf ~loc "no error type given to derive the error case" in
             let code, debug, def = match e.pexp_desc with
               | Pexp_constant Pconst_integer (s, _) -> int_of_string s, false, true

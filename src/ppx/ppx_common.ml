@@ -385,12 +385,15 @@ let param_options ~typ ~id ?kind ?schema ?destruct ?construct ?json_kind e = mat
       ) param l
   | _ -> Location.raise_errorf ~loc:e.pexp_loc "param options not understood"
 
-let param_value p e =
-  let loc = p.ppat_loc in
-  let t = match p.ppat_desc, e.pexp_desc with
-    | _, Pexp_constraint (_, t) | Ppat_constraint (_, t), _ -> remove_poly t
+let param_value vb =
+  let loc = vb.pvb_loc in
+  let t = match vb with
+    | { pvb_expr={pexp_desc=Pexp_constraint (_, t); _}; _}
+    | { pvb_pat={ppat_desc=Ppat_constraint (_, t); _}; _} -> remove_poly t
+    | { pvb_constraint = Some Pvc_constraint { typ; _ }; _ } [@if ast_version >= 502] ->
+      remove_poly typ
     | _ -> [%type: string] in
-  let p, e = remove_pat_constraint p, remove_expr_constraint e in
+  let p, e = remove_pat_constraint vb.pvb_pat, remove_expr_constraint vb.pvb_expr in
   let name = match p.ppat_desc with
     | Ppat_var {txt; _} -> txt
     | _ -> Location.raise_errorf ~loc:p.ppat_loc "wrong param pattern" in
@@ -723,10 +726,7 @@ type server_options = {
   port: expression;
   dir: expression;
   catch: expression;
-  allow_headers: expression;
   allow_origin: expression;
-  allow_methods: expression;
-  allow_credentials: expression;
   servers: expression list;
 }
 
@@ -734,8 +734,7 @@ let server_options e =
   let loc = e.pexp_loc in
   let dft port = {
     port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
-    allow_origin = [%expr None]; allow_methods = [%expr None]; allow_headers = [%expr None];
-    allow_credentials = [%expr None]; servers=[] } in
+    allow_origin = [%expr None]; servers=[] } in
   match e.pexp_desc with
   | Pexp_constant c -> dft (pexp_constant ~loc c)
   | Pexp_record (l, _) ->
@@ -744,10 +743,7 @@ let server_options e =
         | "port" -> { acc with port = e }
         | "dir" -> { acc with dir = e }
         | "catch" -> { acc with catch = [%expr Some [%e e]] }
-        | "headers" -> { acc with allow_headers = [%expr Some [%e e]] }
-        | "methods" -> { acc with allow_methods = [%expr Some [%e e]] }
         | "origin" -> { acc with allow_origin = [%expr Some [%e e]] }
-        | "credentials" -> { acc with allow_credentials = [%expr Some [%e e]] }
         | "servers" ->
           begin match get_list_expr e with
             | None -> acc
@@ -763,9 +759,7 @@ let server_aux e =
     | [] -> [%expr [ [%e options.port], EzAPIServerUtils.API [%e options.dir] ] ]
     | l -> elist ~loc l in
   [%expr
-    EzAPIServer.server ?catch:[%e options.catch] ?allow_headers:[%e options.allow_headers]
-      ?allow_methods:[%e options.allow_methods] ?allow_origin:[%e options.allow_origin]
-      ?allow_credentials:[%e options.allow_credentials] [%e l]
+    EzAPIServer.server ?catch:[%e options.catch] ?allow_origin:[%e options.allow_origin] [%e l]
   ]
 
 let server ~loc p =
@@ -1050,7 +1044,7 @@ let transform ?kind () =
                 acc
             end
           | Pstr_extension (({txt=("param"|"parameter"); loc}, PStr [ { pstr_desc = Pstr_value (_, l); _} ]), _)  ->
-            let lp, ltr = List.split @@ List.map (fun vb -> param_value vb.pvb_pat vb.pvb_expr) l in
+            let lp, ltr = List.split @@ List.map param_value l in
             let lcons, ldes = List.split ltr in
             let it_p = pstr_value ~loc Nonrecursive lp in
             let it_cons = pstr_value ~loc Nonrecursive lcons in
