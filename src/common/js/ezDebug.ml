@@ -10,5 +10,5 @@
 
 open Js_of_ocaml
 
-let printf fmt = Printf.kprintf (fun s -> Console.console##debug (Js.string s)) fmt
+let printf fmt = Printf.ksprintf (fun s -> Console.console##debug (Js.string s)) fmt
 let log s = Console.console##log (Js.string s)

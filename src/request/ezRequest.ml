@@ -55,7 +55,7 @@ module Make(S : Interface) : S = struct
   (* print warnings generated when building the URL before
    sending the request *)
   let internal_get ?meth ?headers ?msg ?error (URL url) f =
-    EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
+    EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m ->
       Some (String.uppercase_ascii @@ Meth.to_string m) in
     let headers = add_user_agent ?headers () in
@@ -70,7 +70,7 @@ module Make(S : Interface) : S = struct
            | Some f -> f n body)
 
   let internal_post ?meth ?content_type ?content ?headers ?msg ?error (URL url) f =
-    EzAPI.warnings (fun s -> Printf.kprintf EzDebug.log "EzRequest.warning: %s" s);
+    EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ Meth.to_string m) in
     let headers = add_user_agent ?headers () in

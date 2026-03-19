@@ -130,22 +130,25 @@ let io_to_answer : type a. code:int -> headers:(string * string) list -> a io ->
     {Answer.code; body; headers=("content-type", content_type)::headers}
   | Json enc ->
     let code = if code = -1 then 200 else code in
-    {Answer.code; body = EzEncoding.construct enc body;
-     headers=("content-type", "application/json")::headers}
+    { Answer.code; body = EzEncoding.construct enc body;
+      headers=("content-type", "application/json")::headers }
 
 let ser_handler :
-  type i o e. ?content_type:string -> access_control:(string * string) list
+  type i o e. ?content_type:string -> headers:StringSet.t StringMap.t
   -> ('a -> i -> (o, e) result Answer.t Lwt.t) -> 'a ->
   i io -> o io -> (e -> int * string) ->
   string -> (string Answer.t, handler_error) result Lwt.t =
-  fun ?content_type ~access_control handler args input output errors ->
+  fun ?content_type ~headers:h handler args input output errors ->
   let handle_result {Answer.code; body; headers} =
     match body with
-    | Ok o -> io_to_answer ~code ~headers:(headers @ access_control) output o
+    | Ok o ->
+      let headers = Cors.to_list @@ Cors.union h (Cors.of_list headers) in
+      io_to_answer ~code ~headers output o
     | Error e ->
       let c, body = errors e in
       let code = if code = -1 then c else code in
-      {Answer.code; body; headers=("content-type", "application/json")::access_control }
+      let headers = Cors.to_list h in
+      { Answer.code; body; headers=("content-type", "application/json") :: headers }
   in
   match input with
   | Empty -> (fun _ ->
@@ -187,24 +190,33 @@ let ser_websocket react bg args input output errors =
       (fun exn -> Lwt.return_error (`handler_exn exn)) in
   react, bg
 
+let options_headers dir = match MethMap.bindings dir.services with
+  | [] -> None
+  | l ->
+    let headers = Cors.allow_methods_header @@ List.map fst l in
+    let aux_sec acc s = StringSet.union acc (Security.headers (Service.security s)) in
+    let sec_set = List.fold_left (fun acc (_, rs) -> match rs with
+        | Http {service; _} -> aux_sec acc service
+        | Websocket {service; _} -> aux_sec acc service
+      ) StringSet.empty l in
+    let headers = Cors.insert headers (Cors.allow_headers_name, sec_set) in
+    let headers = Cors.union headers (Cors.allow_credentials_header (not (StringSet.is_empty sec_set))) in
+    let aux_ac acc s = Cors.union acc (Service.headers s) in
+    let headers = List.fold_left (fun acc (_,rs) -> match rs with
+        | Http {service; _} -> aux_ac acc service
+        | Websocket {service; _} -> aux_ac acc service
+      ) headers l in
+    Some (Cors.to_list headers)
+
 let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt.t =
   resolve [] dir r path >>= function
   | Error _ as err -> Lwt.return err
   | Ok (Dir (dir, args)) ->
     match meth with
     | None | Some `OPTIONS ->
-      begin match MethMap.bindings dir.services with
-        | [] -> Lwt.return_error `Not_found
-        | l ->
-          (* Todo : combine access control headers correctly. *)
-          let access_control = List.fold_left (fun acc (_,rs) -> match rs with
-              | Http {service; _} when acc = [] -> Service.access_control service
-              | _ -> acc) [] l in
-          let meths = Meth.headers @@ List.map fst l in
-          let sec_set = List.fold_left (fun acc (_, rs) -> match rs with
-              | Http {service; _} -> Security.StringSet.union acc (Security.headers (Service.security service))
-              | Websocket _ -> acc) Security.StringSet.empty l in
-          Lwt.return_ok @@ `options (access_control @ meths @ (Security.header sec_set))
+      begin match options_headers dir with
+        | None -> Lwt.return_error `Not_found
+        | Some headers -> Lwt.return_ok (`options headers)
       end
     | Some `HEAD -> Lwt.return_ok `head
     | Some (#Meth.t as m) ->
@@ -214,8 +226,11 @@ let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result Lwt
           let input = Service.input service in
           let output = Service.output service in
           let errors = Service.errors_handler service in
-          let access_control = Service.access_control service in
-          let h = ser_handler ?content_type ~access_control handler args input output errors in
+          let headers = Service.headers service in
+          let sec_set = Security.headers (Service.security service) in
+          let headers = Cors.insert headers (Cors.allow_headers_name, sec_set) in
+          let headers = Cors.union headers (Cors.allow_credentials_header (not (StringSet.is_empty sec_set))) in
+          let h = ser_handler ?content_type ~headers handler args input output errors in
           Lwt.return_ok @@ `http h
         | `GET, Some (Websocket {service; react; bg; onclose; step}) ->
           let input = Service.input service in

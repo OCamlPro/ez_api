@@ -8,6 +8,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Misc
+
 type uninhabited = |
 type none = [ `Nosecurity of uninhabited ]
 type 'a apikey = { ref_name : string; name : 'a }
@@ -44,21 +46,14 @@ let params (l : [< scheme ] list) =
       | `Header _ | `Cookie _  -> acc
     ) [] l
 
-module StringSet = Set.Make(String)
-
 let headers (sec : [< scheme ] list) =
   List.fold_left (fun headers -> function
       | `Nosecurity _ -> headers
-      | `Basic _ | `Bearer _ -> StringSet.add "Authorization" headers
+      | `Basic _ | `Bearer _ -> StringSet.add "authorization" headers
       | `Query _ -> headers
       | `Header { name; _ } -> StringSet.add name headers
-      | `Cookie _ -> StringSet.add "Cookie" headers
+      | `Cookie _ -> StringSet.add "cookie" headers
     ) StringSet.empty sec
-
-let header s =
-  match StringSet.elements s with
-  | [] -> []
-  | l -> ["access-control-allow-headers", String.concat ", " l]
 
 let make_authorization_headers ~kind s =
   [ "authorization", kind ^ " " ^ s ]

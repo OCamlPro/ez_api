@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module StringMap = Map.Make(String)
+open Misc
 
 type version = [ `HTTP_1_0 | `HTTP_1_1 ]
 

@@ -54,4 +54,4 @@ let () =
   Printf.eprintf "Starting server on port %s\n%!"
     (String.concat ","
        (List.map (fun (port, _) -> string_of_int port) servers) ) ;
-  EzAPIServer.server servers
+  EzAPIServer.server ~allow_origin:(`custom [web_host]) servers

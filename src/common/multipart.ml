@@ -1,13 +1,15 @@
+open Misc
+
 type 'content form_data = {
   fo_name: string;
   fo_content: 'content;
   fo_filename: string option;
-  fo_headers: string list Req.StringMap.t;
+  fo_headers: string list StringMap.t;
 }
 
 let make ?(headers=[]) ?filename ~name content = {
   fo_name=name; fo_content=content; fo_filename=filename;
-  fo_headers=List.fold_left (fun acc (k, v) -> Req.StringMap.add k v acc) Req.StringMap.empty headers;
+  fo_headers=List.fold_left (fun acc (k, v) -> StringMap.add k v acc) StringMap.empty headers;
 }
 
 let split sep s =
@@ -24,25 +26,25 @@ let split sep s =
 let process_header ?(debug=false) map s = match String.split_on_char ':' s with
   | [ k; v ] ->
     let k, v = String.lowercase_ascii (String.trim k), String.trim v in
-    Req.StringMap.add k (String.split_on_char ',' v) map
+    StringMap.add k (String.split_on_char ',' v) map
   | _ ->
     if debug then Format.eprintf "malformed header: %s@." s;
     map
 
 let make_form_data ?debug ?(index=0) ~headers contents =
-  let headers = List.fold_left (process_header ?debug) Req.StringMap.empty headers in
+  let headers = List.fold_left (process_header ?debug) StringMap.empty headers in
   let unquote s =
     let n = String.length s in
     if n > 1 && String.get s 0 = '"' && String.get s (n-1) = '"' then String.sub s 1 (n-2)
     else s in
   let fo_content = String.concat "\r\n" contents in
   let default = Format.sprintf "part%d" index in
-  let fo_name, fo_filename, fo_headers = match Req.StringMap.find_opt "content-disposition" headers with
+  let fo_name, fo_filename, fo_headers = match StringMap.find_opt "content-disposition" headers with
     | Some [ cd ] ->
       let _, params = Req.header_params ?debug cd in
       Option.value ~default (List.find_map (fun (k, v) -> if k="name" then Some (unquote v) else None) params),
       List.find_map (fun (k, v) -> if k="filename" then Some (unquote v) else None) params,
-      Req.StringMap.remove "content-disposition" headers
+      StringMap.remove "content-disposition" headers
     | _ -> default, None, headers in
   { fo_name; fo_filename; fo_headers; fo_content }
 
@@ -55,7 +57,7 @@ let get_boundary_from_content_type ?debug ct =
     | Some b -> Ok b
 
 let get_boundary ?debug headers =
-  match Req.StringMap.find_opt "content-type" headers with
+  match StringMap.find_opt "content-type" headers with
   | Some [ ct ] -> get_boundary_from_content_type ?debug ct
   | _ -> Error "content-type header not found"
 
@@ -98,7 +100,7 @@ let produce_form_data ~boundary b data =
   Buffer.add_string b ("content-disposition: form-data; name=\"" ^ data.fo_name ^ "\"");
   Option.iter (fun filename -> Buffer.add_string b ("; filename=\"" ^ filename ^ "\"")) data.fo_filename;
   Buffer.add_string b "\r\n";
-  Req.StringMap.iter (fun k lv ->
+  StringMap.iter (fun k lv ->
       Buffer.add_string b (k ^ ":");
       let () = match lv with
         | [] -> ()

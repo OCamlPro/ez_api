@@ -60,11 +60,6 @@ module Services = struct
     Security.
       [`Cookie ({ref_name= "Session id cookie"; name= "Session_id"}, None)]
 
-  let access_control = [
-    "access-control-allow-origin", web_host;
-    "access-control-allow-credentials", "true" 
-  ]
-
   let arg_test = Arg.string ~example:"example-of-value" "arg-in-path"
 
   let param_arg =
@@ -74,26 +69,26 @@ module Services = struct
 
   let test1 : (Types.output, exn, no_security) service0 =
     service ~section:section_test ~name:"test1" ~params:[param_arg]
-      ~output:Encoding.output ~access_control
+      ~output:Encoding.output
       Path.(root // "test1")
 
   let test11 : (Types.output, exn, no_security) service0 =
     service ~section:section_test ~name:"test11" ~meth:`POST
-      ~params:[param_arg] ~output:Encoding.output ~access_control
+      ~params:[param_arg] ~output:Encoding.output
       Path.(root // "test1")
 
   let test2 : (string, Types.output, exn, no_security) service1 =
     service ~section:section_test ~name:"test2" ~params:[param_arg]
-      ~output:Encoding.output ~access_control
+      ~output:Encoding.output
       Path.(root // "test2" /: arg_test)
 
   let test22 : (string, Types.output, exn, no_security) service1 =
     service ~section:section_test ~name:"test2" ~meth:`POST
-      ~params:[param_arg] ~output:Encoding.output ~access_control
+      ~params:[param_arg] ~output:Encoding.output
       Path.(root // "test2" /: arg_test)
 
   let test3 : (Types.input, Types.output, exn, no_security) post_service0 =
-    post_service ~section:section_test ~name:"test3" ~params:[] ~access_control
+    post_service ~section:section_test ~name:"test3" ~params:[]
       ~input:Encoding.input ~output:Encoding.output
       Path.(root // "test3")
 
@@ -105,6 +100,6 @@ module Services = struct
       , EzAPI.Security.cookie )
       post_service1 =
     post_service ~section:section_test ~name:"test4" ~params:[param_arg]
-      ~input:Encoding.input ~output:Encoding.output ~security ~access_control
+      ~input:Encoding.input ~output:Encoding.output ~security
       Path.(root // "test4" /: arg_test)
 end

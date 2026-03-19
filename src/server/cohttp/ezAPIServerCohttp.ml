@@ -60,8 +60,7 @@ let debug_cohttp req =
             (String.split_on_char ',' v))
         (Request.headers req))
 
-let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
-    ?catch ?footer s io req body =
+let dispatch ?allow_origin ?catch ?footer s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
   debug_cohttp req;
@@ -75,7 +74,7 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
   debugf ~v:2 (fun () ->
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
-  Lwt.catch (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
+  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin s.server_kind r path body)
     (fun exn ->
        EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
        match catch with
@@ -84,25 +83,17 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
   >>= function
   | `ws (Ok ra) -> Lwt.return ra
   | `ws (Error _) ->
-    let headers = Header.of_list @@
-      merge_headers_with_default ?allow_origin ?allow_headers ?allow_methods
-        ?allow_credentials [] in
     let status = Code.status_of_code 501 in
-    Server.respond_string ~headers ~status ~body:"" () >|= fun (r, b) ->
+    Server.respond_string ~status ~body:"" () >|= fun (r, b) ->
     `Response (r, b)
-  | `http {Answer.code; body; headers=resp_headers} ->
-    let origin = match allow_origin with
-      | Some `origin -> StringMap.find_opt "origin" headers
-      | _ -> None in
-    let headers = merge_headers_with_default ?allow_origin ?allow_headers
-        ?allow_methods ?allow_credentials ?origin resp_headers in
+  | `http {Answer.code; body; headers} ->
     let status = Code.status_of_code code in
     debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
     debugf ~v:4 (fun () ->
         List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
       );
     debugf ~v:3 (fun () ->
-        let content_type = List.assoc_opt "content-type" resp_headers in
+        let content_type = List.assoc_opt "content-type" headers in
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Reply content:\n%s" body);
     let headers = Header.of_list headers in
@@ -110,13 +101,11 @@ let dispatch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
     `Response (r, b)
 
-let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
-    ?allow_credentials ?footer server_port server_kind =
+let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
-  let callback conn req body = dispatch ?allow_origin ?allow_headers
-      ?allow_methods ?allow_credentials ?catch ?footer s (fst conn) req body in
+  let callback conn req body = dispatch ?allow_origin ?catch ?footer s (fst conn) req body in
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
@@ -128,7 +117,6 @@ let create_server ?catch ?allow_origin ?allow_headers ?allow_methods
 
 let shutdown () = Lwt.return_unit
 
-let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
+let server ?catch ?allow_origin ?footer servers =
   Lwt.join (List.map (fun (port,kind) ->
-      create_server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer
-        port kind) servers)
+      create_server ?catch ?allow_origin ?footer port kind) servers)

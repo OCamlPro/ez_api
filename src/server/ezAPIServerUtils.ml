@@ -19,6 +19,7 @@ module Req = Req
 module File = File
 module GMTime = GMTime
 module Ip = Ip
+module Cors = Cors
 
 (** Server *)
 
@@ -125,79 +126,47 @@ module Legacy = struct
 
 end
 
-let handle ?meth ?content_type ?ws s r path body =
+let handle ?meth ?content_type ?ws ?(allow_origin=`default) s r path body =
   let r, body =
     if content_type = Some Url.content_type then
       Req.add_params r (Url.decode_args body), ""
     else r, body in
-  match s with
-  | Root (root, default) -> File.reply ?meth root ?default path >|= fun a -> `http a
-  | API dir ->
-    Directory.lookup ?meth ?content_type dir r path >>= function
-    | Error `Not_found -> Answer.not_found () >|= fun a -> `http a
-    | Error (`Cannot_parse a) -> Answer.cannot_parse a >|= fun a -> `http a
-    | Error `Method_not_allowed -> Answer.method_not_allowed () >|= fun a -> `http a
-    | Ok (`options headers) ->
-      Lwt.return {Answer.code=200; body=""; headers} >|= fun a -> `http a
-    | Ok `head -> Lwt.return {Answer.code=200; body=""; headers =[]} >|= fun a -> `http a
-    | Ok (`http h) ->
-      begin
-        h body >>= function
-        | Error (`destruct_exn exn) -> Answer.destruct_exception exn
-        | Error (`unsupported c) -> Answer.unsupported_media_type c
-        | Error (`handler_error s) ->
-          EzDebug.printf "In %s: error %s" (String.concat "/" path) s;
-          Answer.server_error (Failure s)
-        | Error (`handler_exn exn) ->
-          EzDebug.printf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn;
-          Answer.server_error exn
-        | Ok a -> Lwt.return a
-      end >|= fun a -> (`http a)
-    | Ok (`ws (react, bg, onclose, step)) ->
-      begin match ws with
-        | None -> assert false
-        | Some ws ->
-          let body = if body = "" then None else Some body in
-          ws ?onclose ?step ?body ~react ~bg r.Req.req_id
-      end >|= fun ra -> `ws ra
-
-type allow_kind_without_none = [ `all | `default | `custom of string list ]
-type allow_kind = [ `all | `default | `custom of string list ]
-
-let merge_headers_allow ~dft ~key headers = function
-  | `none -> headers
-  | #allow_kind_without_none as k ->
-    let v old =
-      match k, old with
-      | `all, _ -> "*"
-      (* restrict headers if former ones are * *)
-      | `default, None | `default, Some "*" -> dft
-      | `custom l, None | `custom l, Some "*" -> String.concat "," l
-      | `default, Some old -> old ^ "," ^ dft
-      | `custom l, Some old -> String.concat "," (old :: l) in
-    match List.assoc_opt key headers with
-    | None -> headers @ [ key, v None ]
-    | Some old -> List.remove_assoc key headers @ [ key, v (Some old) ]
-
-let merge_headers_allow_origin ?origin headers kind =
-  let key = "access-control-allow-origin" in
-  match kind with
-  | `none -> headers
-  | `origin -> (match origin with None -> headers | Some o -> headers @ [ key, String.concat "," o ])
-  | `all | `default -> List.remove_assoc key headers @ [ key, "*" ]
-  | `custom l -> match List.assoc_opt key headers with
-    | None -> headers @ [ key, String.concat "," l ]
-    | Some "*" -> (List.remove_assoc key headers) @ [ key, String.concat "," l ]
-    | Some v -> (List.remove_assoc key headers) @ [ key, String.concat "," (v :: l) ]
-
-let merge_headers_with_default ?(allow_origin=`default) ?(allow_headers=`default) ?(allow_methods=`default)
-    ?allow_credentials ?origin headers =
-  let headers = merge_headers_allow_origin ?origin headers allow_origin in
-  let headers = merge_headers_allow ~dft:"accept,content-type" ~key:"access-control-allow-headers" headers allow_headers in
-  let headers = merge_headers_allow ~dft:"*" ~key:"access-control-allow-methods" headers allow_methods in
-  let key = "access-control-allow-credentials" in
-  match allow_credentials with
-  | None -> headers
-  | Some b -> match List.assoc_opt key headers with
-    | None -> headers @ [ key, string_of_bool b ]
-    | Some _ -> List.remove_assoc key headers @ [ key, string_of_bool b ]
+  let a = match s with
+    | Root (root, default) ->
+      File.reply ?meth root ?default path >|= fun a -> `http a
+    | API dir ->
+      Directory.lookup ?meth ?content_type dir r path >>= function
+      | Error `Not_found -> Answer.not_found () >|= fun a -> `http a
+      | Error (`Cannot_parse a) -> Answer.cannot_parse a >|= fun a -> `http a
+      | Error `Method_not_allowed -> Answer.method_not_allowed () >|= fun a -> `http a
+      | Ok (`options headers) ->
+        Lwt.return {Answer.code=200; body=""; headers} >|= fun a -> `http a
+      | Ok `head -> Lwt.return {Answer.code=200; body=""; headers =[]} >|= fun a -> `http a
+      | Ok (`http h) ->
+        begin
+          h body >>= function
+          | Error (`destruct_exn exn) -> Answer.destruct_exception exn
+          | Error (`unsupported c) -> Answer.unsupported_media_type c
+          | Error (`handler_error s) ->
+            EzDebug.printf "In %s: error %s" (String.concat "/" path) s;
+            Answer.server_error (Failure s)
+          | Error (`handler_exn exn) ->
+            EzDebug.printf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn;
+            Answer.server_error exn
+          | Ok a -> Lwt.return a
+        end >|= fun a -> (`http a)
+      | Ok (`ws (react, bg, onclose, step)) ->
+        begin match ws with
+          | None -> assert false
+          | Some ws ->
+            let body = if body = "" then None else Some body in
+            ws ?onclose ?step ?body ~react ~bg r.Req.req_id
+        end >|= fun ra -> `ws ra in
+  a >|= function
+  | `ws ra -> `ws ra
+  | `http a ->
+    let origin = match allow_origin with
+      | `origin -> StringMap.find_opt "origin" r.Req.req_headers
+      | _ -> None in
+    let headers = Cors.merge_headers_allow_origin ?origin a.Answer.headers allow_origin in
+    `http { a with Answer.headers }

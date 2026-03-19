@@ -232,13 +232,13 @@ let shutdown () = match !server with
   | None -> Lwt.return_unit
   | Some server -> Lazy.force server.shutdown
 
-let server ?name ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer handler servers =
+let server ?name ?catch ?allow_origin ?footer handler servers =
   let max_connections =
     let n = List.length servers in
     if n = 0 then 0 else limit_open_file () / 2 / n in
   let waiter = fst @@ Lwt.wait () in
   Lwt.join (List.map (fun (port, kind) ->
       let handler s sockaddr fd =
-        handler ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer s sockaddr fd in
+        handler ?catch ?allow_origin ?footer s sockaddr fd in
       create_server ?name ~max_connections port kind handler) servers) >>= fun () ->
   waiter

@@ -30,7 +30,3 @@ let of_string s : [> all | `Other of string ] = match s with
   | "DELETE" -> `DELETE
   | "OPTIONS" -> `OPTIONS
   | s -> `Other s
-
-let headers l =
-  let meths = String.concat "," @@ List.map to_string l in
-  [ "access-control-allow-methods", meths ]

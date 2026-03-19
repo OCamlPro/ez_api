@@ -37,8 +37,7 @@ let debug_httpun req =
 
 let register_ip req time addr = Server_common.register_ip ~header:(Headers.get req.Request.headers) time addr
 
-let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
-    ?allow_credentials ?footer s sockaddr fd =
+let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
 
   let request_handler sockaddr { Gluten.reqd; upgrade; _ } =
     let req = Reqd.request reqd in
@@ -57,7 +56,7 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Request content:\n%s" body);
     let> res = Lwt.catch
-        (fun () -> handle ~ws ?meth ?content_type s.server_kind r path body)
+        (fun () -> handle ~ws ?meth ?content_type ?allow_origin s.server_kind r path body)
         (fun exn ->
            EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
            let> a = match catch with
@@ -65,28 +64,20 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
              | Some c -> c path_str exn in
            Lwt.return (`http a)) in
     match res with
-    | `ws (Error _) ->
-      let headers = Headers.of_list @@
-        merge_headers_with_default ?allow_origin ?allow_headers ?allow_methods
-          ?allow_credentials [] in
+    | `ws (Error `no_ws_library) ->
       let status = Status.unsafe_of_code 501 in
-      let response = Response.create ~headers status in
+      let response = Response.create status in
       Reqd.respond_with_string reqd response "";
       Lwt.return_unit
     | `ws (Ok ()) -> Lwt.return_unit
-    | `http {Answer.code; body; headers=resp_headers} ->
+    | `http {Answer.code; body; headers} ->
       let status = Status.unsafe_of_code code in
       debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      let origin = match allow_origin with
-        | Some `origin -> StringMap.find_opt "origin" headers
-        | _ -> None in
-      let headers = merge_headers_with_default ?allow_origin ?allow_headers
-          ?allow_methods ?allow_credentials ?origin resp_headers in
       debugf ~v:4 (fun () ->
           List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
         );
       debugf ~v:3 (fun () ->
-          let content_type = List.assoc_opt "content-type" resp_headers in
+          let content_type = List.assoc_opt "content-type" headers in
           if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
             EzDebug.printf "Reply content:\n%s" body);
       let headers = Headers.of_list headers in
@@ -112,5 +103,5 @@ let connection_handler ?catch ?allow_origin ?allow_headers ?allow_methods
 
 let shutdown = Server_common.shutdown
 
-let server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer servers =
-  Server_common.server ?catch ?allow_origin ?allow_headers ?allow_methods ?allow_credentials ?footer connection_handler servers
+let server ?catch ?allow_origin ?footer servers =
+  Server_common.server ?catch ?allow_origin ?footer connection_handler servers

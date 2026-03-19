@@ -749,7 +749,9 @@ let server_options e =
             | None -> acc
             | Some servers -> {acc with servers}
           end
-        | _ -> acc) (dft (eint ~loc 8080)) l
+        | _ ->
+          Format.eprintf "server option %S not understood@." s;
+          acc) (dft (eint ~loc 8080)) l
   | _ -> Location.raise_errorf ~loc "server options not understood"
 
 let server_aux e =

@@ -1,7 +1,7 @@
 (library
  (name ezAPIServerUtils)
  (public_name ez_api.server_utils)
- (modules answer directory gMTime timings file ip ezAPIServerUtils)
+ (modules answer cors directory gMTime timings file ip ezAPIServerUtils)
  (libraries ezAPI
   (select ip.ml from
    (geoip -> ip.geoip.ml)
