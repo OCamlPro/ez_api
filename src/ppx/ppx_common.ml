@@ -727,6 +727,7 @@ type server_options = {
   allow_origin: expression;
   allow_methods: expression;
   allow_credentials: expression;
+  servers: expression list;
 }
 
 let server_options e =
@@ -734,7 +735,7 @@ let server_options e =
   let dft port = {
     port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
     allow_origin = [%expr None]; allow_methods = [%expr None]; allow_headers = [%expr None];
-    allow_credentials = [%expr None] } in
+    allow_credentials = [%expr None]; servers=[] } in
   match e.pexp_desc with
   | Pexp_constant c -> dft (pexp_constant ~loc c)
   | Pexp_record (l, _) ->
@@ -747,18 +748,24 @@ let server_options e =
         | "methods" -> { acc with allow_methods = [%expr Some [%e e]] }
         | "origin" -> { acc with allow_origin = [%expr Some [%e e]] }
         | "credentials" -> { acc with allow_credentials = [%expr Some [%e e]] }
+        | "servers" ->
+          begin match get_list_expr e with
+            | None -> acc
+            | Some servers -> {acc with servers}
+          end
         | _ -> acc) (dft (eint ~loc 8080)) l
   | _ -> Location.raise_errorf ~loc "server options not understood"
 
 let server_aux e =
   let loc = e.pexp_loc in
   let options = server_options e in
+  let l = match options.servers with
+    | [] -> [%expr [ [%e options.port], EzAPIServerUtils.API [%e options.dir] ] ]
+    | l -> elist ~loc l in
   [%expr
     EzAPIServer.server ?catch:[%e options.catch] ?allow_headers:[%e options.allow_headers]
       ?allow_methods:[%e options.allow_methods] ?allow_origin:[%e options.allow_origin]
-      ?allow_credentials:[%e options.allow_credentials] [
-      ([%e options.port], EzAPIServerUtils.API [%e options.dir])
-    ]
+      ?allow_credentials:[%e options.allow_credentials] [%e l]
   ]
 
 let server ~loc p =
