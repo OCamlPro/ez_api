@@ -591,7 +591,12 @@ let register name a =
   let loc = a.attr_loc in
   let _, options = get_options ~loc a.attr_payload in
   let ppx_dir_str = ppx_dir ~loc options.directory in
-  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
+  let ppx_dir_p, ppx_dir_e = match options.directory with
+    | None -> [%pat? ppx_dir], [%expr ppx_dir]
+    | Some {pexp_desc=Pexp_ident {txt; _}; _} ->
+      let n = Longident.name txt in
+      pvar ~loc n, evar ~loc n
+    | Some e -> [%pat? ppx_dir], e in
   match options.service with
   | None -> Location.raise_errorf ~loc "service not defined"
   | Some e ->
@@ -599,8 +604,8 @@ let register name a =
       | Pexp_ident {txt; _} -> Some (Longident.name txt)
       | _ -> None in
     let register =
-      value_binding ~loc ~pat:[%pat? ppx_dir]
-        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [ e; evar ~loc name; ppx_dir ]) in
+      value_binding ~loc ~pat:ppx_dir_p
+        ~expr:(eapply ~loc (evar ~loc "EzAPIServerUtils.register") [ e; evar ~loc name; ppx_dir_e ]) in
     let str = ppx_dir_str @ [ pstr_value ~loc Nonrecursive [ register ] ] in
     if options.debug then Format.printf "%a@." Pprintast.structure str;
     str, service_name
@@ -609,7 +614,12 @@ let register_ws ~onclose react_name bg_name a =
   let loc = a.attr_loc in
   let _, options = get_options ~loc a.attr_payload in
   let ppx_dir_str = ppx_dir ~loc options.directory in
-  let ppx_dir = match options.directory with None -> [%expr ppx_dir] | Some e -> e in
+  let ppx_dir_p, ppx_dir_e = match options.directory with
+    | None -> [%pat? ppx_dir], [%expr ppx_dir]
+    | Some {pexp_desc=Pexp_ident {txt; _}; _} ->
+      let n = Longident.name txt in
+      pvar ~loc n, evar ~loc n
+    | Some e -> [%pat? ppx_dir], e in
   let onclose = match onclose with
     | [] -> [%expr None]
     | [ {pvb_pat = {ppat_desc = Ppat_var {txt; loc}; _}; _} ] -> [%expr Some [%e evar ~loc txt]]
@@ -621,13 +631,13 @@ let register_ws ~onclose react_name bg_name a =
       | Pexp_ident {txt; _} -> Some (Longident.name txt)
       | _ -> None in
     let register =
-      value_binding ~loc ~pat:[%pat? ppx_dir]
+      value_binding ~loc ~pat:ppx_dir_p
         ~expr:(pexp_apply ~loc (evar ~loc "EzAPIServerUtils.register_ws") [
             Nolabel, e;
             Optional "onclose", onclose;
             Labelled "react", evar ~loc react_name;
             Labelled "bg", evar ~loc bg_name;
-            Nolabel, ppx_dir ]) in
+            Nolabel, ppx_dir_e ]) in
     let str = ppx_dir_str @ [ pstr_value ~loc Nonrecursive [ register ] ] in
     if options.debug then Format.printf "%a@." Pprintast.structure str;
     str, service_name
