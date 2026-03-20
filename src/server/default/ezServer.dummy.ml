@@ -8,11 +8,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let server ?catch:_ ?allow_origin:_ ?allow_headers:_ ?allow_methods:_ ?allow_credentials:_ ?footer:_ _ =
+let server ?catch:_ ?allow_origin:_ ?footer:_ _ =
   Format.eprintf
-    "Cohttp or Httpaf server implementation not availble\n\
+    "Cohttp, Httpaf or Httpun server implementation not availble\n\
      Try: `opam install cohttp-lwt-unix`\n\
-     or:  `opam install httpaf-lwt-unix`@.";
+     `opam install httpaf-lwt-unix`\n\
+     or `opam install httpun-lwt-unix`@.";
   Lwt.return_unit
 
 let shutdown () = Lwt.return_unit
