@@ -593,8 +593,7 @@ let register name a =
   let ppx_dir_str = ppx_dir ~loc options.directory in
   let ppx_dir_p, ppx_dir_e = match options.directory with
     | None -> [%pat? ppx_dir], [%expr ppx_dir]
-    | Some {pexp_desc=Pexp_ident {txt; _}; _} ->
-      let n = Longident.name txt in
+    | Some {pexp_desc=Pexp_ident {txt=Lident n; _}; _} ->
       pvar ~loc n, evar ~loc n
     | Some e -> [%pat? ppx_dir], e in
   match options.service with
@@ -616,8 +615,7 @@ let register_ws ~onclose react_name bg_name a =
   let ppx_dir_str = ppx_dir ~loc options.directory in
   let ppx_dir_p, ppx_dir_e = match options.directory with
     | None -> [%pat? ppx_dir], [%expr ppx_dir]
-    | Some {pexp_desc=Pexp_ident {txt; _}; _} ->
-      let n = Longident.name txt in
+    | Some {pexp_desc=Pexp_ident {txt=Lident n; _}; _} ->
       pvar ~loc n, evar ~loc n
     | Some e -> [%pat? ppx_dir], e in
   let onclose = match onclose with
