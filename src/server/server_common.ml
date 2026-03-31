@@ -222,9 +222,7 @@ let create_server ?(name="HTTPUN") ~max_connections server_port server_kind hand
   EzDebug.printf "Starting %s server (port=%d, connection=%d)" name server_port max_connections;
   establish_server_with_client_socket
     ~nb_max_connections:max_connections
-    listen_address (handler s)(* fun sockaddr fd -> *)
-        (* handler ?catch ?allow_origin ?allow_headers ?allow_methods *)
-  (*   ?allow_credentials s sockaddr fd) *) >>= fun s ->
+    listen_address (handler s) >>= fun s ->
   server := Some s;
   Lwt.return_unit
 

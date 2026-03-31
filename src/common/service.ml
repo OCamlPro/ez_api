@@ -41,6 +41,9 @@ module IO = struct
         | Error e -> Error e
         | Ok a -> Ok (f a)
 
+  let is_empty : type a. a io -> bool = function
+    | Empty -> true
+    | _ -> false
 end
 
 type ('args, 'input, 'output, 'error, 'security) t = {
