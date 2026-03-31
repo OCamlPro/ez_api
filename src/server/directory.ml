@@ -200,7 +200,7 @@ let options_headers dir = match MethMap.bindings dir.services with
         | Websocket {service; _} -> aux_sec acc service
       ) StringSet.empty l in
     let allowed_headers_set = if List.exists (fun (_, rs) -> match rs with
-        | Http {service; _} -> IO.is_empty service.Service.input
+        | Http {service; _} -> not (IO.is_empty service.Service.input)
         | Websocket _ -> false) l then
         StringSet.add "content-type" sec_set else sec_set in
     let headers = Cors.insert headers (Cors.allow_headers_name, allowed_headers_set) in
