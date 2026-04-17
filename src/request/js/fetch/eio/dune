@@ -1,0 +1,8 @@
+(library
+ (name ezFetch_eio)
+ (public_name ez_api.fetch_eio)
+ (optional)
+ (modules ezReqEio)
+ (preprocess (pps js_of_ocaml-ppx))
+ (implements ezReqEio)
+ (libraries verbose ezRequestEio ezjs_fetch.eio ezAPIJS))

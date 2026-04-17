@@ -1,0 +1,7 @@
+(library
+ (name ezCohttp_lwt_i)
+ (public_name ez_api.icohttp_lwt)
+ (optional)
+ (modules EzReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezCohttp_lwt))

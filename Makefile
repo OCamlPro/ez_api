@@ -3,19 +3,19 @@
 all: build
 
 build:
-	@dune build src
+	@opam exec -- dune build src
 
 dev:
-	@dune build
+	@opam exec -- dune build
 
 install:
-	@dune install
+	@opam exec -- dune install
 
 clean:
-	@dune clean
+	@opam exec -- dune clean
 
 doc:
-	@dune build @doc
+	@opam exec -- dune build @doc
 	@rsync -ru _build/default/_doc/_html/* docs/
 
 deps:

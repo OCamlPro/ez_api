@@ -8,16 +8,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Lwt
+open Lwt.Infix
+open EzAPI
 open EzAPIServerUtils
 open Httpaf
 
 let set_debug () = ()
 
 let mk_uri { Request.meth ; Request.target ; Request.headers ; _ } =
-  Server_common.mk_uri ~meth ~target  ~header:(Headers.get headers)
+  Httpunaf.mk_uri ~meth ~target  ~header:(Headers.get headers)
 
-let meth_from_httpaf req = Server_common.meth_from_ext req.Request.meth
+let meth_from_httpaf req = Httpunaf.meth req.Request.meth
 
 let headers_from_httpaf req =
   Headers.fold ~f:(fun k v acc ->
@@ -28,14 +29,14 @@ let version_from_httpaf req =
   if req.Request.version.Version.minor = 0 then `HTTP_1_0
   else `HTTP_1_1
 
-let read_body body = Server_common.read_body ~read:Body.schedule_read body
+let read_body body = Lwt_httpunaf.read_body ~read:Body.schedule_read body
 
 let debug_httpaf req =
   let meth = Method.to_string req.Request.meth in
   let headers = Headers.to_list req.Request.headers in
-  Server_common.debug_http_ext ~meth ~target:req.Request.target ~headers
+  Httpunaf.debug ~meth ~target:req.Request.target ~headers
 
-let register_ip req time addr = Server_common.register_ip ~header:(Headers.get req.Request.headers) time addr
+let register_ip req time addr = Httpunaf.register_ip ~header:(Headers.get req.Request.headers) time addr
 
 let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
   let request_handler sockaddr reqd =
@@ -51,7 +52,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     Lwt.async @@ fun () ->
     read_body (Reqd.request_body reqd) >>= fun body ->
     let ws = WsHttpaf.ws reqd fd in
-    debugf ~v:2 (fun () ->
+    Log.debugf ~v:2 (fun () ->
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Request content:\n%s" body);
     Lwt.catch
@@ -59,7 +60,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
       (fun exn ->
          EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
          match catch with
-         | None -> Answer.server_error exn >|= fun a -> `http a
+         | None ->  Lwt.return (`http (Answer.server_error exn))
          | Some c -> c path_str exn >|= fun a -> `http a)
     >>= function
     | `ws (Error `no_ws_library) ->
@@ -71,11 +72,11 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
       Lwt.return_unit
     | `http {Answer.code; body; headers} ->
       let status = Status.unsafe_of_code code in
-      debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      debugf ~v:4 (fun () ->
+      Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
+      Log.debugf ~v:4 (fun () ->
           List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
         );
-      debugf ~v:3 (fun () ->
+      Log.debugf ~v:3 (fun () ->
           let content_type = List.assoc_opt "content-type" headers in
           if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
             EzDebug.printf "Reply content:\n%s" body);
@@ -107,7 +108,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     sockaddr
     fd
 
-let shutdown = Server_common.shutdown
+let shutdown = Lwt_httpunaf.shutdown
 
 let server ?catch ?allow_origin ?footer servers =
-  Server_common.server ~name:"HTTPAF" ?catch ?allow_origin ?footer connection_handler servers
+  Lwt_httpunaf.server ~name:"HTTPAF" ?catch ?allow_origin ?footer connection_handler servers

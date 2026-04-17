@@ -1,5 +1,13 @@
 (library
  (name ezWsCommon)
  (public_name ez_api.ws_types)
+ (optional)
  (modules ezWsCommon)
  (libraries lwt ezDebug ezEncoding))
+
+(library
+ (name ezWsEioTypes)
+ (public_name ez_api.ws_eio_types)
+ (modules ezWsEioTypes)
+ (optional)
+ (libraries ezAPI eio))

@@ -1,0 +1,7 @@
+(library
+ (name ezCurl_lwt_i)
+ (public_name ez_api.icurl_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezCurl_lwt))

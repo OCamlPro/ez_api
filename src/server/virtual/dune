@@ -1,6 +1,17 @@
 (library
  (name ezServer)
  (public_name ez_api.server_s)
+ (optional)
+ (modules ezServer)
  (virtual_modules ezServer)
  (default_implementation ezServerDefault)
  (libraries ezAPIServerUtils))
+
+(library
+ (name ezServerEio)
+ (public_name ez_api.server_eio)
+ (optional)
+ (modules ezServerEio)
+ (virtual_modules ezServerEio)
+ (default_implementation ezServerDefault_eio)
+ (libraries ezServerEioUtils))

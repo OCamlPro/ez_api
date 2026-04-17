@@ -15,30 +15,41 @@
 (package
  (name ez_api)
  (synopsis "Easy API library and tools")
- (documentation "https://ocpmax.github.io/ez_api/ez_api/index.html")
+ (documentation "https://ocamlpro.github.io/ez_api/ez_api/index.html")
  (depends
   (ocaml (>= 4.08))
   (json-data-encoding (>= 1.0.1))
-  (lwt (>= 4.0.0))
   (ezjsonm (>= 1.1.0))
   uuidm)
  (depopts
+  lwt
   geoip
   js_of_ocaml-lwt
   calendar
+  cohttp
+  cohttp-lwt
   cohttp-lwt-unix
   cohttp-lwt-jsoo
   httpaf-lwt-unix
   curl_lwt
   ezjs_fetch
-  websocket-lwt-unix
   ppx_deriving_encoding
   digestif
   yaml
+  httpun
   httpun-lwt-unix
+  httpun-ws
   httpun-ws-lwt-unix
   tls-lwt
   lwt_ssl
+  eio
+  httpun-eio
+  httpun-ws-eio
+  cohttp-eio
+  js_of_ocaml-eio
+  tls-eio
+  eio-ssl
+  websocket
  )
  (conflicts
   (js_of_ocaml-lwt (< 6.0.0))

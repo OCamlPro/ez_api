@@ -1,0 +1,8 @@
+(library
+ (name ezCohttpEio)
+ (optional)
+ (public_name ez_api.cohttp_eio)
+ (modules ezReqEio)
+ (implements ez_api.req_eio)
+ (libraries ez_api.request_eio cohttp-eio cohttp_eio_tls verbose)
+)

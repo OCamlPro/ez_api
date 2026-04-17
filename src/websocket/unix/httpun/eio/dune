@@ -1,0 +1,7 @@
+(library
+ (name ezWsEio_httpun)
+ (public_name ez_api.ws_eio_httpun)
+ (optional)
+ (modules ezWsEio)
+ (implements ezWsEio)
+ (libraries httpun_ws_common httpun-ws-eio))

@@ -1,0 +1,8 @@
+(library
+ (name ezXhr_lwt_i)
+ (public_name ez_api.ixhr_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezXhr_lwt)
+ (modes byte))

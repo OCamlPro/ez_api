@@ -1,6 +1,0 @@
-(library
- (name ezReq)
- (public_name ez_api.req)
- (virtual_modules ezReq)
- (libraries ezReq_S)
- (default_implementation ezReq_default))

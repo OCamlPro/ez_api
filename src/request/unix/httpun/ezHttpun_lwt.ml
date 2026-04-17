@@ -1,5 +1,5 @@
 let wrap_error e =
-  let aux () = Format.asprintf "%a" Httpun_client.pp_error e in
+  let aux () = Format.asprintf "%a" Httpun_common.pp_error e in
   match e with
   | `http (code, content) -> code, Some content
   | `timeout _ -> 408, Some (aux ())

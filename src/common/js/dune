@@ -12,4 +12,4 @@
  (optional)
  (modules ezLwtSys)
  (implements ezLwtSys)
- (libraries js_of_ocaml))
+ (libraries lwt js_of_ocaml))

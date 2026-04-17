@@ -1,16 +1,23 @@
 (library
- (name wsCommon)
- (public_name ez_api.ws_server_utils)
- (optional)
- (modules wsCommon)
- (libraries websocket ezAPIServerUtils calendar))
-
-(library
  (name wsCohttp)
- (public_name ez_api.ws_server_cohttp)
+ (package ez_api)
  (optional)
  (modules wsCohttp)
- (libraries
-  (select wsCohttp.ml from
-   (websocket-lwt-unix.cohttp wsCommon -> wsCohttp.real.ml)
-   (ezAPIServerUtils -> wsCohttp.dummy.ml))))
+ (libraries websocket calendar uuidm))
+
+(library
+ (name wsCohttpLwt)
+ (package ez_api)
+ (optional)
+ (modules wsCohttpLwt)
+ (libraries ezAPIServerUtils wsCohttp))
+
+(library
+ (name wsCohttpEio)
+ (package ez_api)
+ (optional)
+ (modules wsCohttpEio)
+ (libraries ezServerEioUtils
+  (select wsCohttpEio.ml from
+   (wsCohttp cohttp-eio eio.unix -> wsCohttpEio.real.ml)
+   (-> wsCohttpEio.dummy.ml))))

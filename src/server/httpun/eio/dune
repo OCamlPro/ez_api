@@ -1,0 +1,7 @@
+(library
+ (name ezServerHttpun_eio)
+ (public_name ez_api.server_eio_httpun)
+ (optional)
+ (implements ezServerEio)
+ (modules ezServerEio)
+ (libraries wsHttpunEio httpunaf httpun-eio))

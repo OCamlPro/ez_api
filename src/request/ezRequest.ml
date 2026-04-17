@@ -9,8 +9,7 @@
 (**************************************************************************)
 
 open EzAPI
-
-type error_handler = (int -> string option -> unit)
+open EzRequest_common
 
 module type S = EzReq_S.S
 module type Interface = EzReq_S.Interface
@@ -43,18 +42,9 @@ module Make(S : Interface) : S = struct
     any_get := S.get;
     any_post := S.post
 
-  let add_user_agent ?headers () =
-    match !Req.user_agent_header, headers with
-    | None, _ -> headers
-    | Some h, None -> Some [ h ]
-    | Some h, Some l ->
-      if List.exists (fun (k, _) -> String.lowercase_ascii k = "user-agent") l then Some l
-      else Some (h :: l)
-
-
   (* print warnings generated when building the URL before
    sending the request *)
-  let internal_get ?meth ?headers ?msg ?error (URL url) f =
+  let internal_get ?meth ?headers ?msg ?error ~ok (URL url) =
     EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m ->
       Some (String.uppercase_ascii @@ Meth.to_string m) in
@@ -63,13 +53,13 @@ module Make(S : Interface) : S = struct
       (fun code ->
          !request_reply_hook ();
          match code with
-         | Ok res -> f res
+         | Ok res -> ok res
          | Error (n, body) ->
            match error with
            | None -> ()
            | Some f -> f n body)
 
-  let internal_post ?meth ?content_type ?content ?headers ?msg ?error (URL url) f =
+  let internal_post ?meth ?headers ?msg ?error ~ok ?content_type ?content (URL url) =
     EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
     let meth = match meth with None -> None | Some m -> Some (
         String.uppercase_ascii @@ Meth.to_string m) in
@@ -78,7 +68,7 @@ module Make(S : Interface) : S = struct
       (fun code ->
          !request_reply_hook ();
          match code with
-         | Ok res -> f res
+         | Ok res -> ok res
          | Error (n, body) ->
            match error with
            | None -> ()
@@ -105,60 +95,18 @@ module Make(S : Interface) : S = struct
     let ok = decode_result ~error encoding (fun x -> f (Ok x)) in
     ok, error
 
-  let get = internal_get
-  let post = internal_post
+  let get ?meth ?headers ?msg ?error url f = internal_get ?meth ?headers ?msg ?error ~ok:f url
+  let post ?meth ?content_type ?content ?headers ?msg ?error url f =
+    internal_post ?meth ?content_type ?content ?headers ?msg ?error ~ok:f url
 
   module Raw = struct
 
-    let request :
-      type i.
-      ?headers:(string * string) list ->
-      ?params:(Param.t * param_value) list ->
-      ?msg:string ->
-      ?post:bool ->
-      ?url_encode:bool ->
-      ?error:error_handler ->
-      input:i ->
-      EzAPI.base_url ->
-      ('arg, i, 'output, 'error, 'security) service ->
-      'arg ->
-      (('output, 'error) result -> unit) ->
-      unit =
-      fun ?headers ?(params=[]) ?msg ?(post=false) ?(url_encode=false) ?error ~input api service arg f ->
+    let request ?headers ?params ?msg ?post ?url_encode ?error ~input api service arg f =
       !before_hook ();
       let ok, error = handlers ?error service.s f in
       let meth = Service.meth service.s in
-      let input_encoding = Service.input service.s in
-      let url = forge api service arg params in
-      let headers = match !Req.user_agent_header, headers with
-        | None, _ -> headers
-        | Some h, None -> Some [ h ]
-        | Some h, Some l ->
-          if List.exists (fun (k, _) -> String.lowercase_ascii k = "user-agent") l then Some l
-          else Some (h :: l) in
-      match input_encoding with
-      | Empty ->
-        if post then
-          let url = forge api service arg [] in
-          let content, content_type = encode_params service.s params, Mime.(to_string url_encoded) in
-          internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
-        else
-          internal_get ~meth ?msg url ?headers ~error ok
-      | Raw [] ->
-        let content, content_type = input, Mime.(to_string octet_stream) in
-        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
-      | Raw [ h ] when h = Mime.url_encoded && input = "" ->
-        let url = forge api service arg [] in
-        let content, content_type = encode_params service.s params, Mime.to_string h in
-        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
-      | Raw (h :: _) ->
-        let content, content_type = input, Mime.to_string h in
-        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
-      | Json enc ->
-        let content, content_type =
-          if url_encode then Url.encode_obj enc input, Mime.(to_string url_encoded)
-          else EzEncoding.construct enc input, Mime.(to_string json) in
-        internal_post ?msg ~meth url ~content ~content_type ?headers ~error ok
+      handle_input ?params ?post ?url_encode ~input api service arg
+        (internal_get ~meth ?headers ?msg ~error ~ok, internal_post ~meth ?headers ?msg ~error ~ok)
 
     let get0 ?post ?headers ?params ?msg ?error api service f =
       request ?headers ?params ?msg ?post ?error ~input:() api service Req.dummy f

@@ -1,0 +1,7 @@
+(library
+ (name ezServerHttpun)
+ (public_name ez_api.iserver_httpun)
+ (optional)
+ (implements ezServer)
+ (modules ezServer)
+ (libraries ezAPIServerHttpun))

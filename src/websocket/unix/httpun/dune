@@ -1,7 +1,6 @@
 (library
- (name ezWs_httpun)
- (public_name ez_api.ws_httpun)
+ (name httpun_ws_common)
+ (public_name ez_api.httpun_ws_common)
  (optional)
- (modules ezWs)
- (implements ezWs)
- (libraries httpun-ws-lwt-unix))
+ (modules httpun_ws_common)
+ (libraries ezAPI httpun-ws))

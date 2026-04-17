@@ -1,0 +1,8 @@
+(library
+ (name ezWsEio_js)
+ (public_name ez_api.ws_eio_js)
+ (optional)
+ (modules ezWsEio)
+ (preprocess (pps js_of_ocaml-ppx))
+ (implements ezWsEio)
+ (libraries ezAPIJS))

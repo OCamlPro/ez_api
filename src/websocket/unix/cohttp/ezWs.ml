@@ -28,7 +28,8 @@ let aux_react =
     | Opcode.Ping, _ ->
       send_frame ~opcode:Opcode.Pong ~content:fr.content conn >|= fun () ->
       Ok `Open
-    | Opcode.Pong, _ -> Lwt.return_ok `Open
+    | Opcode.Pong, _ ->
+      Lwt.return_ok `Open
     | Opcode.Close, _ ->
       (if String.length fr.content >= 2 then
          send_frame ~opcode:Opcode.Close ~content:(String.sub fr.content 0 2) conn

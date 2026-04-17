@@ -4,7 +4,7 @@
  (optional)
  (modules ezLoads)
  (preprocess (pps ppx_deriving_encoding))
- (libraries ez_api.req_lwt str unix))
+ (libraries ez_api.req_lwt str ez_api.lwt_sys_unix))
 
 (library
  (name ezLoads_offset)

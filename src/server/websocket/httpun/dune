@@ -1,9 +1,26 @@
 (library
  (name wsHttpun)
- (public_name ez_api.ws_server_httpun)
+ (package ez_api)
  (optional)
  (modules wsHttpun)
+ (libraries httpun-ws digestif calendar uuidm))
+
+(library
+ (name wsHttpunLwt)
+ (package ez_api)
+ (optional)
+ (modules wsHttpunLwt)
  (libraries ezAPIServerUtils
-  (select wsHttpun.ml from
-   (httpun-ws digestif calendar -> wsHttpun.real.ml)
-   (-> wsHttpun.dummy.ml))))
+  (select wsHttpunLwt.ml from
+   (wsHttpun ezLwtSys -> wsHttpunLwt.real.ml)
+   (-> wsHttpunLwt.dummy.ml))))
+
+(library
+ (name wsHttpunEio)
+ (package ez_api)
+ (optional)
+ (modules wsHttpunEio)
+ (libraries ezServerEioUtils
+  (select wsHttpunEio.ml from
+   (wsHttpun eio.unix -> wsHttpunEio.real.ml)
+   (-> wsHttpunEio.dummy.ml))))

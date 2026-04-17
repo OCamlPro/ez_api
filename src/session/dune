@@ -13,6 +13,7 @@
 (library
  (name ezSessionServer)
  (public_name ez_api.server_session)
+ (optional)
  (wrapped false)
  (modules ezCookieServer ezSessionServer)
  (libraries ezSession ezAPIServerUtils

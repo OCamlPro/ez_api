@@ -2,11 +2,11 @@
  (name ezAPI)
  (public_name ez_api)
  (modules misc arg param req path mime meth err security service doc url error_codes multipart ezAPI)
- (libraries lwt ezEncoding ezDebug ezLwtSys uuidm))
+ (libraries ezEncoding ezDebug uuidm))
 
 (library
  (name ezAPIJS)
  (public_name ez_api.js)
  (optional)
  (modules)
- (libraries ezAPI ezjsonm_js ezDebug_js ezLwtSys_js))
+ (libraries ezAPI ezjsonm_js ezDebug_js))

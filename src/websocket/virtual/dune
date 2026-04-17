@@ -2,6 +2,16 @@
  (name ezWs)
  (public_name ez_api.ws)
  (optional)
+ (modules ezWs)
  (virtual_modules ezWs)
- (libraries ezWsCommon ezAPI)
- (default_implementation ezWs_default))
+ (default_implementation ezWs_default)
+ (libraries ezAPI ezWsCommon))
+
+(library
+ (name ezWsEio)
+ (public_name ez_api.ws_eio)
+ (optional)
+ (modules ezWsEio)
+ (virtual_modules ezWsEio)
+ (default_implementation ezWsEio_default)
+ (libraries ezWsEioTypes))

@@ -1,0 +1,7 @@
+(library
+ (name ezHttpunEio)
+ (public_name ez_api.httpun_eio)
+ (optional)
+ (modules ezReqEio)
+ (implements ez_api.req_eio)
+ (libraries httpun_common httpun-eio httpun_eio_tls ez_api.request_eio))

@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open EzAPIServerUtils
+open EzAPI
 
 (* RFC 2965 has
     cookie          =  "Cookie:" cookie-version 1*((";" | ",") cookie-value)
@@ -54,9 +54,9 @@ let clear ~name () =
   set ~name ~value:"" ~expiration:0L ()
 
 let set ?secure ?http_only ?expiration ~name ~value =
-  let expiration = 
+  let expiration =
     match expiration with
     | Some exp -> exp
     | None -> day_in_seconds
   in
-  set ?secure ?http_only ~name ~value ~expiration 
+  set ?secure ?http_only ~name ~value ~expiration

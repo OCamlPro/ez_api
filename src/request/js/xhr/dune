@@ -8,28 +8,10 @@
  (modes byte))
 
 (library
- (name ezXhr_i)
- (public_name ez_api.ixhr)
- (optional)
- (modules ezReq)
- (implements ezReq)
- (libraries ezXhr)
- (modes byte))
-
-(library
  (name ezXhr_lwt)
  (public_name ez_api.xhr_lwt)
  (optional)
  (modules ezXhr_lwt)
  (preprocess (pps js_of_ocaml-ppx))
  (libraries verbose ezRequest_lwt ezAPIJS js_of_ocaml-lwt)
- (modes byte))
-
-(library
- (name ezXhr_lwt_i)
- (public_name ez_api.ixhr_lwt)
- (optional)
- (modules ezReq_lwt)
- (implements ezReq_lwt)
- (libraries ezXhr_lwt)
  (modes byte))

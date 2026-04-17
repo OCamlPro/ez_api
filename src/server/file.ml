@@ -54,14 +54,12 @@ let rec reply ?(meth=`GET) ?default root path =
   match meth with
   | `OPTIONS ->
     if Sys.file_exists file then
-      Lwt.return { Answer.code = 200; body = ""; headers=[Cors.allow_methods_name, "GET"] }
+      { Answer.code = 200; body = ""; headers=[Cors.allow_methods_name, "GET"] }
     else begin match default with
-      | None ->
-        Lwt.return { Answer.code = 404; body = ""; headers=[] }
-      | Some file ->
-        reply ~meth root (String.split_on_char '/' file)
+      | None -> { Answer.code = 404; body = ""; headers=[] }
+      | Some file -> reply ~meth root (String.split_on_char '/' file)
     end
   | _ ->
     let body = FileString.read_file file in
     EzDebug.printf "Returning file %S of length %d" file (String.length body);
-    Lwt.return { Answer.code = 200; body; headers=["content-type", content_type] }
+    { Answer.code = 200; body; headers=["content-type", content_type] }

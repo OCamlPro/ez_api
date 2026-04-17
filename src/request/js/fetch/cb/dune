@@ -1,0 +1,8 @@
+(library
+ (name ezFetch_i)
+ (public_name ez_api.ifetch)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezFetch)
+ (modes byte))

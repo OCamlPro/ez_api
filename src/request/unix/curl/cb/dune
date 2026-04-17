@@ -1,0 +1,7 @@
+(library
+ (name ezCurl_i)
+ (public_name ez_api.icurl)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezCurl))

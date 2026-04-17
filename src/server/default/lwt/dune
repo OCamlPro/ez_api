@@ -1,0 +1,12 @@
+(library
+ (name ezServerDefault)
+ (public_name ez_api.iserver_default)
+ (optional)
+ (implements ezServer)
+ (modules ezServer)
+ (libraries ezAPIServerUtils
+  (select ezServer.ml from
+   (ezAPIServerHttpun -> ezServer.httpun.ml)
+   (ezAPIServerHttpAf -> ezServer.httpaf.ml)
+   (ezAPIServerCohttp -> ezServer.cohttp.ml)
+   (-> ezServer.dummy.ml))))

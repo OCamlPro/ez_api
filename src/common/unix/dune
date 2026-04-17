@@ -7,7 +7,9 @@
 (library
  (name ezLwtSys_unix)
  (public_name ez_api.lwt_unix)
- (optional)
  (modules ezLwtSys)
  (implements ezLwtSys)
- (libraries lwt.unix))
+ (libraries
+  (select ezLwtSys.ml from
+   (lwt.unix -> ezLwtSys.lwt.ml)
+   (-> ezLwtSys.dummy.ml))))

@@ -1,0 +1,12 @@
+(library
+ (name ezReq_lwt_default)
+ (public_name ez_api.req_lwt_default)
+ (optional)
+ (implements ezReq_lwt)
+ (modules ezReq_lwt)
+ (libraries ezRequest_lwt
+  (select ezReq_lwt.ml from
+   (ezHttpun_lwt -> ezReq_lwt.httpun.ml)
+   (ezCohttp_lwt -> ezReq_lwt.cohttp.ml)
+   (ezCurl_lwt -> ezReq_lwt.curl.ml)
+   (-> ezReq_lwt.dummy.ml))))

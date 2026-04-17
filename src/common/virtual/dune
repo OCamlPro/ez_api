@@ -11,4 +11,7 @@
  (virtual_modules ezLwtSys)
  (modules ezLwtSys)
  (default_implementation ezLwtSys_unix)
- (libraries lwt))
+ (libraries
+  (select ezLwtSys.mli from
+   (lwt -> ezLwtSys.lwt.mli)
+   (-> ezLwtSys.dummy.mli))))

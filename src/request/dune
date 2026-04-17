@@ -4,20 +4,34 @@
  (modules verbose))
 
 (library
+ (name ezRequest_common)
+ (public_name ez_api.request_common)
+ (modules ezRequest_common)
+ (libraries ezAPI))
+
+(library
  (name ezRequest)
  (public_name ez_api.request)
  (modules ezRequest)
- (libraries ezReq_S))
+ (libraries ezReq_S ezRequest_common))
 
 (library
  (name ezRequest_lwt)
  (public_name ez_api.request_lwt)
+ (optional)
  (modules ezRequest_lwt)
- (libraries ezReq_lwt_S))
+ (libraries ezReq_lwt_S ezRequest_common))
 
 (library
- (name ezCohttp_base)
- (public_name ez_api.cohttp_base)
+ (name ezRequestEio)
+ (public_name ez_api.request_eio)
  (optional)
- (modules ezCohttp_base)
+ (modules ezRequestEio)
+ (libraries ezReqEioS ezRequest_common))
+
+(library
+ (name cohttp_base)
+ (package ez_api)
+ (optional)
+ (modules cohttp_base)
  (libraries verbose ezAPI cohttp-lwt))

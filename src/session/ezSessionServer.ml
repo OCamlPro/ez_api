@@ -8,6 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open EzAPI
 open EzAPIServerUtils
 open EzSession.TYPES
 open Lwt.Infix
@@ -155,8 +156,8 @@ end = struct
         { challenge_id; challenge }
 
     (** Returns authentication header that sould be then added inside the server response.
-    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with 
-    [token] as a cookie value, if it is specified (else, clears cookie). Otherwise creates 
+    If [S.token_kind] is a cookie, then create corresponding {i Set-Cookie} header with
+    [token] as a cookie value, if it is specified (else, clears cookie). Otherwise creates
     header {i Access-control-allow-headers} and mention CSRF header name that should be present
     for every client's request for authentication purpose. *)
     let add_auth_header ?(clear_cookie=false) ?token () =
@@ -176,15 +177,15 @@ end = struct
       let res, code = f @@ new_challenge req in
       return ?code ~headers res
 
-    (** Creates authentification response that returns challenge to resolve. Adds 
+    (** Creates authentification response that returns challenge to resolve. Adds
     authentification header with [add_auth_header]. Clears the cookie, if presents. *)
 
     let request_auth req =
       request_auth_base ~clear_cookie:true req (fun auth_needed ->
           Ok (AuthNeeded auth_needed), Some 200
         )
-        
-    (** Creates response that contains error with specified code. Adds authentification 
+
+    (** Creates response that contains error with specified code. Adds authentification
     header with [add_auth_header] *)
     let request_error ?(clear_cookie=false) ~code msg =
       let headers = add_auth_header ~clear_cookie () in
@@ -263,13 +264,13 @@ end = struct
           | Some (Some pwhash, user_id, user_info) ->
             begin match Hashtbl.find challenges login_challenge_id with
               | exception Not_found ->
-                debug ~v:1 "/login: could not find challenge\n%!";
+                Log.debug ~v:1 "/login: could not find challenge\n%!";
                 request_error ~code:401
                   (`Challenge_not_found_or_expired login_challenge_id)
               | (challenge, _t0) ->
                 let expected_reply = EzSession.Hash.challenge ~challenge ~pwhash in
                 if expected_reply <> login_challenge_reply then begin
-                  debug ~v:1 "/login: challenge failed";
+                  Log.debug ~v:1 "/login: challenge failed";
                   request_error ~code:401 `Bad_user_or_password
                 end else begin
                   Hashtbl.remove challenges login_challenge_id;
@@ -277,7 +278,7 @@ end = struct
                 end
             end
           | _ ->
-            debug ~v:1 "/login: could not find user %S" login_user;
+            Log.debug ~v:1 "/login: could not find user %S" login_user;
             request_error ~code:401 `Bad_user_or_password
 
         end
@@ -295,7 +296,7 @@ end = struct
               return_auth req ~login:foreign_login ~foreign:{foreign_origin; foreign_token}
                 user_id user_info
             | Error _ ->
-              debug ~v:1 "/login: could not register foreign user";
+              Log.debug ~v:1 "/login: could not register foreign user";
               request_error ~code:400 `User_not_registered
 
     (** Connection service handler that at the end returns new challenge to make possible
@@ -410,11 +411,11 @@ end = struct
     Hashtbl.create initial_hashtbl_size
 
   let create_user ?pwhash ?password ?kind ~login user_info =
-    debug ~v:1 "create_user %S ?" login;
+    Log.debug ~v:1 "create_user %S ?" login;
     if Hashtbl.mem users login then raise UserAlreadyDefined;
     match kind with
     | Some _ ->
-      debug ~v:1 "create_user %S ok" login;
+      Log.debug ~v:1 "create_user %S ok" login;
       Hashtbl.add users login
         { login; pwhash = ""; user_id = login; user_info; kind }
     | None ->
@@ -425,26 +426,26 @@ end = struct
           | None -> raise NoPasswordProvided
           | Some password ->
             EzSession.Hash.password ~login ~password in
-      debug ~v:1 "create_user %S ok" login;
+      Log.debug ~v:1 "create_user %S ok" login;
       Hashtbl.add users login
         { login; pwhash; user_id = login; user_info; kind }
 
   let find_user ~login =
-    debug ~v:1 "find_user %S ?" login;
+    Log.debug ~v:1 "find_user %S ?" login;
     match Hashtbl.find users login with
     | exception Not_found ->
       Lwt.return None
     | u ->
-      debug ~v:1 "find_user %S ok" login;
+      Log.debug ~v:1 "find_user %S ok" login;
       let pwhash = match u.kind with None -> Some u.pwhash | Some _k -> None in
       Lwt.return ( Some (pwhash, u.user_id, u.user_info) )
 
   let check_foreign ~origin ~token =
-    debug ~v:1 "check_foreign %S ?" (origin ^ "-" ^ token);
+    Log.debug ~v:1 "check_foreign %S ?" (origin ^ "-" ^ token);
     match Hashtbl.find users (origin ^ "-" ^ token) with
     | exception Not_found -> Lwt.return (Error (500, Some "User not found"))
     | u ->
-      debug ~v:1 "check_foreign %S ok" (origin ^ "-" ^ token);
+      Log.debug ~v:1 "check_foreign %S ok" (origin ^ "-" ^ token);
       Lwt.return (Ok u.login)
 
   let register_foreign = default_register_foreign

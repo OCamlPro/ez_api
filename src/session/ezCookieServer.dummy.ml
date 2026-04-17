@@ -8,11 +8,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open EzAPIServerUtils
-
-let get ( _req : Req.t ) =
+let get ( _req : EzAPI.Req.t ) =
   Format.eprintf "Dummy implementation of cookie server, to install:\n`opam install cohttp`@.";
-  StringMap.empty
+  EzAPI.StringMap.empty
 
 let set ?secure:_ ?http_only:_ ?expiration:_ ~name ~value () =
   Format.eprintf "Dummy implementation of cookie server, to install:\n`opam install cohttp`@.";

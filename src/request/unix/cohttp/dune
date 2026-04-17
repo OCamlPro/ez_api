@@ -1,29 +1,16 @@
 (library
- (name ezCohttp)
- (public_name ez_api.cohttp)
- (optional)
- (modules ezCohttp)
- (libraries cohttp-lwt-unix ezRequest ezCohttp_base))
-
-(library
- (name ezCohttp_i)
- (public_name ez_api.icohttp)
- (optional)
- (modules ezReq)
- (implements ezReq)
- (libraries ezCohttp))
-
-(library
  (name ezCohttp_lwt)
  (public_name ez_api.cohttp_lwt)
  (optional)
  (modules ezCohttp_lwt)
- (libraries cohttp-lwt-unix ezRequest_lwt ezCohttp_base))
+ (libraries cohttp-lwt-unix ezRequest_lwt cohttp_base))
 
 (library
- (name ezCohttp_lwt_i)
- (public_name ez_api.icohttp_lwt)
+ (name cohttp_eio_tls)
+ (public_name ez_api.cohttp_eio_tls)
  (optional)
- (modules EzReq_lwt)
- (implements ezReq_lwt)
- (libraries ezCohttp_lwt))
+ (modules cohttp_eio_tls)
+ (libraries
+  (select cohttp_eio_tls.ml from
+   (tls-eio domain-name uri mirage-crypto-rng.unix -> cohttp_eio_tls.tls.ml)
+   (-> cohttp_eio_tls.none.ml))))

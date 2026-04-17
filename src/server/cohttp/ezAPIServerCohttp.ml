@@ -32,53 +32,25 @@ let register_ip req io time =
     end
   | _ -> ()
 
-let headers_from_cohttp req =
-  let headers = ref StringMap.empty in
-  Header.iter (fun s v ->
-      headers :=
-        StringMap.add (String.lowercase_ascii s) (String.split_on_char ',' v) !headers)
-    (Request.headers req);
-  !headers
-
-let meth_from_cohttp req =
-  match Request.meth req with
-  | #Meth.all as m -> Some m
-  | _ -> None
-
-let version_from_cohttp req =
-  match Request.version req with
-  | #Req.version as v -> Some v
-  | _ -> None
-
-let debug_cohttp req =
-  debug "[%s] REQUEST: %s %S" (pp_time ())
-    (req |> Request.meth |> Code.string_of_method)
-    (req |> Request.uri |> Uri.path_and_query);
-  debugf ~v:1 (fun () ->
-      Header.iter (fun s v ->
-          List.iter (fun v -> EzDebug.printf "  %s: %s" s v)
-            (String.split_on_char ',' v))
-        (Request.headers req))
-
 let dispatch ?allow_origin ?catch ?footer s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
-  debug_cohttp req;
-  let headers = headers_from_cohttp req in
-  let version = version_from_cohttp req in
+  Cohttp_common.debug req;
+  let headers = Cohttp_common.headers req in
+  let version = Cohttp_common.version req in
   let path_str, path, content_type, r =
     Req.request ?version ~headers ~time (Request.uri req) in
-  let meth = meth_from_cohttp req in
+  let meth = Cohttp_common.meth req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
-  let ws = WsCohttp.ws req in
-  debugf ~v:2 (fun () ->
+  let ws = WsCohttpLwt.ws req in
+  Log.debugf ~v:2 (fun () ->
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
   Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin s.server_kind r path body)
     (fun exn ->
        EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
        match catch with
-       | None -> Answer.server_error exn >|= fun a -> `http a
+       | None ->  Lwt.return (`http (Answer.server_error exn))
        | Some c -> c path_str exn >|= fun a -> `http a)
   >>= function
   | `ws (Ok ra) -> Lwt.return ra
@@ -88,11 +60,11 @@ let dispatch ?allow_origin ?catch ?footer s io req body =
     `Response (r, b)
   | `http {Answer.code; body; headers} ->
     let status = Code.status_of_code code in
-    debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    debugf ~v:4 (fun () ->
+    Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
+    Log.debugf ~v:4 (fun () ->
         List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
       );
-    debugf ~v:3 (fun () ->
+    Log.debugf ~v:3 (fun () ->
         let content_type = List.assoc_opt "content-type" headers in
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Reply content:\n%s" body);

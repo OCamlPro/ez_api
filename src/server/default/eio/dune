@@ -1,0 +1,11 @@
+(library
+ (name ezServerDefault_eio)
+ (public_name ez_api.server_eio_default)
+ (optional)
+ (implements ezServerEio)
+ (modules ezServerEio)
+ (libraries ezServerEioUtils
+  (select ezServerEio.ml from
+   (wsHttpunEio httpunaf httpun-eio -> ezServerEio.httpun.ml)
+   (cohttp_common cohttp-eio wsCohttpEio -> ezServerEio.cohttp.ml)
+   (-> ezServerEio.dummy.ml))))

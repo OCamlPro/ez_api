@@ -1,0 +1,6 @@
+(library
+ (name ezServerEioUtils)
+ (public_name ez_api.server_eio_utils)
+ (optional)
+ (modules directory ezServerEioUtils)
+ (libraries server_utils eio))

@@ -13,7 +13,7 @@
  (modules ppx_client)
  (kind ppx_rewriter)
  (libraries ppx_common)
- (ppx_runtime_libraries ezAPI))
+ (ppx_runtime_libraries ezAPI lwt))
 
 (library
  (name ppx)
@@ -40,10 +40,12 @@
  (modules ppx_req)
  (kind ppx_rewriter)
  (libraries ppx_common)
- (ppx_runtime_libraries ezReq_lwt))
+ (ppx_runtime_libraries ezReqLwt))
 
 (library
  (name ppxlib_optcomp)
+ (public_name ez_api.ppxlib_optcomp)
+ (optional)
  (modules ppxlib_optcomp)
  (libraries compiler-libs.common ppxlib)
  (kind ppx_rewriter))
@@ -57,3 +59,39 @@
  (kind ppx_rewriter)
  (ppx_runtime_libraries ez_api)
  (libraries ppx_deriving_encoding.lib ez_api))
+
+(library
+ (name ppx_client_eio)
+ (public_name ez_api.ppx_client_eio)
+ (optional)
+ (modules ppx_client_eio)
+ (kind ppx_rewriter)
+ (libraries ppx_common)
+ (ppx_runtime_libraries ezAPI eio))
+
+(library
+ (name ppx_eio)
+ (public_name ez_api.ppx_eio)
+ (optional)
+ (modules ppx_eio)
+ (kind ppx_rewriter)
+ (libraries ppx_common)
+ (ppx_runtime_libraries ezEioServerUtils))
+
+(library
+ (name ppx_server_eio)
+ (public_name ez_api.ppx_server_eio)
+ (optional)
+ (modules ppx_server_eio)
+ (kind ppx_rewriter)
+ (libraries ppx_common)
+ (ppx_runtime_libraries ezServerEio))
+
+(library
+ (name ppx_req_eio)
+ (public_name ez_api.ppx_req_eio)
+ (optional)
+ (modules ppx_req_eio)
+ (kind ppx_rewriter)
+ (libraries ppx_common)
+ (ppx_runtime_libraries ezReqEio))

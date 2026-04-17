@@ -1,30 +1,29 @@
 (library
- (name ezAPIServerUtils)
- (public_name ez_api.server_utils)
- (modules answer cors directory gMTime timings file ip ezAPIServerUtils)
- (libraries ezAPI unix
+ (name server_utils)
+ (package ez_api)
+ (modules answer cors gMTime timings ip file log dir_types)
+ (wrapped false)
+ (libraries unix ezAPI
   (select ip.ml from
    (geoip -> ip.geoip.ml)
    (-> ip.dummy.ml))))
 
 (library
- (name server_common)
- (modules server_common)
- (optional)
+ (name httpunaf)
  (package ez_api)
- (libraries ezAPIServerUtils lwt.unix bigstringaf)
- (foreign_stubs (language c) (names rlimit_no_file))
- (enabled_if (= %{os_type} Unix))
-)
+ (modules httpunaf)
+ (libraries server_utils))
 
 (library
  (name ezOpenAPI)
  (public_name ez_api.openAPI)
+ (optional)
  (modules ezOpenAPI)
  (libraries ezAPI ezYaml ezjsonm))
 
 (library
  (name ezAPIServer)
+ (optional)
  (public_name ez_api.server)
  (modules ezAPIServer)
- (libraries ezServer))
+ (libraries ezServer ezAPIServerUtils))

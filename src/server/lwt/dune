@@ -1,0 +1,13 @@
+(library
+ (name ezAPIServerUtils)
+ (public_name ez_api.server_utils)
+ (optional)
+ (modules directory ezAPIServerUtils)
+ (libraries lwt server_utils))
+
+(library
+ (name lwt_httpunaf)
+ (package ez_api)
+ (optional)
+ (modules lwt_httpunaf)
+ (libraries httpunaf ezAPIServerUtils lwt.unix bigstringaf ezLwtSys_unix))

@@ -1,21 +1,28 @@
 (library
- (name httpun_tls)
- (public_name ez_api.httpun_tls)
+ (name httpun_common)
+ (public_name ez_api.httpun_common)
  (optional)
- (modules httpun_tls)
+ (modules httpun_common)
+ (libraries verbose ez_api httpun))
+
+(library
+ (name httpun_lwt_tls)
+ (public_name ez_api.httpun_lwt_tls)
+ (optional)
+ (modules httpun_lwt_tls)
  (libraries httpun-lwt-unix
-  (select httpun_tls.ml from
-   (tls-lwt lwt_ssl -> httpun_tls.both.ml)
-   (tls-lwt -> httpun_tls.tls.ml)
-   (lwt_ssl -> httpun_tls.ssl.ml)
-   (-> httpun_tls.none.ml))))
+  (select httpun_lwt_tls.ml from
+   (tls-lwt lwt_ssl -> httpun_lwt_tls.both.ml)
+   (tls-lwt -> httpun_lwt_tls.tls.ml)
+   (lwt_ssl -> httpun_lwt_tls.ssl.ml)
+   (-> httpun_lwt_tls.none.ml))))
 
 (library
  (name httpun_client)
  (public_name ez_api.httpun_client)
  (optional)
  (modules httpun_client)
- (libraries verbose ez_api httpun_tls))
+ (libraries httpun_common httpun_lwt_tls))
 
 (library
  (name ezHttpun_lwt)
@@ -25,9 +32,11 @@
  (libraries httpun_client ez_api.request_lwt))
 
 (library
- (name ezHttpun_lwt_i)
- (public_name ez_api.ihttpun_lwt)
+ (name httpun_eio_tls)
+ (public_name ez_api.httpun_eio_tls)
  (optional)
- (modules ezReq_lwt)
- (implements ez_api.req_lwt)
- (libraries ezHttpun_lwt))
+ (modules httpun_eio_tls)
+ (libraries httpun-eio
+  (select httpun_eio_tls.ml from
+   (eio-ssl -> httpun_eio_tls.ssl.ml)
+   (-> httpun_eio_tls.none.ml))))

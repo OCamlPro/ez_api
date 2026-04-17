@@ -1,0 +1,8 @@
+(library
+ (name ezXhr_i)
+ (public_name ez_api.ixhr)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezXhr)
+ (modes byte))

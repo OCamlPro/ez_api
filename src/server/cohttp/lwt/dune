@@ -1,0 +1,7 @@
+(library
+ (name ezServerCohttp)
+ (public_name ez_api.iserver_cohttp)
+ (optional)
+ (implements ezServer)
+ (modules ezServer)
+ (libraries ezAPIServerCohttp))

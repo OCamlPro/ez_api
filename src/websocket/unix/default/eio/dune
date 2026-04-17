@@ -1,0 +1,10 @@
+(library
+ (name ezWsEio_default)
+ (public_name ez_api.ws_eio_default)
+ (optional)
+ (modules ezWsEio)
+ (implements ezWsEio)
+ (libraries ezWsEioTypes
+  (select ezWsEio.ml from
+   (httpun_ws_common httpun-ws-eio -> ezWsEio.httpun.ml)
+   (-> ezWsEio.dummy.ml))))

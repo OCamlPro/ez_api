@@ -1,0 +1,56 @@
+(library
+ (name ezReq_S)
+ (public_name ez_api.req_s)
+ (modules_without_implementation ezReq_S)
+ (modules ezReq_S)
+ (libraries ezAPI))
+
+(library
+ (name ezReq)
+ (public_name ez_api.req)
+ (modules ezReq)
+ (virtual_modules ezReq)
+ (libraries ezReq_S)
+ (default_implementation ezReq_default))
+
+(library
+ (name ezReq_lwt_S)
+ (public_name ez_api.req_lwt_s)
+ (optional)
+ (modules_without_implementation ezReq_lwt_S)
+ (modules ezReq_lwt_S)
+ (libraries ezAPI lwt))
+
+(library
+ (name ezReq_lwt)
+ (public_name ez_api.req_lwt_dp)
+ (optional)
+ (modules ezReq_lwt)
+ (virtual_modules ezReq_lwt)
+ (default_implementation ezReq_lwt_default)
+ (libraries ezReq_lwt_S))
+
+(library
+ (name ezReqLwt)
+ (public_name ez_api.req_lwt)
+ (optional)
+ (modules ezReqLwt)
+ (libraries ezReq_lwt))
+
+(library
+ (name ezReqEioS)
+ (public_name ez_api.req_eio_s)
+ (optional)
+ (modules ezReqEioS)
+ (modules_without_implementation ezReqEioS)
+ (libraries ezAPI eio))
+
+(library
+ (name ezReqEio)
+ (public_name ez_api.req_eio)
+ (optional)
+ (modules ezReqEio)
+ (virtual_modules ezReqEio)
+ (default_implementation ezCohttpEio)
+ (libraries ezReqEioS)
+)

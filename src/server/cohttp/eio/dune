@@ -1,0 +1,7 @@
+(library
+ (name ezServerCohttp_eio)
+ (public_name ez_api.server_eio_cohttp)
+ (optional)
+ (implements ezServerEio)
+ (modules ezServerEio)
+ (libraries cohttp_common cohttp-eio ezServerEioUtils wsCohttpEio))

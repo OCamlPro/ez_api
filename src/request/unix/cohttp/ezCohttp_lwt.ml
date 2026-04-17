@@ -8,7 +8,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Base = EzCohttp_base.Make(Cohttp_lwt_unix.Client)
+module Base = Cohttp_base.Make(Cohttp_lwt_unix.Client)
 
 let () =
   let cb v  = if v land 4 <> 0 then Cohttp_lwt_unix.Debug.activate_debug () in

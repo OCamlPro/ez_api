@@ -1,0 +1,7 @@
+(library
+ (name ezHttpun_lwt_i)
+ (public_name ez_api.ihttpun_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezHttpun_lwt))

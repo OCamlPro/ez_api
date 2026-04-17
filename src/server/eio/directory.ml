@@ -1,0 +1,290 @@
+open EzAPI
+open Dir_types
+
+type 'a directory = {
+  services: 'a registered_service MethMap.t ;
+  subdirs: ('a static_subdirectories option * 'a variable_subdirectories option)
+}
+
+and 'a static_subdirectories = 'a directory StringMap.t
+
+and _ variable_subdirectories =
+  | Arg: 'a1 Arg.t * ('a * 'a1) directory -> 'a variable_subdirectories
+
+and _ registered_service =
+  | Http : {
+      service : ('a, 'i, 'o, 'e, 's) Service.t;
+      handler : ('a -> 'i -> ('o, 'e) result Answer.t);
+    } -> 'a registered_service
+  | Websocket : {
+      service : ('a, 'i, 'o, 'e, 's) Service.t;
+      react : ('a -> 'i -> ('o, 'e) result);
+      bg : ('a -> (('o, 'e) result -> unit) -> unit);
+      onclose : ('a -> unit) option;
+      step : float option;
+    } -> 'a registered_service
+
+let empty = { services = MethMap.empty ; subdirs = (None, None) }
+
+type t = Req.t directory
+
+type resolved_directory =
+    Dir: 'a directory * 'a -> resolved_directory
+
+type lookup_error = [
+  | `Not_found
+  | `Cannot_parse of Arg.descr * string * string list
+  | `Method_not_allowed ]
+
+type handler_error = [
+  | EzEncoding.destruct_error
+  | `unsupported of string option
+  | `handler_exn of exn
+  | `handler_error of string ]
+
+type ws_frame = [ `binary of string | `text of string | `none ]
+
+type lookup_ok = [
+  | `head | `options of (string * string) list
+  | `http of (string -> (string Answer.t, handler_error) result)
+  | `ws of ((string -> (ws_frame, handler_error) result) *
+            (((ws_frame, handler_error) result -> unit) -> unit) *
+            (unit -> unit) option * float option) ]
+
+let conflict_to_string = function
+  | CService m -> Format.sprintf "Duplicated service (%s)" (Meth.to_string m)
+  | CTypes (arg1, arg2) ->
+    Format.sprintf "Conflicing dynamic arguments: %s <> %s" arg1.Arg.name arg2.Arg.name
+
+let rec resolve :
+  type a. string list -> a directory -> a -> string list ->
+  (resolved_directory, lookup_error) result =
+  fun prefix dir args path ->
+  match path, dir with
+  | [], dir -> Ok (Dir (dir, args))
+  | _name :: _path, { subdirs = None, None; _ } -> Error `Not_found
+  | name :: path, { subdirs = Some static, None; _ } ->
+    begin match StringMap.find_opt name static with
+      | None -> Error `Not_found
+      | Some dir -> resolve (name :: prefix) dir args path
+    end
+  | name :: path, { subdirs = None, Some (Arg (arg, dir)); _ } ->
+    begin match arg.Arg.destruct name with
+      | Ok x -> resolve (name :: prefix) dir (args, x) path
+      | Error msg -> Error (`Cannot_parse (arg.Arg.description, msg, name :: prefix))
+    end
+  | name :: path, { subdirs = Some static, Some (Arg (arg, dir)); _ } ->
+    match StringMap.find_opt name static with
+    | Some dir -> resolve (name :: prefix) dir args path
+    | None ->
+      match arg.Arg.destruct name with
+      | Ok x -> resolve (name :: prefix) dir (args, x) path
+      | Error msg -> Error (`Cannot_parse (arg.Arg.description, msg, name :: prefix))
+
+(* Note : headers are merged with predefined headers *)
+let io_to_answer : type a. code:int -> headers:(string * string) list -> a io -> a -> string Answer.t =
+  fun ~code ~headers io body ->
+  match io with
+  | Empty ->
+    let code = if code = -1 then 204 else code in
+    {Answer.code; body=""; headers}
+  | Raw l ->
+    let content_type = match l with
+      | [] -> "application/octet-stream"
+      | h :: _ -> Mime.to_string h in
+    let code = if code = -1 then 200 else code in
+    {Answer.code; body; headers=("content-type", content_type)::headers}
+  | Json enc ->
+    let code = if code = -1 then 200 else code in
+    { Answer.code; body = EzEncoding.construct enc body;
+      headers=("content-type", "application/json")::headers }
+
+let ser_handler :
+  type i o e. ?content_type:string -> headers:StringSet.t StringMap.t
+  -> ('a -> i -> (o, e) result Answer.t) -> 'a ->
+  i io -> o io -> (e -> int * string) ->
+  string -> (string Answer.t, handler_error) result =
+  fun ?content_type ~headers:h handler args input output errors ->
+  let handle_result {Answer.code; body; headers} =
+    match body with
+    | Ok o ->
+      let headers = Cors.to_list @@ Cors.union h (Cors.of_list headers) in
+      io_to_answer ~code ~headers output o
+    | Error e ->
+      let c, body = errors e in
+      let code = if code = -1 then c else code in
+      let headers = Cors.to_list h in
+      { Answer.code; body; headers=("content-type", "application/json") :: headers }
+  in
+  match input with
+  | Empty -> (fun _ ->
+      try Ok (handle_result @@ handler args ())
+      with exn -> Error (`handler_exn exn))
+  | Raw mimes -> (fun s ->
+      if not (Mime.allowed mimes content_type) then
+        Error (`unsupported content_type)
+      else
+        try Ok (handle_result @@ handler args s)
+        with exn -> Error (`handler_exn exn))
+  | Json enc -> (fun (s : string) ->
+      match EzEncoding.destruct_res enc s with
+      | Ok i ->
+        begin
+          try Ok (handle_result @@ handler args i)
+          with exn -> Error (`handler_exn exn)
+        end
+      | Error e -> Error e)
+
+let io_to_ws_frame : type a. a io -> a -> ws_frame = fun io a ->
+  match io with
+  | Empty -> `none
+  | Raw _ -> `binary a
+  | Json enc -> `text (EzEncoding.construct enc a)
+
+let ser_websocket react bg args input output errors =
+  let handle_result r = match r with
+    | Ok x -> Ok (io_to_ws_frame output x)
+    | Error e -> Error (`handler_error (EzEncoding.construct errors e)) in
+  let bg send = bg args (fun r -> send @@ handle_result r) in
+  let react s =
+    try begin
+      match IO.from_string input (fun i -> handle_result (react args i)) s with
+      | Ok p -> p
+      | Error e -> Error e
+    end
+    with exn -> Error (`handler_exn exn) in
+  react, bg
+
+let options_headers dir = match MethMap.bindings dir.services with
+  | [] -> None
+  | l ->
+    let headers = Cors.allow_methods_header @@ List.map fst l in
+    let aux_sec acc s = StringSet.union acc (Security.headers (Service.security s)) in
+    let sec_set = List.fold_left (fun acc (_, rs) -> match rs with
+        | Http {service; _} -> aux_sec acc service
+        | Websocket {service; _} -> aux_sec acc service
+      ) StringSet.empty l in
+    let allowed_headers_set = if List.exists (fun (_, rs) -> match rs with
+        | Http {service; _} -> not (IO.is_empty service.Service.input)
+        | Websocket _ -> false) l then
+        StringSet.add "content-type" sec_set else sec_set in
+    let headers = Cors.insert headers (Cors.allow_headers_name, allowed_headers_set) in
+    let headers = Cors.union headers (Cors.allow_credentials_header (not (StringSet.is_empty sec_set))) in
+    let aux_ac acc s = Cors.union acc (Service.headers s) in
+    let headers = List.fold_left (fun acc (_,rs) -> match rs with
+        | Http {service; _} -> aux_ac acc service
+        | Websocket {service; _} -> aux_ac acc service
+      ) headers l in
+    Some (Cors.to_list headers)
+
+let lookup ?meth ?content_type dir r path : (lookup_ok, lookup_error) result =
+  match resolve [] dir r path with
+  | Error _ as err -> err
+  | Ok (Dir (dir, args)) ->
+    match meth with
+    | None | Some `OPTIONS ->
+      begin match options_headers dir with
+        | None -> Error `Not_found
+        | Some headers -> Ok (`options headers)
+      end
+    | Some `HEAD -> Ok `head
+    | Some (#Meth.t as m) ->
+      if MethMap.is_empty dir.services then Error `Not_found
+      else match m, MethMap.find_opt m dir.services with
+        | _, Some (Http {service; handler}) ->
+          let input = Service.input service in
+          let output = Service.output service in
+          let errors = Service.errors_handler service in
+          let headers = Service.headers service in
+          let sec_set = Security.headers (Service.security service) in
+          let headers = Cors.insert headers (Cors.allow_headers_name, sec_set) in
+          let headers = Cors.union headers (Cors.allow_credentials_header (not (StringSet.is_empty sec_set))) in
+          let h = ser_handler ?content_type ~headers handler args input output errors in
+          Ok (`http h)
+        | `GET, Some (Websocket {service; react; bg; onclose; step}) ->
+          let input = Service.input service in
+          let output = Service.output service in
+          let errors = Service.errors_encoding service in
+          let react, bg = ser_websocket react bg args input output errors in
+          let onclose = match onclose with None -> None | Some f -> Some (fun () -> f args) in
+          Ok (`ws (react, bg, onclose, step))
+        | _ -> Error `Method_not_allowed
+
+let step_of_path path =
+  let rec aux : type r p. (r, p) Path.t -> Step.t list -> Step.t list = fun path acc ->
+    match path with
+    | Path.Root -> acc
+    | Path.Static (path, name) -> aux path (Step.Static name :: acc)
+    | Path.Dynamic (path, arg) -> aux path (Step.Dynamic arg.Arg.description :: acc)
+    | Path.Trailing path -> aux path acc in
+  aux path []
+
+let conflict path kind = Error (step_of_path path, kind)
+
+let rec insert
+  : type r a.
+    (r, a) Path.t -> r directory ->
+    (a directory * (a directory -> r directory), Step.t list * conflict) result
+  = fun path dir ->
+    match path with
+    | Path.Root -> Ok (dir, (fun x -> x))
+    | Path.Static (subpath, name) -> begin
+        match insert subpath dir with
+        | Error c -> Error c
+        | Ok (subdir, rebuild) ->
+          let dirmap, dir, services = match subdir with
+            | { subdirs = None, _; services } -> StringMap.empty, empty, services
+            | { subdirs = Some m, _; services } ->
+              let dir = match StringMap.find_opt name m with
+                | None -> empty
+                | Some dir -> dir in
+              m, dir, services in
+          let rebuild s =
+            let subdirs = Some (StringMap.add name s dirmap), snd subdir.subdirs in
+            rebuild { subdirs; services } in
+          Ok (dir, rebuild)
+      end
+    | Path.Dynamic (subpath, arg) -> begin
+        match insert subpath dir with
+        | Error c -> Error c
+        | Ok (subdir, rebuild) ->
+          let r = match subdir with
+            | { subdirs = static, None ; services } -> Ok (static, empty, services)
+            | { subdirs = static, Some (Arg (arg', dir)); services } ->
+              try
+                let Arg.Ty.Eq = Arg.Ty.eq arg.Arg.id arg'.Arg.id in
+                Ok (static, (dir :> a directory), services)
+              with Arg.Ty.Not_equal ->
+                conflict path (CTypes (arg.Arg.description, arg'.Arg.description)) in
+          match r with
+          | Error c -> Error c
+          | Ok (static, dir, services) ->
+            let rebuild s =
+              let subdirs = static, Some (Arg (arg, s)) in
+              rebuild { subdirs ; services } in
+            Ok (dir, rebuild)
+      end
+    | Path.Trailing subpath -> insert subpath dir
+
+let register :
+  type a.
+  t -> (a, _, _, _, _) Service.t ->
+  ((a, _, _, _, _) Service.t -> a registered_service) ->
+  (t, Step.t list * conflict) result =
+  fun root service f ->
+  let path = Service.path service in
+  match insert path root with
+  | Error c -> Error c
+  | Ok (dir, insert) ->
+    let rs = f service in
+    let meth = Service.meth service in
+    match dir with
+    | { services ; subdirs = _ } as dir when not (MethMap.mem meth services) ->
+      Ok (insert { dir with services = MethMap.add meth rs services })
+    | _ -> conflict path @@ CService meth
+
+let register_http root service handler =
+  register root service (fun service -> Http {service; handler})
+
+let register_ws root ?onclose ?step ~react ~bg service =
+  register root service (fun service -> Websocket {service; react; bg; onclose; step})

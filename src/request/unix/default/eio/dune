@@ -1,0 +1,11 @@
+(library
+ (name ezReqEio_default)
+ (public_name ez_api.req_eio_default)
+ (optional)
+ (implements ezReqEio)
+ (modules ezReqEio)
+ (libraries ezRequestEio
+  (select ezReqEio.ml from
+   (httpun_common httpun-eio httpun_eio_tls -> ezReqEio.httpun.ml)
+   (cohttp-eio cohttp_eio_tls verbose -> ezReqEio.cohttp.ml)
+   (-> ezReqEio.dummy.ml))))
