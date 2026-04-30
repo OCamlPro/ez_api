@@ -13,7 +13,9 @@
  (optional)
  (package ez_api)
  (libraries ezAPIServerUtils lwt.unix bigstringaf)
- (foreign_stubs (language c) (names rlimit_no_file)))
+ (foreign_stubs (language c) (names rlimit_no_file))
+ (enabled_if (= %{os_type} Unix))
+)
 
 (library
  (name ezOpenAPI)
