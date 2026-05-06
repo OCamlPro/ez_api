@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Make (ez_api.WsCohttp.Make)</title><meta charset="utf-8"/><link rel="stylesheet" href="../../../odoc.support/odoc.css"/><meta name="generator" content="odoc 3.1.0"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../../index.html">Index</a> &#x00BB; <a href="../../index.html">ez_api</a> &#x00BB; <a href="../index.html">WsCohttp</a> &#x00BB; Make</nav><header class="odoc-preamble"><h1>Module <code><span>WsCohttp.Make</span></code></h1></header><div class="odoc-tocs"><nav class="odoc-toc odoc-local-toc"><ul><li><a href="#parameters">Parameters</a></li><li><a href="#signature">Signature</a></li></ul></nav></div><div class="odoc-content"><h2 id="parameters"><a href="#parameters" class="anchor"></a>Parameters</h2><div class="odoc-spec"><div class="spec parameter anchored" id="argument-1-S"><a href="#argument-1-S" class="anchor"></a><code><span><span class="keyword">module</span> </span><span><a href="argument-1-S/index.html">S</a></span><span> : <a href="../module-type-S/index.html">S</a></span></code></div></div><h2 id="signature"><a href="#signature" class="anchor"></a>Signature</h2><div class="odoc-spec"><div class="spec value anchored" id="val-react_content"><a href="#val-react_content" class="anchor"></a><code><span><span class="keyword">val</span> react_content : 
+  <span><span>(<span><span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+    <span><span><span>(<span>[&lt; <span>`binary of string</span> <span>| `none</span> <span><span>| `text</span> of string</span> ]</span>,
+      <span>[&gt; <span>`handler_error of string</span> ]</span>)</span>
+      <span class="xref-unresolved">Stdlib</span>.result</span>
+      <a href="argument-1-S/index.html#type-m">S.m</a></span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span><span class="xref-unresolved">Websocket</span>.Frame.t option</span> <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span>unit <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-react"><a href="#val-react" class="anchor"></a><code><span><span class="keyword">val</span> react : 
+  <span><span>(<span>string <span class="arrow">&#45;&gt;</span></span>
+    <span><span><span>(<span>[&lt; <span>`binary of string</span> <span>| `none</span> <span><span>| `text</span> of string</span> ]</span>,
+      <span>[&gt; <span>`handler_error of string</span> ]</span>)</span>
+      <span class="xref-unresolved">Stdlib</span>.result</span>
+      <a href="argument-1-S/index.html#type-m">S.m</a></span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span>string <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span><span class="xref-unresolved">Websocket</span>.Frame.t option</span> <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span>unit <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="xref-unresolved">Websocket</span>.Frame.t <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-ping_pong"><a href="#val-ping_pong" class="anchor"></a><code><span><span class="keyword">val</span> ping_pong : 
+  <span><span class="optlabel">?step</span>:float <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="xref-unresolved">Uuidm</span>.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span><span class="xref-unresolved">Websocket</span>.Frame.t option</span> <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span>(<span>unit <span class="arrow">&#45;&gt;</span></span> <span>unit <a href="argument-1-S/index.html#type-m">S.m</a></span>)</span> * <span>(<span>string <span class="arrow">&#45;&gt;</span></span> unit)</span></span></code></div></div></div></body></html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Httpunaf (ez_api.Httpunaf)</title><meta charset="utf-8"/><link rel="stylesheet" href="../../odoc.support/odoc.css"/><meta name="generator" content="odoc 3.1.0"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../index.html">Index</a> &#x00BB; <a href="../index.html">ez_api</a> &#x00BB; Httpunaf</nav><header class="odoc-preamble"><h1>Module <code><span>Httpunaf</span></code></h1></header><div class="odoc-content"><div class="odoc-spec"><div class="spec value anchored" id="val-meth"><a href="#val-meth" class="anchor"></a><code><span><span class="keyword">val</span> meth : 
+  <span><span>[&gt; `DELETE <span>| `GET</span> <span>| `HEAD</span> <span>| `OPTIONS</span> <span><span>| `Other</span> of string</span> <span>| `POST</span> <span>| `PUT</span> ]</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>[&gt; `DELETE <span>| `GET</span> <span>| `HEAD</span> <span>| `OPTIONS</span> <span>| `PATCH</span> <span>| `POST</span> <span>| `PUT</span> ]</span> option</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-debug"><a href="#val-debug" class="anchor"></a><code><span><span class="keyword">val</span> debug : 
+  <span><span class="label">meth</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">target</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-mk_uri"><a href="#val-mk_uri" class="anchor"></a><code><span><span class="keyword">val</span> mk_uri : 
+  <span><span class="label">meth</span>:<span>[&gt; `CONNECT ]</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">target</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">header</span>:<span>(<span>string <span class="arrow">&#45;&gt;</span></span> <span>string option</span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span class="xref-unresolved">Uri</span>.t</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-register_ip"><a href="#val-register_ip" class="anchor"></a><code><span><span class="keyword">val</span> register_ip : 
+  <span><span class="label">header</span>:<span>(<span>string <span class="arrow">&#45;&gt;</span></span> <span>string option</span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span>float <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="xref-unresolved">Unix</span>.sockaddr <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div></div></body></html>

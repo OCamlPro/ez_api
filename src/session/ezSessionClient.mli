@@ -15,13 +15,13 @@ module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
   a token can be provided (saved in local storage).
 *)
 
-  (** See {EzSession.TYPES.SessionArg.user_id}. *)
+  (** See [EzSession.TYPES.SessionArg.user_id]. *)
   type user_id = S.user_id
 
-  (** See {EzSession.TYPES.SessionArg.user_info}. *)
+  (** See [EzSession.TYPES.SessionArg.user_info]. *)
   type user_info = S.user_info
 
-  (** See {EzSession.TYPES.auth}. *)
+  (** See [EzSession.TYPES.auth]. *)
   type nonrec auth = (S.user_id, S.user_info) EzSession.TYPES.auth
 
   (** See {!EzSession.Make} *)
@@ -36,9 +36,9 @@ module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
     | `Too_many_login_attempts
     | `Session_expired ]
 
-  (** Performs request to the server's authentication service if actual state is set to 
+  (** Performs request to the server's authentication service if actual state is set to
   disconnected and calls callback on the response result. If state is set to connected or
-  authenticated, then callback is called on actual connection/authentication status without 
+  authenticated, then callback is called on actual connection/authentication status without
   performing request, unless [token] is specified. *)
   val connect :
     EzAPI.base_url ->
@@ -46,11 +46,11 @@ module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
     (((S.user_id, S.user_info) EzSession.TYPES.auth option, EzSession.TYPES.connect_error) result -> unit) -> unit
 
   (** Performs request to the server's login service. If actual state is set to disconnected,
-  then firstly, it performs [connect] request. If connect request returns authentication 
+  then firstly, it performs [connect] request. If connect request returns authentication
   information for different user (if token or cookies wasn't updated) or if other user is
   already autenticated, it performs logout for this user, and retry logining. If user is
-  connected but not authenticated, it constructs challenge reply by using user's [login] and 
-  [password] or uses foreign user information to authenticate. Calls callback on 
+  connected but not authenticated, it constructs challenge reply by using user's [login] and
+  [password] or uses foreign user information to authenticate. Calls callback on
   authentification status. *)
   val login :
     ?format:(string -> string) ->
@@ -61,8 +61,8 @@ module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
     (((S.user_id, S.user_info) EzSession.TYPES.auth, login_error) result -> unit) -> unit
 
   (** Performs request to the server's logout service if actual state is set to authenticated.
-  After this step, state is set to connected. Callback is called with [Ok true] if logout was 
-  successfully performed. If previous state wasn't set to authenticated, then callback is 
+  After this step, state is set to connected. Callback is called with [Ok true] if logout was
+  successfully performed. If previous state wasn't set to authenticated, then callback is
   called with [Ok false]. *)
   val logout :
     EzAPI.base_url ->
@@ -77,7 +77,7 @@ module Make(S: EzSession.TYPES.SessionArg)(_ : EzReq_S.S) : sig
   (* In `CSRF mode, these headers should be added to all queries that
     need authentication *)
 
-  (** Returns authentication headers depending on [S.token_kind] for client requests. 
+  (** Returns authentication headers depending on [S.token_kind] for client requests.
   It doesn't include cookies because cookies are automatically added by browser. *)
   val auth_headers : token:string -> (string * string) list
 

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Make (ez_api.EzRequestEio.Make)</title><meta charset="utf-8"/><link rel="stylesheet" href="../../../odoc.support/odoc.css"/><meta name="generator" content="odoc 3.1.0"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../../index.html">Index</a> &#x00BB; <a href="../../index.html">ez_api</a> &#x00BB; <a href="../index.html">EzRequestEio</a> &#x00BB; Make</nav><header class="odoc-preamble"><h1>Module <code><span>EzRequestEio.Make</span></code></h1></header><div class="odoc-tocs"><nav class="odoc-toc odoc-local-toc"><ul><li><a href="#parameters">Parameters</a></li><li><a href="#signature">Signature</a></li></ul></nav></div><div class="odoc-content"><h2 id="parameters"><a href="#parameters" class="anchor"></a>Parameters</h2><div class="odoc-spec"><div class="spec parameter anchored" id="argument-1-_"><a href="#argument-1-_" class="anchor"></a><code><span><span class="keyword">module</span> </span><span><a href="argument-1-_/index.html">_</a></span><span> : <a href="../../EzReqEioS/module-type-Interface/index.html">Interface</a></span></code></div></div><h2 id="signature"><a href="#signature" class="anchor"></a>Signature</h2><div class="odoc-spec"><div class="spec value anchored" id="val-get"><a href="#val-get" class="anchor"></a><code><span><span class="keyword">val</span> get : 
+  <span><span class="optlabel">?meth</span>:<a href="../../EzAPI/Meth/index.html#type-t">EzAPI.Meth.t</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-url">EzAPI.url</a> <span class="arrow">&#45;&gt;</span></span>
+  <a href="../../EzReqEioS/index.html#type-response">EzReqEioS.response</a></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-post"><a href="#val-post" class="anchor"></a><code><span><span class="keyword">val</span> post : 
+  <span><span class="optlabel">?meth</span>:<a href="../../EzAPI/Meth/index.html#type-t">EzAPI.Meth.t</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?content_type</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?content</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-url">EzAPI.url</a> <span class="arrow">&#45;&gt;</span></span>
+  <a href="../../EzReqEioS/index.html#type-response">EzReqEioS.response</a></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-get0"><a href="#val-get0" class="anchor"></a><code><span><span class="keyword">val</span> get0 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?post</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-service0">EzAPI.service0</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-get1"><a href="#val-get1" class="anchor"></a><code><span><span class="keyword">val</span> get1 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?post</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-service1">EzAPI.service1</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-get2"><a href="#val-get2" class="anchor"></a><code><span><span class="keyword">val</span> get2 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?post</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a1</span>, <span class="type-var">'a2</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-service2">EzAPI.service2</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a1</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a2</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-post0"><a href="#val-post0" class="anchor"></a><code><span><span class="keyword">val</span> post0 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?url_encode</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">input</span>:<span class="type-var">'input</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'input</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-post_service0">EzAPI.post_service0</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-post1"><a href="#val-post1" class="anchor"></a><code><span><span class="keyword">val</span> post1 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?url_encode</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">input</span>:<span class="type-var">'input</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a</span>, <span class="type-var">'input</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-post_service1">EzAPI.post_service1</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-post2"><a href="#val-post2" class="anchor"></a><code><span><span class="keyword">val</span> post2 : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?url_encode</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">input</span>:<span class="type-var">'input</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a1</span>, <span class="type-var">'a2</span>, <span class="type-var">'input</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-post_service2">EzAPI.post_service2</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a1</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a2</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-request"><a href="#val-request" class="anchor"></a><code><span><span class="keyword">val</span> request : 
+  <span><span class="optlabel">?headers</span>:<span><span>(string * string)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?params</span>:<span><span>(<a href="../../EzAPI/Param/index.html#type-t">EzAPI.Param.t</a> * <a href="../../EzAPI/index.html#type-param_value">EzAPI.param_value</a>)</span> list</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?msg</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?post</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?url_encode</span>:bool <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">net</span>:<span><span class="type-var">_</span> <a href="../../EzReqEioS/index.html#type-net">EzReqEioS.net</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">sw</span>:<span class="xref-unresolved">Eio</span>.Switch.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">input</span>:<span class="type-var">'input</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../../EzAPI/index.html#type-base_url">EzAPI.base_url</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a</span>, <span class="type-var">'input</span>, <span class="type-var">'output</span>, <span class="type-var">'error</span>, <span class="type-var">'security</span>)</span> <a href="../../EzAPI/index.html#type-service">EzAPI.service</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span class="type-var">'output</span>, <span><span class="type-var">'error</span> <a href="../../EzReqEioS/index.html#type-error">EzReqEioS.error</a></span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div></div></body></html>

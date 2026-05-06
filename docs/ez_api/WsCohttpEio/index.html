@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>WsCohttpEio (ez_api.WsCohttpEio)</title><meta charset="utf-8"/><link rel="stylesheet" href="../../odoc.support/odoc.css"/><meta name="generator" content="odoc 3.1.0"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../index.html">Index</a> &#x00BB; <a href="../index.html">ez_api</a> &#x00BB; WsCohttpEio</nav><header class="odoc-preamble"><h1>Module <code><span>WsCohttpEio</span></code></h1></header><div class="odoc-content"><div class="odoc-spec"><div class="spec module anchored" id="module-Eio_IO"><a href="#module-Eio_IO" class="anchor"></a><code><span><span class="keyword">module</span> <a href="Eio_IO/index.html">Eio_IO</a></span><span> : <span class="keyword">sig</span> ... <span class="keyword">end</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-send_frames"><a href="#val-send_frames" class="anchor"></a><code><span><span class="keyword">val</span> send_frames : <span><span><span class="xref-unresolved">Websocket</span>.Frame.t <span class="xref-unresolved">Eio</span>.Stream.t</span> <span class="arrow">&#45;&gt;</span></span> <span><span class="xref-unresolved">Eio</span>.Buf_write.t <span class="arrow">&#45;&gt;</span></span> <span class="type-var">'a</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-read_frames"><a href="#val-read_frames" class="anchor"></a><code><span><span class="keyword">val</span> read_frames : 
+  <span><a href="Eio_IO/IO/index.html#type-ic">Eio_IO.IO.ic</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="Eio_IO/IO/index.html#type-oc">Eio_IO.IO.oc</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span><span class="xref-unresolved">Websocket</span>.Frame.t <a href="Eio_IO/IO/index.html#type-t">Eio_IO.IO.t</a></span> <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span class="type-var">'a</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-ws"><a href="#val-ws" class="anchor"></a><code><span><span class="keyword">val</span> ws : 
+  <span><span class="xref-unresolved">Cohttp</span>.Request.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?onclose</span>:<span>(<span>unit <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?step</span>:float <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="optlabel">?body</span>:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">react</span>:
+    <span>(<span>string <span class="arrow">&#45;&gt;</span></span>
+      <span><span>(<span>[&lt; <span>`binary of string</span> <span>| `none</span> <span><span>| `text</span> of string</span> ]</span>,
+        <span>[&gt; <span>`handler_error of string</span> ]</span>)</span>
+        <span class="xref-unresolved">Stdlib</span>.result</span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">bg</span>:
+    <span>(<span><span>(<span><span><span>(<span>[&lt; <span>`binary of string</span> <span>| `none</span> <span><span>| `text</span> of string</span> ]</span>, <span class="type-var">'a</span>)</span> <span class="xref-unresolved">Stdlib</span>.result</span> <span class="arrow">&#45;&gt;</span></span>
+       unit)</span> <span class="arrow">&#45;&gt;</span></span>
+      unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="xref-unresolved">Uuidm</span>.t <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span>[&gt; <span>`Expert of <span class="xref-unresolved">Cohttp</span>.Response.t * <span>(<span><a href="Eio_IO/IO/index.html#type-ic">Eio_IO.IO.ic</a> <span class="arrow">&#45;&gt;</span></span> <span><a href="Eio_IO/IO/index.html#type-oc">Eio_IO.IO.oc</a> <span class="arrow">&#45;&gt;</span></span> unit)</span></span> ]</span>,
+    <span class="type-var">'b</span>)</span>
+    <span class="xref-unresolved">Stdlib</span>.result</span></span></code></div></div></div></body></html>
