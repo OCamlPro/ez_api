@@ -1,4 +1,9 @@
-## [2.2.0](https://github.com/ocamlpro/ez_api/compare/v2.1.0...2.2.0) (2026-04-30)
+## [3.0.0](https://github.com/ocamlpro/ez_api/compare/2.2.0...3.0.0) (2026-05-06)
+
+* optional lwt
+* eio client and server
+
+## [2.2.0](https://github.com/ocamlpro/ez_api/compare/2.1.0...2.2.0) (2026-04-30)
 
 * more ppx: security scheme, parameters, request
 * betters cors
