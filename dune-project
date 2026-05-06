@@ -31,6 +31,7 @@
   cohttp-lwt-unix
   cohttp-lwt-jsoo
   httpaf-lwt-unix
+  curl
   curl_lwt
   ezjs_fetch
   ppx_deriving_encoding

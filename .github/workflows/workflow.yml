@@ -16,9 +16,9 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          # - macos-latest
         ocaml-compiler:
           - 4
+          - 5
 
     runs-on: ${{ matrix.os }}
 
@@ -31,13 +31,26 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
-      - name: Install system packages required by opam packages
-        run: opam depext --update geoip ocurl tls
+      - name: Install minimal dependencies
+        run: opam install . --deps-only --with-doc --with-test
 
-      - name: Install opam packages
+      - name: Run minimal build
+        run: make
+
+      - name: Install depext
         run: |
-          opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g')
-          opam install . --deps-only --with-doc --with-test
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-gnutls-dev libgeoip-dev
 
-      - name: Run build
-        run: opam exec -- make build
+      - name: Install optional dependencies for ocaml 4
+        run: |
+          opam install --best-effort $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g' | awk '!($1 ~ /eio/) { print $1 }')
+        if: ${{ matrix.ocaml-compiler == 4 }}
+
+      - name: Install optional dependencies for ocaml 5
+        run: |
+          opam install $(opam show -f depopts: . | sed -e 's/{.*}//g' -e 's/"//g' | awk '{ if ($1 != "js_of_ocaml-eio" && $1 != "geoip") print $1 }')
+        if: ${{ matrix.ocaml-compiler != 4 }}
+
+      - name: Run full build
+        run: make
