@@ -43,7 +43,7 @@ let request_handler ?allow_origin ?catch ?footer ~sw s { Gluten.reqd; upgrade; _
   Eio.Fiber.fork ~sw @@ fun () ->
   let body = read_body (Reqd.request_body reqd) in
   let ws = WsHttpunEio.ws reqd upgrade in
-  debugf ~v:2 (fun () ->
+  Log.debugf ~v:2 (fun () ->
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
   let r =
@@ -61,11 +61,11 @@ let request_handler ?allow_origin ?catch ?footer ~sw s { Gluten.reqd; upgrade; _
   | `ws (Ok ()) -> ()
   | `http {Answer.code; body; headers} ->
     let status = Status.unsafe_of_code code in
-    debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    debugf ~v:4 (fun () ->
+    Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
+    Log.debugf ~v:4 (fun () ->
         List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
       );
-    debugf ~v:3 (fun () ->
+    Log.debugf ~v:3 (fun () ->
         let content_type = List.assoc_opt "content-type" headers in
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Reply content:\n%s" body);

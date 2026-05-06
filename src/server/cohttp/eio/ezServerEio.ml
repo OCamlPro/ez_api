@@ -12,7 +12,7 @@ let dispatch ?allow_origin ?catch ?footer s req body =
   let meth = Cohttp_common.meth req in
   let body = Eio.Buf_read.(parse_exn take_all) body ~max_size:max_int in
   let ws = WsCohttpEio.ws req in
-  debugf ~v:2 (fun () ->
+  Log.debugf ~v:2 (fun () ->
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
   let a =
@@ -29,11 +29,11 @@ let dispatch ?allow_origin ?catch ?footer s req body =
     `Response (Cohttp_eio.Server.respond_string ~status ~body:"" ())
   | `http {Answer.code; body; headers} ->
     let status = Code.status_of_code code in
-    debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    debugf ~v:4 (fun () ->
+    Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
+    Log.debugf ~v:4 (fun () ->
         List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
       );
-    debugf ~v:3 (fun () ->
+    Log.debugf ~v:3 (fun () ->
         let content_type = List.assoc_opt "content-type" headers in
         if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
           EzDebug.printf "Reply content:\n%s" body);
