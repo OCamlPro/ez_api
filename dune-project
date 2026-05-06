@@ -59,4 +59,5 @@
   (ezjs_fetch (< 0.2))
   (digestif (< 1.0.0))
   (ppx_deriving_encoding (< 0.4.0))
+  (ppxlib (< 0.17.0))
 ))
