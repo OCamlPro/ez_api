@@ -14,6 +14,7 @@ open EzAPIServerUtils
 open Cohttp
 
 module Server = Cohttp_lwt_unix.Server
+module File = File_lwt
 
 let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
 
@@ -32,6 +33,8 @@ let register_ip req io time =
     end
   | _ -> ()
 
+let file = File.reply
+
 let dispatch ?allow_origin ?catch ?footer s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
@@ -46,7 +49,7 @@ let dispatch ?allow_origin ?catch ?footer s io req body =
   Log.debugf ~v:2 (fun () ->
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
-  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin s.server_kind r path body)
+  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
     (fun exn ->
        EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
        match catch with
@@ -81,7 +84,7 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "Starting COHTTP server (port: %d)" server_port;
+  EzDebug.printf "Running COHTTP LWT server on localhost:%d" server_port;
   Server.create
     ~on_exn
     ~mode:(`TCP (`Port server_port))
@@ -89,6 +92,6 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
 
 let shutdown () = Lwt.return_unit
 
-let server ?catch ?allow_origin ?footer servers =
+let server ?catch ?allow_origin ?footer ?addr:_ servers =
   Lwt.join (List.map (fun (port,kind) ->
       create_server ?catch ?allow_origin ?footer port kind) servers)

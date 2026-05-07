@@ -1,4 +1,11 @@
 (library
+ (name ezAPIServerHttpun)
+ (public_name ez_api.server_httpun)
+ (optional)
+ (modules ezAPIServerHttpun)
+ (libraries lwt_httpunaf httpun-lwt-unix wsHttpunLwt file_lwt))
+
+(library
  (name ezServerHttpun)
  (public_name ez_api.iserver_httpun)
  (optional)

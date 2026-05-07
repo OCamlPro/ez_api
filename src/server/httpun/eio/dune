@@ -4,4 +4,4 @@
  (optional)
  (implements ezServerEio)
  (modules ezServerEio)
- (libraries wsHttpunEio httpunaf httpun-eio))
+ (libraries wsHttpunEio httpunaf httpun-eio file_eio))

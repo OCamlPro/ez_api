@@ -4,4 +4,4 @@
  (optional)
  (implements ezServerEio)
  (modules ezServerEio)
- (libraries cohttp_common cohttp-eio ezServerEioUtils wsCohttpEio))
+ (libraries cohttp_common cohttp-eio ezServerEioUtils wsCohttpEio file_eio))

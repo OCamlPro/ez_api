@@ -15,7 +15,6 @@ module Timings = Timings
 module Directory = Directory
 module Answer = Answer
 module Req = Req
-module File = File
 module GMTime = GMTime
 module Ip = Ip
 module Cors = Cors
@@ -99,14 +98,15 @@ module Legacy = struct
 
 end
 
-let handle ?meth ?content_type ?ws ?(allow_origin=`default) s r path body =
+let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file s r path body =
   let r, body =
     if content_type = Some Url.content_type then
       Req.add_params r (Url.decode_args body), ""
     else r, body in
   let a = match s with
     | Root (root, default) ->
-      Lwt.return (`http (File.reply ?meth root ?default path))
+      file ?meth ?default root path >>= fun a ->
+      Lwt.return (`http a)
     | API dir ->
       Directory.lookup ?meth ?content_type dir r path >>= function
       | Error `Not_found -> Lwt.return (`http (Answer.not_found ()))
@@ -141,5 +141,7 @@ let handle ?meth ?content_type ?ws ?(allow_origin=`default) s r path body =
     let origin = match allow_origin with
       | `origin -> StringMap.find_opt "origin" r.Req.req_headers
       | _ -> None in
-    let headers = Cors.merge_headers_allow_origin ?origin a.Answer.headers allow_origin in
+    let headers =
+      Cors.merge_headers_allow_origin ?origin a.Answer.headers allow_origin @
+      [ "connection", "close" ] in
     `http { a with Answer.headers }

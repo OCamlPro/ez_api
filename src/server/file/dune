@@ -1,0 +1,23 @@
+(library
+ (name file_lwt)
+ (package ez_api)
+ (optional)
+ (modules file_lwt)
+ (libraries server_utils lwt.unix))
+
+(library
+ (name file_eio)
+ (package ez_api)
+ (optional)
+ (modules file_eio)
+ (libraries server_utils eio))
+
+(executable
+ (name file_server)
+ (public_name ezserve)
+ (modules file_server_arg file_server)
+ (libraries
+  (select file_server.ml from
+   (ezAPIServerEio eio_main -> file_server.eio.ml)
+   (ezAPIServer -> file_server.lwt.ml)
+   (-> file_server.dummy.ml))))

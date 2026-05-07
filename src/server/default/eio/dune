@@ -6,6 +6,6 @@
  (modules ezServerEio)
  (libraries ezServerEioUtils
   (select ezServerEio.ml from
-   (wsHttpunEio httpunaf httpun-eio -> ezServerEio.httpun.ml)
-   (cohttp_common cohttp-eio wsCohttpEio -> ezServerEio.cohttp.ml)
+   (wsHttpunEio httpunaf httpun-eio file_eio -> ezServerEio.httpun.ml)
+   (cohttp_common cohttp-eio wsCohttpEio file_eio -> ezServerEio.cohttp.ml)
    (-> ezServerEio.dummy.ml))))

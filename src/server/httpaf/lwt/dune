@@ -3,7 +3,7 @@
  (public_name ez_api.server_httpaf)
  (optional)
  (modules ezAPIServerHttpAf)
- (libraries httpaf-lwt-unix wsHttpaf lwt_httpunaf))
+ (libraries httpaf-lwt-unix wsHttpaf lwt_httpunaf file_lwt))
 
 (library
  (name ezServerHttpaf)

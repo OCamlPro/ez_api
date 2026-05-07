@@ -2,7 +2,7 @@ open EzAPI
 open EzServerEioUtils
 open Cohttp
 
-let dispatch ?allow_origin ?catch ?footer s req body =
+let dispatch ?allow_origin ?catch ?footer ~fs s req body =
   let time = GMTime.time () in
   Cohttp_common.debug req;
   let headers = Cohttp_common.headers req in
@@ -16,7 +16,9 @@ let dispatch ?allow_origin ?catch ?footer s req body =
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
   let a =
-    try handle ~ws ?meth ?content_type ?allow_origin s.server_kind r path body
+    try
+      let file = File_eio.reply ~fs in
+      handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body
     with exn ->
       EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
       match catch with
@@ -41,21 +43,25 @@ let dispatch ?allow_origin ?catch ?footer s req body =
     let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
     `Response (Cohttp_eio.Server.respond_string ~headers ~status ~body ())
 
-let create ?catch ?allow_origin ?footer ~env ~sw server_port server_kind =
+let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   let s = { server_port; server_kind } in
   let net = Eio.Stdenv.net env in
+  let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
   let callback _conn req body =
-    dispatch ?allow_origin ?catch ?footer s req body in
+    dispatch ?allow_origin ?catch ?footer ~fs s req body in
   let on_error exn = EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "Starting COHTTP server (port: %d)" server_port;
+  EzDebug.printf "Running COHTTP EIO server on %s:%d" (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
-  let socket = Eio.Net.listen ~reuse_addr:true ~reuse_port:true ~backlog:128 ~sw net
-      (`Tcp (Eio.Net.Ipaddr.V4.loopback, server_port)) in
+  let addr = match addr with
+    | None -> Eio.Net.Ipaddr.V4.loopback
+    | Some s -> Eio_unix.Net.Ipaddr.of_unix (Unix.inet_addr_of_string s) in
+  let socket = Eio.Net.listen ~reuse_addr:true ~backlog:128 ~sw net
+      (`Tcp (addr, server_port)) in
   let server = Cohttp_eio.Server.make_response_action ~callback () in
   Cohttp_eio.Server.run ~on_error ~additional_domains socket server
 
-let run ?catch ?allow_origin ?footer ~env ~sw servers =
+let run ?catch ?allow_origin ?footer ?addr ~env ~sw servers =
   Eio.Fiber.all @@ List.map (fun (port, kind) -> fun () ->
-      create ?catch ?allow_origin ?footer ~env ~sw port kind)
+      create ?catch ?allow_origin ?footer ?addr ~env ~sw port kind)
     servers

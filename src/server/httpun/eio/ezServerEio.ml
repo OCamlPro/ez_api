@@ -31,7 +31,7 @@ let read_body body =
   Body.Reader.schedule_read body ~on_eof ~on_read;
   Eio.Promise.await w
 
-let request_handler ?allow_origin ?catch ?footer ~sw s { Gluten.reqd; upgrade; _ } =
+let request_handler ?allow_origin ?catch ?footer ~fs ~sw s { Gluten.reqd; upgrade; _ } =
   let req = Reqd.request reqd in
   let time = GMTime.time () in
   let headers = headers_from_httpun req in
@@ -47,7 +47,9 @@ let request_handler ?allow_origin ?catch ?footer ~sw s { Gluten.reqd; upgrade; _
       if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
         EzDebug.printf "Request content:\n%s" body);
   let r =
-    try handle ?meth ?content_type ?allow_origin ~ws s.server_kind r path body
+    try
+      let file = File_eio.reply ~fs in
+      handle ?meth ?content_type ?allow_origin ~ws ~file s.server_kind r path body
     with exn ->
       EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
       match catch with
@@ -87,22 +89,26 @@ let error_handler ?footer _sockaddr ?request:_ error start =
   end;
   Body.Writer.flush response_body (function `Written -> Body.Writer.close response_body | _ -> ())
 
-let create ?catch ?allow_origin ?footer ~env ~sw server_port server_kind =
+let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   let s = { server_port; server_kind } in
   let net = Eio.Stdenv.net env in
+  let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
   let request_handler ~sw _addr reqd = request_handler ?allow_origin ?catch ?footer ~sw s reqd in
   let error_handler = error_handler ?footer in
-  let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~sw) ~error_handler ~sw in
+  let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~fs ~sw) ~error_handler ~sw in
   let on_error exn = EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "Starting HTTPUN server (port: %d)" server_port;
+  EzDebug.printf "Running HTTPUN EIO server on %s:%d" (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
+  let addr = match addr with
+    | None -> Eio.Net.Ipaddr.V4.loopback
+    | Some s -> Eio_unix.Net.Ipaddr.of_unix (Unix.inet_addr_of_string s) in
   let socket = Eio.Net.listen ~reuse_addr:true ~backlog:128 ~sw net
-      (`Tcp (Eio.Net.Ipaddr.V4.loopback, server_port)) in
+      (`Tcp (addr, server_port)) in
   Eio.Net.run_server socket ~additional_domains ~on_error @@ fun socket peer_addr ->
   Eio.Switch.run @@ fun sw -> handler ~sw peer_addr socket
 
-let run ?catch ?allow_origin ?footer ~env ~sw servers =
+let run ?catch ?allow_origin ?footer ?addr ~env ~sw servers =
   Eio.Fiber.all @@ List.map (fun (port, kind) -> fun () ->
-      create ?catch ?allow_origin ?footer ~env ~sw port kind)
+      create ?catch ?allow_origin ?footer ?addr ~env ~sw port kind)
     servers

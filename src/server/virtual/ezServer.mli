@@ -11,7 +11,7 @@
 open EzAPIServerUtils
 
 val server : ?catch:(string -> exn -> string Answer.t Lwt.t) ->
-  ?allow_origin:Cors.allow_kind -> ?footer:string ->
+  ?allow_origin:Cors.allow_kind -> ?footer:string -> ?addr:string ->
   (int * server_kind) list -> unit Lwt.t
 
 val shutdown : unit -> unit Lwt.t

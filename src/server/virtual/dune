@@ -9,7 +9,7 @@
 
 (library
  (name ezServerEio)
- (public_name ez_api.server_eio)
+ (public_name ez_api.server_eio_s)
  (optional)
  (modules ezServerEio)
  (virtual_modules ezServerEio)

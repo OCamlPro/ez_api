@@ -1,7 +1,7 @@
 (library
  (name server_utils)
  (package ez_api)
- (modules answer cors gMTime timings ip file log dir_types)
+ (modules answer cors gMTime timings ip log dir_types)
  (wrapped false)
  (libraries unix ezAPI
   (select ip.ml from
@@ -26,4 +26,11 @@
  (optional)
  (public_name ez_api.server)
  (modules ezAPIServer)
- (libraries ezServer ezAPIServerUtils))
+ (libraries ezServer))
+
+(library
+ (name ezAPIServerEio)
+ (optional)
+ (public_name ez_api.server_eio)
+ (modules ezAPIServerEio)
+ (libraries ezServerEio))
