@@ -20,7 +20,7 @@ let create_server ?(name="HTTPUN") ?addr server_port server_kind handler =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ EzAPI.Doc.nservices ();
   ignore @@ EzAPI.Doc.all_services_registered ();
-  EzDebug.printf "Running %s LWT server on %s:%d" name (Option.value ~default:"localhost" addr) server_port;
+  EzDebug.printf "[%t] Running %s LWT server on %s:%d" GMTime.pp_now name (Option.value ~default:"localhost" addr) server_port;
   let addr = match addr with
     | None -> Unix.inet_addr_loopback
     | Some s -> Unix.inet_addr_of_string s in

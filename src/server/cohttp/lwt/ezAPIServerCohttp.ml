@@ -84,7 +84,7 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "Running COHTTP LWT server on localhost:%d" server_port;
+  EzDebug.printf "[%t] Running COHTTP LWT server on localhost:%d" GMTime.pp_now server_port;
   Server.create
     ~on_exn
     ~mode:(`TCP (`Port server_port))
