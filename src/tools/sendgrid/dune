@@ -18,4 +18,4 @@
  (public_name ez_api.sendgrid)
  (optional)
  (modules ezSendgrid)
- (libraries ezReq_lwt calendar ezSendgrid_services))
+ (libraries ezReq_lwt ezSendgrid_services))

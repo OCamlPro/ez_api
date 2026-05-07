@@ -1,7 +1,6 @@
 (lang dune 2.8)
 (generate_opam_files true)
 (name ez_api)
-(version 2.0.0)
 (source (github ocamlpro/ez_api))
 (license LGPL-2.1-only)
 (authors
@@ -25,7 +24,6 @@
   lwt
   geoip
   js_of_ocaml-lwt
-  calendar
   cohttp
   cohttp-lwt
   cohttp-lwt-unix

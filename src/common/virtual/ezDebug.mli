@@ -8,5 +8,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val printf : ('a, unit, string, unit) format4 -> 'a
+val printf : ('a, Format.formatter, unit, unit) format4 -> 'a
 val log : string -> unit

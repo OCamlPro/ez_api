@@ -3,6 +3,4 @@
  (public_name ez_api.ws_server_httpaf)
  (optional)
  (modules wsHttpaf)
- (libraries
-  (select wsHttpaf.ml from
-   (ezAPIServerUtils -> wsHttpaf.dummy.ml))))
+ (libraries ezAPIServerUtils))

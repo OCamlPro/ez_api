@@ -8,25 +8,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open CalendarLib
-
 type recaptcha = {
   cap_success: bool;
   cap_score: float option;
   cap_action: string option;
-  cap_challenge_ts: Calendar.t option;
+  cap_challenge_ts: string option;
   cap_hostname: string option;
   cap_error_codes: string list option
 }
 
 module Encoding = struct
   open Json_encoding
-
-  let tsp =
-    conv
-      (fun timestamp -> Printer.Calendar.sprint "%Y-%m-%dT%H:%M:%SZ" timestamp)
-      (fun s -> Printer.Calendar.from_fstring "%Y-%m-%dT%H:%M:%SZ" s)
-      string
 
   let captcha =
     conv
@@ -42,7 +34,7 @@ module Encoding = struct
          (req "success" bool)
          (opt "score" float)
          (opt "action" string)
-         (opt "challenge_ts" tsp)
+         (opt "challenge_ts" string)
          (opt "hostname" string)
          (opt "error-codes" (list string)))
 end

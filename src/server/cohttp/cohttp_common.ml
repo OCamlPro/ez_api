@@ -18,7 +18,7 @@ let version req = match Request.version req with
   | _ -> None
 
 let debug req =
-  Log.debug "[%s] REQUEST: %s %S" (Log.pp_time ())
+  Log.debug "[%t] REQUEST: %s %S" GMTime.pp_now
     (req |> Request.meth |> Code.string_of_method)
     (req |> Request.uri |> Uri.path_and_query);
   Log.debugf ~v:1 (fun () ->

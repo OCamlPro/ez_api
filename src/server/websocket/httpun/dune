@@ -3,7 +3,7 @@
  (package ez_api)
  (optional)
  (modules wsHttpun)
- (libraries httpun-ws digestif calendar uuidm))
+ (libraries httpun-ws digestif uuidm unix))
 
 (library
  (name wsHttpunLwt)

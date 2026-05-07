@@ -8,5 +8,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let printf fmt = Printf.ksprintf (fun s -> Format.eprintf "%s@." s) fmt
+let printf fmt = Format.kasprintf (fun s -> Format.eprintf "%s@." s) fmt
 let log = prerr_endline

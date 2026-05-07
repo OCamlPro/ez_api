@@ -28,24 +28,25 @@ let read_file =
            Lwt.reraise exn)
 
 let rec reply ?(meth=`GET) ?default root path =
-  let file = Filename.concat root (String.concat "/" path) in
+  let path = String.concat "/" path in
+  let file = Filename.concat root path in
   let content_type = EzAPI.Mime.content_type_of_file file in
   match meth with
   | `OPTIONS ->
-    if Sys.file_exists file then
+    if Sys.file_exists file && not (Sys.is_directory file) then
       Lwt.return { Answer.code = 200; body = ""; headers=[Cors.allow_methods_name, "GET"] }
-    else begin match default with
-      | None -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
-      | Some file -> reply ~meth root (String.split_on_char '/' file)
+    else begin match path, default with
+      | "", Some file -> reply ~meth root (String.split_on_char '/' file)
+      | _ -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
     end
   | _ ->
-    if Sys.file_exists file then
+    if Sys.file_exists file && not (Sys.is_directory file) then
       Lwt.bind (read_file file) @@ function
       | None -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
       | Some body ->
-        EzDebug.printf "Returning file %S of length %d" file (String.length body);
+        EzDebug.printf "[%t] 200 - /%s - %d" GMTime.pp_now path (String.length body);
         Lwt.return { Answer.code = 200; body; headers=["content-type", content_type] }
-    else begin match default with
-      | None -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
-      | Some file -> reply ~meth root (String.split_on_char '/' file)
+    else begin match path, default with
+      | "", Some file -> reply ~meth root (String.split_on_char '/' file)
+      | _ -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
     end

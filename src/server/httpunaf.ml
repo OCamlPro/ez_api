@@ -4,7 +4,7 @@ let meth = function
   | _ -> None
 
 let debug ~meth ~target ~headers =
-  Log.debug "[%t] REQUEST: %s %S" Log.pp_time meth target;
+  Log.debug "[%t] REQUEST: %s %S" GMTime.pp_now meth target;
   Log.debugf ~v:1 @@ fun () ->
   List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
 

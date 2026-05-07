@@ -21,16 +21,14 @@ end
 let close ?(code=1000) send =
   send (Some (close code))
 
-let ping_table : (string, CalendarLib.Fcalendar.Precise.t) Hashtbl.t = Hashtbl.create 1024
+let ping_table : (string, float) Hashtbl.t = Hashtbl.create 1024
 
 let check_ping ?(step=30.) id key =
-  let open CalendarLib.Fcalendar.Precise in
   match Hashtbl.find_opt ping_table (id ^ key) with
   | None -> false
   | Some t ->
-    let step = Period.second (Time.Second.from_float step) in
-    let now = now () in
-    if compare (add t step) now < 0 then (
+    let now = Unix.gettimeofday () in
+    if t +. step < now then (
       Hashtbl.remove ping_table (id ^ key);
       false)
     else true
@@ -89,7 +87,7 @@ module Make(S: S) = struct
         S.bind (S.sleep (step /. 2.)) @@ fun () -> loop ()
       else S.return () in
     let fill content =
-      let now = CalendarLib.Fcalendar.Precise.now () in
+      let now = Unix.gettimeofday () in
       Hashtbl.replace ping_table (id_str ^ content) now in
     loop, fill
 end

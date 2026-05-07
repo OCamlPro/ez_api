@@ -3,7 +3,7 @@
  (package ez_api)
  (optional)
  (modules wsCohttp)
- (libraries websocket calendar uuidm))
+ (libraries websocket uuidm unix))
 
 (library
  (name wsCohttpLwt)
