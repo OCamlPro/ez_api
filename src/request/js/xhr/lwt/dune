@@ -1,4 +1,13 @@
 (library
+ (name ezXhr_lwt)
+ (public_name ez_api.xhr_lwt)
+ (optional)
+ (modules ezXhr_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries verbose ezRequest_lwt ezAPIJS js_of_ocaml-lwt)
+ (modes byte))
+
+(library
  (name ezXhr_lwt_i)
  (public_name ez_api.ixhr_lwt)
  (optional)

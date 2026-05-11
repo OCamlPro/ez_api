@@ -1,4 +1,30 @@
 (library
+ (name httpun_lwt_tls)
+ (public_name ez_api.httpun_lwt_tls)
+ (optional)
+ (modules httpun_lwt_tls)
+ (libraries httpun-lwt-unix
+  (select httpun_lwt_tls.ml from
+   (tls-lwt lwt_ssl -> httpun_lwt_tls.both.ml)
+   (tls-lwt -> httpun_lwt_tls.tls.ml)
+   (lwt_ssl -> httpun_lwt_tls.ssl.ml)
+   (-> httpun_lwt_tls.none.ml))))
+
+(library
+ (name httpun_client)
+ (public_name ez_api.httpun_client)
+ (optional)
+ (modules httpun_client)
+ (libraries httpun_common httpun_lwt_tls))
+
+(library
+ (name ezHttpun_lwt)
+ (public_name ez_api.httpun_lwt)
+ (optional)
+ (modules ezHttpun_lwt)
+ (libraries httpun_client ez_api.request_lwt))
+
+(library
  (name ezHttpun_lwt_i)
  (public_name ez_api.ihttpun_lwt)
  (optional)

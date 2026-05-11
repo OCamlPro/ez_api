@@ -10,7 +10,7 @@
  (package ez_api)
  (optional)
  (modules file_eio)
- (libraries server_utils eio))
+ (libraries server_utils eio log_eio))
 
 (executable
  (name file_server)

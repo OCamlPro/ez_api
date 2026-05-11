@@ -1,4 +1,13 @@
 (library
+ (name ezFetch_lwt)
+ (public_name ez_api.fetch_lwt)
+ (optional)
+ (modules ezFetch_lwt)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries verbose ezRequest_lwt ezjs_fetch.lwt ezAPIJS)
+ (modes byte))
+
+(library
  (name ezFetch_lwt_i)
  (public_name ez_api.ifetch_lwt)
  (optional)

@@ -23,7 +23,7 @@ let connect ?msg ?protocols:_ ?error ~react url =
   match parse url with
   | Error e -> Lwt.return_error e
   | Ok (host, _scheme, port, resource) ->
-    log ~action:"connect" url msg;
+    Verbose.request ?msg ~meth:"CONNECT" url;
     let* addresses = Lwt_unix.getaddrinfo host (Int.to_string port) [Unix.(AI_FAMILY PF_INET)] in
     let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     let* () = Lwt_unix.connect socket (List.hd addresses).Unix.ai_addr in

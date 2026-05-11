@@ -3,7 +3,7 @@
  (public_name ez_api.ws_types)
  (optional)
  (modules ezWsCommon)
- (libraries lwt ezDebug ezEncoding))
+ (libraries lwt ezEncoding))
 
 (library
  (name ezWsEioTypes)

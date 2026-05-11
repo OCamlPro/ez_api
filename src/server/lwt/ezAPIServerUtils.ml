@@ -98,7 +98,7 @@ module Legacy = struct
 
 end
 
-let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file s r path body =
+let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file ~(printf: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a) s r path body =
   let r, body =
     if content_type = Some Url.content_type then
       Req.add_params r (Url.decode_args body), ""
@@ -121,10 +121,10 @@ let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file s r path body 
           | Error (`destruct_exn exn) -> Lwt.return @@ Answer.destruct_exception exn
           | Error (`unsupported c) -> Lwt.return @@ Answer.unsupported_media_type c
           | Error (`handler_error s) ->
-            EzDebug.printf "In %s: error %s" (String.concat "/" path) s;
+            printf "In %s: error %s" (String.concat "/" path) s >>= fun () ->
             Lwt.return @@ Answer.server_error (Failure s)
           | Error (`handler_exn exn) ->
-            EzDebug.printf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn;
+            printf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn >>= fun () ->
             Lwt.return @@ Answer.server_error exn
           | Ok a -> Lwt.return a
         end >|= fun a -> (`http a)

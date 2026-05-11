@@ -43,40 +43,37 @@ class type http = object
     (message t -> unit) callback optdef -> request t meth
 end
 
-let log ?(meth="GET") url = function
-  | None ->
-    if !Verbose.v <> 0 then log "[ez_api] %s %s@." meth url
-    else ()
-  | Some msg -> log_str ("[>" ^ msg ^ " " ^ meth ^ " " ^ url ^ "]")
-
 let require s = Unsafe.(fun_call (pure_js_expr "require") [|inject @@ string s|])
 
 let http : http t = require "http"
 let https : http t = require "https"
 
-let handle f (m : message t) =
+let handle ?msg ~url f (m : message t) =
   if m##.statusCode >= 200 && m##.statusCode < 300 then
     let s = ref "" in
     m##on_data (string "data") (wrap_callback (fun chunk ->
         s := !s ^ (Typed_array.String.of_arrayBuffer chunk)));
     m##on_end (string "end") (wrap_callback (fun () ->
-        if !Verbose.v land 1 <> 0 && !s <> "" then Format.printf "[ez_api] received:\n%s@." !s;
+        Verbose.response ?msg ~code:m##.statusCode ~content:!s url;
         f (Ok !s)))
   else (
-    if !Verbose.v land 1 <> 0 then Format.printf "[ez_api] received:\n%s@." (to_string m##.statusMessage);
+    Verbose.response ?msg ~code:m##.statusCode ~content:(to_string m##.statusMessage) url;
     f (Error (m##.statusCode, Some (to_string m##.statusMessage))))
 
-let get ?(protocol=http) ?options url f =
+let get ?(protocol=http) ?options ?msg url f =
+  let meth = Option.bind options (fun o -> o.meth) in
+  Verbose.request ?msg ?meth url;
   let o = optdef options_to_jsoo options in
-  let req = protocol##get (string url) o (def @@ wrap_callback (handle f)) in
+  let req = protocol##get (string url) o (def @@ wrap_callback (handle ?msg ~url f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
       f (Error (e##.code, Some (to_string e##.message)))));
   req##end_ undefined
 
-let post ?(protocol=http) ?options url ~content f =
-  if !Verbose.v land 2 <> 0 && content <> "" then Format.printf "[ez_api] sent:\n%s@." content;
+let post ?(protocol=http) ?options ?msg url ~content f =
+  let meth = Option.bind options (fun o -> o.meth) in
+  Verbose.request ?msg ?meth ~content url;
   let o = optdef options_to_jsoo options in
-  let req = protocol##request (string url) o (def @@ wrap_callback (handle f)) in
+  let req = protocol##request (string url) o (def @@ wrap_callback (handle ?msg ~url f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
       f (Error (e##.code, Some (to_string e##.message)))));
   req##end_ (def (string content))
@@ -87,4 +84,4 @@ let get_protocol url =
 
 let () =
   (Js_of_ocaml.Js.Unsafe.pure_js_expr "global")##.set_verbose_ := Js_of_ocaml.Js.wrap_callback Verbose.set_verbose;
-  EzDebug.log "ezNodeJs Loaded"
+  Format.eprintf "ezNodeJs Loaded"

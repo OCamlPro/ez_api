@@ -17,10 +17,6 @@ type stream_error_base = [ `interval_timeout of float | `exn of exn | http_error
 type 'e stream_error = [ stream_error_base | `cb of 'e ]
 type error = [ http_error | perform_error | stream_error_base ]
 
-let log ?(meth="GET") url = function
-  | None -> if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
-  | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
-
 let pp_error fmt (e: [< error]) = match e with
   | `msg s -> Format.fprintf fmt "%s" s
   | `exn exn -> Format.fprintf fmt "exn: %s" (Printexc.to_string exn)
@@ -48,17 +44,17 @@ let response_handler :
   Response.t -> Body.Reader.t -> 'a = fun ?msg ~res ~url cb response body ->
   let b = Buffer.create 0x1000 in
   let open Response in
-  log ~meth:("RECV " ^ (string_of_int @@ Status.to_code response.status)) url msg;
   let on_eof f () =
     let content = Buffer.contents b in
-    if !Verbose.v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content;
     cb @@ f res response content in
   let rec on_read f bs ~off ~len =
     Buffer.add_string b (Bigstringaf.substring ~off ~len bs);
     Body.Reader.schedule_read body ~on_read:(on_read f) ~on_eof:(on_eof f) in
   match response.status with
   | #Status.successful ->
-    let f : type r. r response -> _ -> string -> (r, _) result = fun res response content -> match res with
+    let f : type r. r response -> _ -> string -> (r, _) result = fun res response content ->
+      Verbose.response ?msg ~code:(Status.to_code response.status) ~content url;
+      match res with
       | Simple -> Ok content
       | WithHeaders ->
         let headers = Headers.to_list response.headers in
@@ -66,6 +62,8 @@ let response_handler :
     let on_eof, on_read = on_eof f, on_read f in
     Body.Reader.schedule_read body ~on_read ~on_eof
   | _ ->
-    let f _ _ content = Error (`http (Status.to_code response.status, content)) in
+    let f _ _ content =
+      Verbose.response ?msg ~code:(Status.to_code response.status) ~content url;
+      Error (`http (Status.to_code response.status, content)) in
     let on_eof, on_read = on_eof f, on_read f in
     Body.Reader.schedule_read body ~on_read ~on_eof

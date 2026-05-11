@@ -58,9 +58,10 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     let ws = WsHttpaf.ws reqd fd in
     Log_lwt.request_content ?content_type body >>= fun () ->
     Lwt.catch
-      (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
+      (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+          s.server_kind r path body)
       (fun exn ->
-         EzDebug.printf "In %s: exception %s" target @@ Printexc.to_string exn;
+         Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn >>= fun () ->
          match catch with
          | None ->  Lwt.return (`http (Answer.server_error exn))
          | Some c -> c target exn >|= fun a -> `http a)

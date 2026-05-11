@@ -1,4 +1,14 @@
 (library
+ (name httpun_eio_tls)
+ (public_name ez_api.httpun_eio_tls)
+ (optional)
+ (modules httpun_eio_tls)
+ (libraries httpun-eio
+  (select httpun_eio_tls.ml from
+   (eio-ssl -> httpun_eio_tls.ssl.ml)
+   (-> httpun_eio_tls.none.ml))))
+
+(library
  (name ezHttpunEio)
  (public_name ez_api.httpun_eio)
  (optional)

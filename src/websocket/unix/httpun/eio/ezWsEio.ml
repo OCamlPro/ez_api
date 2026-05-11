@@ -15,7 +15,7 @@ let connect ?msg ?protocols:_ ?error ~net ~sw ~react url =
       | Unix.ADDR_UNIX _ -> None
       | Unix.ADDR_INET (addr, port) -> Some (`Tcp (Eio_unix.Net.Ipaddr.of_unix addr, port))) addresses in
   let socket = Eio.Net.connect ~sw net addr in
-  log ~action:"connect" url msg;
+  Verbose.request ?msg ~meth:"CONNECT" url;
   let nonce = EzAPI.Multipart.random_string () in
   let conn, n = Eio.Promise.create () in
   let action_w, action_n = Eio.Promise.create () in

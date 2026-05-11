@@ -4,7 +4,7 @@
  (optional)
  (modules ezWs)
  (implements ezWs)
- (libraries ezWsCommon
+ (libraries ezWsCommon verbose
   (select ezWs.ml from
    (httpun-ws-lwt-unix httpun_ws_common -> ezWs.httpun.ml)
    (websocket-lwt-unix -> ezWs.cohttp.ml)

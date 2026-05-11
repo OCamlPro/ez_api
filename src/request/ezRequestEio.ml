@@ -7,12 +7,12 @@ module type Interface = EzReqEioS.Interface
 module Make(S : Interface) : S = struct
 
   let get ?meth ?headers ?msg ~net ~sw (URL url) =
-    EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
+    EzAPI.warnings (Format.eprintf "EzRequest.warning: %s");
     let headers = add_user_agent ?headers () in
     S.get ?meth ?headers ?msg ~net ~sw url
 
   let post ?meth ?headers ?msg ?content_type ?content ~net ~sw (URL url) =
-    EzAPI.warnings (fun s -> Printf.ksprintf EzDebug.log "EzRequest.warning: %s" s);
+    EzAPI.warnings (Format.eprintf "EzRequest.warning: %s");
     let headers = add_user_agent ?headers () in
     S.post ?meth ?content_type ?content ?headers ?msg ~net ~sw url
 

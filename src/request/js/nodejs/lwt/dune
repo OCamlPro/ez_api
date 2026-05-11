@@ -1,0 +1,16 @@
+(library
+ (name ezNodeJS_lwt)
+ (public_name ez_api.node_js_lwt)
+ (optional)
+ (modules ezNodeJS_lwt)
+ (libraries ezRequest_lwt nodejs_common)
+ (modes byte))
+
+(library
+ (name ezNodeJS_lwt_i)
+ (public_name ez_api.inode_js_lwt)
+ (optional)
+ (modules ezReq_lwt)
+ (implements ezReq_lwt)
+ (libraries ezNodeJS_lwt)
+ (modes byte))

@@ -1,4 +1,11 @@
 (library
+ (name ezCurl_lwt)
+ (public_name ez_api.curl_lwt)
+ (optional)
+ (modules ezCurl_lwt)
+ (libraries verbose curl_lwt ezCurl_common ezRequest_lwt))
+
+(library
  (name ezCurl_lwt_i)
  (public_name ez_api.icurl_lwt)
  (optional)

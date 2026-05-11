@@ -1,9 +1,6 @@
 open Js_of_ocaml
 include EzWsEioTypes.Types
 
-let log ?(action="recv") url =
-  Option.iter @@ fun msg -> EzDebug.printf "[>%s %s %s]" msg action url
-
 let res_encoding err ok = Json_encoding.(union [
     case ok Result.to_option Result.ok;
     case err (function Error e -> Some e | _ -> None) Result.error
@@ -28,7 +25,7 @@ let connect ?msg ?protocols ?error ~net:_ ~sw ~react url =
   let protocols = match protocols with
     | None -> new%js Js.array_empty
     | Some l -> Js.array @@ Array.of_list @@ List.map Js.string l in
-  log ~action:"connect" url msg;
+  Verbose.request ?msg ~meth:"CONNECT" url;
   let w0, n0 = Eio.Promise.create () in
   try
     let socket = new%js WebSockets.webSocket_withProtocols (Js.string url) protocols in
@@ -40,7 +37,7 @@ let connect ?msg ?protocols ?error ~net:_ ~sw ~react url =
       catch (fun () -> socket##close_withCode code) in
     let action = {send; close} in
     socket##.onmessage := Dom.handler @@ (fun e ->
-        log url msg;
+        Verbose.log ~meth:"RECV" url msg;
         let s = Js.to_string e##.data in
         Eio.Fiber.fork ~sw (fun () ->
             Result.iter_error (fun e -> match error with

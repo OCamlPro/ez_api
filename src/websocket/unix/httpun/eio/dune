@@ -4,4 +4,4 @@
  (optional)
  (modules ezWsEio)
  (implements ezWsEio)
- (libraries httpun_ws_common httpun-ws-eio))
+ (libraries httpun_ws_common httpun-ws-eio verbose))

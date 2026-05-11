@@ -1,13 +1,6 @@
-let log ?(meth="GET") url = function
-  | None -> if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
-  | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
 
 let make ~(meth: EzAPI.Meth.t) ?(headers=[]) ?msg ?content_type ?content ~net ~sw url =
-  log ~meth:(EzAPI.Meth.to_string meth) url msg;
-  if !Verbose.v land 2 <> 0 then (
-    match content with
-    | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
-    | _ -> ());
+  Verbose.request ?msg ~meth:(EzAPI.Meth.to_string meth) ?content url;
   let body = Option.map Cohttp_eio.Body.of_string content in
   let headers = Cohttp.Header.of_list headers in
   let headers = match content_type with None -> headers | Some ct -> Cohttp.Header.add headers "content-type" ct in
@@ -16,8 +9,7 @@ let make ~(meth: EzAPI.Meth.t) ?(headers=[]) ?msg ?content_type ?content ~net ~s
   let code = Cohttp.Code.code_of_status @@ Cohttp.Response.status r in
   let headers = Cohttp.Header.to_list @@ Cohttp.Response.headers r in
   let body = Eio.Buf_read.(parse_exn take_all) body ~max_size:max_int in
-  log ~meth:("RECV " ^ string_of_int code) url msg;
-  if !Verbose.v land 1 <> 0 && body <> "" then Format.printf "[ez_api] received:\n%s@." body;
+  Verbose.response ?msg ~code ~content:body url;
   (code, body, headers)
 
 module Interface = struct

@@ -9,9 +9,6 @@ module type S = sig
   val async : (unit -> unit m) -> unit
 end
 
-let log ?(action="recv") url =
-  Option.iter @@ fun msg -> EzDebug.printf "[>%s %s %s]" msg action url
-
 let parse url =
   let uri = Uri.of_string url in
   match Uri.host uri, Uri.scheme uri with

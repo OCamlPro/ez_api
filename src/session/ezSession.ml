@@ -8,10 +8,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* TODO:
-  * Use a better hash fuction than md5 !!!
- *)
-
 let debug = false
 
 module TYPES = struct
@@ -139,21 +135,11 @@ module Hash = struct
 
   (** Hashed version of the password that is computed by the hash function applied on
   [login ^ password] *)
-  let password ~login ~password =
-    let s = hash (login ^ password) in
-    if debug then
-      EzDebug.printf "EzSession.Hash.password:\n  %S %S => %S"
-        login password s;
-    s
+  let password ~login ~password = hash (login ^ password)
 
   (** Hashed version of the challenge that is computed by the hash function applied on
   [challenge ^ pwhash] *)
-  let challenge ~challenge ~pwhash =
-    let s = hash (challenge ^ pwhash) in
-    if debug then
-      EzDebug.printf "EzSession.Hash.challenge:\n  %S %S => %S"
-        challenge pwhash s;
-    s
+  let challenge ~challenge ~pwhash = hash (challenge ^ pwhash)
 
 end
 

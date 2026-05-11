@@ -4,4 +4,4 @@
  (optional)
  (modules ezWs)
  (implements ezWs)
- (libraries httpun_ws_common httpun-ws-lwt-unix))
+ (libraries httpun_ws_common httpun-ws-lwt-unix verbose))

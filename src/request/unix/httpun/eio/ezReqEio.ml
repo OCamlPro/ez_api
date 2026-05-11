@@ -9,13 +9,7 @@ let perform ?msg ?meth ?content ?content_type ?(headers=[]) ?timeout:_ ~net ~sw 
     | Some (`GET | `POST | `PUT | `DELETE as m), _ -> m
     | _, None -> `GET
     | _ -> `POST in
-  log ~meth:(Method.to_string meth) url msg;
-  (if !Verbose.v land 4 <> 0 then
-     Format.printf "[ez_api] headers\n  %s@." @@
-     String.concat "\n  " @@ List.map (fun (k, v) -> k ^ " : " ^ v) headers);
-  (match !Verbose.v land 2 <> 0, content with
-   | true, Some content when content <> "" -> Format.printf "[ez_api] sent:\n%s@." content;
-   | _ -> ());
+  Verbose.request ?msg ~meth:(Method.to_string meth) ?content ~headers url;
   let$ hostname, scheme, port, path = parse url in
   let w, notify = Eio.Promise.create () in
   let addresses = Eio_unix.run_in_systhread @@ fun () ->

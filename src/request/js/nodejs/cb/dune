@@ -1,0 +1,16 @@
+(library
+ (name ezNodeJS)
+ (public_name ez_api.node_js)
+ (optional)
+ (modules ezNodeJS)
+ (libraries ezRequest nodejs_common)
+ (modes byte))
+
+(library
+ (name ezNodeJS_i)
+ (public_name ez_api.inode_js)
+ (optional)
+ (modules ezReq)
+ (implements ezReq)
+ (libraries ezNodeJS)
+ (modes byte))

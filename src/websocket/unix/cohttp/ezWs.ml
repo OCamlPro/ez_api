@@ -56,7 +56,7 @@ let connect ?msg ?protocols ?error ~react url =
   let url = match String.get url 0 with
     | 'w' -> "http" ^ String.sub url 2 (String.length url - 2)
     | _ -> url in
-  log ~action:"connect" url msg;
+  Verbose.request ?msg ~meth:"CONNECT" url;
   let uri = Uri.of_string url in
   let ctx = Conduit_lwt_unix.default_ctx in
   let extra_headers = match protocols with
@@ -74,7 +74,7 @@ let connect ?msg ?protocols ?error ~react url =
   let rec conn () =
     catch (fun () ->
         read con >>= fun fr ->
-        log ~action:(Opcode.to_string fr.opcode) url msg;
+        Verbose.log ~meth:(Opcode.to_string fr.opcode) url msg;
         aux_react react action con fr) >>= function
     | Ok `Open -> conn ()
     | Ok `Closed -> Lwt.return_ok ()

@@ -102,10 +102,10 @@ let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file s r path body 
           | Error (`destruct_exn exn) -> Answer.destruct_exception exn
           | Error (`unsupported c) -> Answer.unsupported_media_type c
           | Error (`handler_error s) ->
-            EzDebug.printf "In %s: error %s" (String.concat "/" path) s;
+            Format.eprintf "In %s: error %s" (String.concat "/" path) s;
             Answer.server_error (Failure s)
           | Error (`handler_exn exn) ->
-            EzDebug.printf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn;
+            Format.eprintf "In %s: exception %s" (String.concat "/" path) @@ Printexc.to_string exn;
             Answer.server_error exn
           | Ok a -> a)
       | Ok (`ws (react, bg, onclose, step)) ->

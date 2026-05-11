@@ -11,12 +11,6 @@
 let timeout = ref (Some 30)
 let set_timeout t = timeout := t
 
-let log ?(meth="GET") url = function
-  | None ->
-    if !Verbose.v <> 0 then Format.printf "[ez_api] %s %s@." meth url
-    else ()
-  | Some msg -> Format.printf "[>%s %s %s ]@." msg meth url
-
 let writer_callback a d =
   Buffer.add_string a d;
   String.length d

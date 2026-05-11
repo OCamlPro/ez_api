@@ -49,7 +49,7 @@ let request_handler ?allow_origin ?catch ?footer ~fs ~sw s { Gluten.reqd; upgrad
       let file = File_eio.reply ~fs in
       handle ?meth ?content_type ?allow_origin ~ws ~file s.server_kind r path body
     with exn ->
-      EzDebug.printf "In %s: exception %s" target @@ Printexc.to_string exn;
+      Format.eprintf "In %s: exception %s" target @@ Printexc.to_string exn;
       match catch with
       | None -> `http (Answer.server_error exn)
       | Some c -> `http (c target exn) in
@@ -88,8 +88,8 @@ let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   let request_handler ~sw _addr reqd = request_handler ?allow_origin ?catch ?footer ~sw s reqd in
   let error_handler = error_handler ?footer in
   let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~fs ~sw) ~error_handler ~sw in
-  let on_error exn = EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "[%t] Running HTTPUN EIO server on %s:%d" GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
+  let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
+  Format.eprintf "[%t] Running HTTPUN EIO server on %s:%d" GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
   let addr = match addr with
     | None -> Eio.Net.Ipaddr.V4.loopback

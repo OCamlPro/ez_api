@@ -59,7 +59,8 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     let ws = WsHttpunLwt.ws reqd upgrade in
     let> () = Log_lwt.request_content ?content_type body in
     let> res = Lwt.catch
-        (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
+        (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+            s.server_kind r path body)
         (fun exn ->
            let> () = Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn in
            let> a = match catch with

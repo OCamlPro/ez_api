@@ -1,7 +1,7 @@
 open Lwt.Infix
 
 let () =
-  Lwt.async_exception_hook := (fun exn -> EzDebug.printf "Exception %s" (Printexc.to_string exn))
+  Lwt.async_exception_hook := (fun exn -> Format.eprintf "Exception %s" (Printexc.to_string exn))
 
 let read_body ~read body =
   let w, n = Lwt.wait () in

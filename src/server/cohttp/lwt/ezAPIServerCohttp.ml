@@ -47,7 +47,8 @@ let dispatch ?allow_origin ?catch ?footer s io req body =
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = WsCohttpLwt.ws req in
   Log_lwt.request_content ?content_type body >>= fun () ->
-  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
+  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+                s.server_kind r path body)
     (fun exn ->
        Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn >>= fun () ->
        match catch with
@@ -74,7 +75,7 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let callback conn req body = dispatch ?allow_origin ?catch ?footer s (fst conn) req body in
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
-    | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
+    | exn -> Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
   Log_lwt.printf "[%t] Running COHTTP LWT server on localhost:%d" GMTime.pp_now server_port >>= fun () ->
   Server.create
     ~on_exn

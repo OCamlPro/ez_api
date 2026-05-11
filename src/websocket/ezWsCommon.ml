@@ -36,9 +36,6 @@ module Types = struct
   }
 end
 
-let log ?(action="recv") url =
-  Option.iter @@ fun msg -> EzDebug.printf "[>%s %s %s]" msg action url
-
 let res_encoding err ok = Json_encoding.(union [
     case ok Result.to_option Result.ok;
     case err (function Error e -> Some e | _ -> None) Result.error

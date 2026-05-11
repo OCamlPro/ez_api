@@ -22,4 +22,4 @@ include EzRequest_lwt.Make(Interface)
 
 let () =
   Js_of_ocaml.Js.Unsafe.global##.set_verbose_ := Js_of_ocaml.Js.wrap_callback Verbose.set_verbose;
-  EzDebug.log "ezCoXhr Loaded"
+  Format.eprintf "ezCoXhr Loaded"

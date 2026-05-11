@@ -32,7 +32,7 @@ let connect ?msg ?protocols ?error ~react url =
   let protocols = match protocols with
     | None -> new%js Js.array_empty
     | Some l -> Js.array @@ Array.of_list @@ List.map Js.string l in
-  log ~action:"connect" url msg;
+  Verbose.request ?msg ~meth:"CONNECT" url;
   let w0, n0 = Lwt.wait () in
   Lwt.catch
     (fun () ->
@@ -45,7 +45,7 @@ let connect ?msg ?protocols ?error ~react url =
          Lwt.return @@ catch (fun () -> socket##close_withCode code) in
        let action = {send; close} in
        socket##.onmessage := Dom.handler @@ (fun e ->
-           log url msg;
+           Verbose.log ~meth:"RECV" url msg;
            let s = Js.to_string e##.data in
            Lwt.async (fun () ->
                react action s >|= function

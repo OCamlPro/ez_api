@@ -5,4 +5,5 @@
  (modules ezReqEio)
  (preprocess (pps js_of_ocaml-ppx))
  (implements ezReqEio)
+ (modes byte)
  (libraries verbose ezRequestEio ezjs_fetch.eio ezAPIJS))

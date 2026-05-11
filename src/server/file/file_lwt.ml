@@ -1,8 +1,8 @@
 open Lwt.Infix
 
 let not_found path =
-  EzDebug.printf "[%t]\027[0;31m 404 /%s\027[0m" GMTime.pp_now path;
-  { Answer.code = 404; body = ""; headers=[] }
+  Log_lwt.printf "[%t]\027[0;31m 404 /%s\027[0m" GMTime.pp_now path >>= fun () ->
+  Lwt.return { Answer.code = 404; body = ""; headers=[] }
 
 let read_file =
   let size = 16_000 in
@@ -42,7 +42,7 @@ let reply ?(meth=`GET) ?default root path =
         Lwt.return { Answer.code = 200; body = ""; headers=[Cors.allow_methods_name, "GET"] }
       else begin match ori, default with
         | "", Some file -> aux file
-        | _ -> Lwt.return (not_found ori)
+        | _ -> not_found ori
       end
     | _ ->
       if Sys.file_exists file && not (Sys.is_directory file) then
@@ -53,6 +53,6 @@ let reply ?(meth=`GET) ?default root path =
           Lwt.return { Answer.code = 200; body; headers=["content-type", content_type] }
       else begin match ori, default with
         | "", Some file -> aux file
-        | _ -> Lwt.return (not_found ori)
+        | _ -> not_found ori
       end in
   aux ?default ori

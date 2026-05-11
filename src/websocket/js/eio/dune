@@ -5,4 +5,4 @@
  (modules ezWsEio)
  (preprocess (pps js_of_ocaml-ppx))
  (implements ezWsEio)
- (libraries ezAPIJS))
+ (libraries ezAPIJS verbose))

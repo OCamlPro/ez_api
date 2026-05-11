@@ -4,7 +4,7 @@
  (optional)
  (modules ezWsEio)
  (implements ezWsEio)
- (libraries ezWsEioTypes
+ (libraries ezWsEioTypes verbose
   (select ezWsEio.ml from
    (httpun_ws_common httpun-ws-eio -> ezWsEio.httpun.ml)
    (-> ezWsEio.dummy.ml))))

@@ -1,4 +1,13 @@
 (library
+ (name ezXhr)
+ (public_name ez_api.xhr)
+ (optional)
+ (modules ezXhr)
+ (preprocess (pps js_of_ocaml-ppx))
+ (libraries verbose ezRequest ezAPIJS)
+ (modes byte))
+
+(library
  (name ezXhr_i)
  (public_name ez_api.ixhr)
  (optional)
