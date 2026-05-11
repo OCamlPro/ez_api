@@ -6,8 +6,15 @@
  (libraries lwt server_utils))
 
 (library
+ (name log_lwt)
+ (package ez_api)
+ (optional)
+ (modules log_lwt)
+ (libraries server_utils lwt.unix))
+
+(library
  (name lwt_httpunaf)
  (package ez_api)
  (optional)
  (modules lwt_httpunaf)
- (libraries httpunaf ezAPIServerUtils lwt.unix bigstringaf ezLwtSys_unix))
+ (libraries httpunaf ezAPIServerUtils log_lwt bigstringaf ezLwtSys_unix))

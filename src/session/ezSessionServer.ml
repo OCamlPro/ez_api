@@ -264,13 +264,13 @@ end = struct
           | Some (Some pwhash, user_id, user_info) ->
             begin match Hashtbl.find challenges login_challenge_id with
               | exception Not_found ->
-                Log.debug ~v:1 "/login: could not find challenge\n%!";
+                Log_lwt.debug ~v:1 "/login: could not find challenge\n%!" >>= fun () ->
                 request_error ~code:401
                   (`Challenge_not_found_or_expired login_challenge_id)
               | (challenge, _t0) ->
                 let expected_reply = EzSession.Hash.challenge ~challenge ~pwhash in
                 if expected_reply <> login_challenge_reply then begin
-                  Log.debug ~v:1 "/login: challenge failed";
+                  Log_lwt.debug ~v:1 "/login: challenge failed" >>= fun () ->
                   request_error ~code:401 `Bad_user_or_password
                 end else begin
                   Hashtbl.remove challenges login_challenge_id;
@@ -278,7 +278,7 @@ end = struct
                 end
             end
           | _ ->
-            Log.debug ~v:1 "/login: could not find user %S" login_user;
+            Log_lwt.debug ~v:1 "/login: could not find user %S" login_user >>= fun () ->
             request_error ~code:401 `Bad_user_or_password
 
         end
@@ -296,7 +296,7 @@ end = struct
               return_auth req ~login:foreign_login ~foreign:{foreign_origin; foreign_token}
                 user_id user_info
             | Error _ ->
-              Log.debug ~v:1 "/login: could not register foreign user";
+              Log_lwt.debug ~v:1 "/login: could not register foreign user" >>= fun () ->
               request_error ~code:400 `User_not_registered
 
     (** Connection service handler that at the end returns new challenge to make possible
@@ -378,7 +378,7 @@ module UserStoreInMemory(
 
   val create_user :
     ?pwhash:string -> ?password:string -> ?kind:string ->
-    login:string -> S.user_info -> unit
+    login:string -> S.user_info -> unit Lwt.t
   val remove_user : login:string -> unit
   val find_user : login:string -> (string option * S.user_id * S.user_info) option Lwt.t
   val check_foreign : origin:string -> token:string ->
@@ -411,13 +411,14 @@ end = struct
     Hashtbl.create initial_hashtbl_size
 
   let create_user ?pwhash ?password ?kind ~login user_info =
-    Log.debug ~v:1 "create_user %S ?" login;
+    Log_lwt.debug ~v:1 "create_user %S ?" login >>= fun () ->
     if Hashtbl.mem users login then raise UserAlreadyDefined;
     match kind with
     | Some _ ->
-      Log.debug ~v:1 "create_user %S ok" login;
+      Log_lwt.debug ~v:1 "create_user %S ok" login >>= fun () ->
       Hashtbl.add users login
-        { login; pwhash = ""; user_id = login; user_info; kind }
+        { login; pwhash = ""; user_id = login; user_info; kind };
+      Lwt.return_unit
     | None ->
       let pwhash = match pwhash with
         | Some pwhash -> pwhash
@@ -426,26 +427,27 @@ end = struct
           | None -> raise NoPasswordProvided
           | Some password ->
             EzSession.Hash.password ~login ~password in
-      Log.debug ~v:1 "create_user %S ok" login;
+      Log_lwt.debug ~v:1 "create_user %S ok" login >>= fun () ->
       Hashtbl.add users login
-        { login; pwhash; user_id = login; user_info; kind }
+        { login; pwhash; user_id = login; user_info; kind };
+      Lwt.return_unit
 
   let find_user ~login =
-    Log.debug ~v:1 "find_user %S ?" login;
+    Log_lwt.debug ~v:1 "find_user %S ?" login >>= fun () ->
     match Hashtbl.find users login with
     | exception Not_found ->
       Lwt.return None
     | u ->
-      Log.debug ~v:1 "find_user %S ok" login;
+      Log_lwt.debug ~v:1 "find_user %S ok" login >>= fun () ->
       let pwhash = match u.kind with None -> Some u.pwhash | Some _k -> None in
       Lwt.return ( Some (pwhash, u.user_id, u.user_info) )
 
   let check_foreign ~origin ~token =
-    Log.debug ~v:1 "check_foreign %S ?" (origin ^ "-" ^ token);
+    Log_lwt.debug ~v:1 "check_foreign %S ?" (origin ^ "-" ^ token) >>= fun () ->
     match Hashtbl.find users (origin ^ "-" ^ token) with
     | exception Not_found -> Lwt.return (Error (500, Some "User not found"))
     | u ->
-      Log.debug ~v:1 "check_foreign %S ok" (origin ^ "-" ^ token);
+      Log_lwt.debug ~v:1 "check_foreign %S ok" (origin ^ "-" ^ token) >>= fun () ->
       Lwt.return (Ok u.login)
 
   let register_foreign = default_register_foreign

@@ -17,12 +17,8 @@ let version req = match Request.version req with
   | #Req.version as v -> Some v
   | _ -> None
 
-let debug req =
-  Log.debug "[%t] REQUEST: %s %S" GMTime.pp_now
-    (req |> Request.meth |> Code.string_of_method)
-    (req |> Request.uri |> Uri.path_and_query);
-  Log.debugf ~v:1 (fun () ->
-      Header.iter (fun s v ->
-          List.iter (fun v -> EzDebug.printf "  %s: %s" s v)
-            (String.split_on_char ',' v))
-        (Request.headers req))
+let debug ~request req =
+  let meth = req |> Request.meth |> Code.string_of_method in
+  let target = req |> Request.uri |> Uri.path_and_query in
+  let headers = Header.to_list (Request.headers req) in
+  request ~meth ~headers target

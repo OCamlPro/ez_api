@@ -11,4 +11,4 @@
 open Js_of_ocaml
 
 let printf fmt = Format.kasprintf (fun s -> Console.console##debug (Js.string s)) fmt
-let log s = Console.console##log (Js.string s)
+let log s = Console.console##debug (Js.string s)

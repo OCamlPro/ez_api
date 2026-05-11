@@ -36,7 +36,7 @@ let read_body body = Lwt_httpunaf.read_body ~read:Body.Reader.schedule_read body
 let debug_httpun req =
   let meth = Method.to_string req.Request.meth in
   let headers = Headers.to_list req.Request.headers in
-  Httpunaf.debug ~meth ~target:req.Request.target ~headers
+  Log_lwt.request ~meth ~headers req.Request.target
 
 let register_ip req time addr = Httpunaf.register_ip ~header:(Headers.get req.Request.headers) time addr
 
@@ -50,23 +50,21 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     register_ip req time sockaddr;
     let headers = headers_from_httpun req in
     let version = version_from_httpun req in
-    let path_str, path, content_type, r =
+    let target, path, content_type, r =
       Req.request ~version ~headers ~time (mk_uri req) in
     let meth = meth_from_httpun req in
-    debug_httpun req;
     Lwt.async @@ fun () ->
+    let> () = debug_httpun req in
     let> body = read_body (Reqd.request_body reqd) in
     let ws = WsHttpunLwt.ws reqd upgrade in
-    Log.debugf ~v:2 (fun () ->
-        if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-          EzDebug.printf "Request content:\n%s" body);
+    let> () = Log_lwt.request_content ?content_type body in
     let> res = Lwt.catch
         (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
         (fun exn ->
-           EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
+           let> () = Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn in
            let> a = match catch with
              | None -> Lwt.return @@ Answer.server_error exn
-             | Some c -> c path_str exn in
+             | Some c -> c target exn in
            Lwt.return (`http a)) in
     match res with
     | `ws (Error `no_ws_library) ->
@@ -77,14 +75,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     | `ws (Ok ()) -> Lwt.return_unit
     | `http {Answer.code; body; headers} ->
       let status = Status.unsafe_of_code code in
-      Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-      Log.debugf ~v:4 (fun () ->
-          List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
-        );
-      Log.debugf ~v:3 (fun () ->
-          let content_type = List.assoc_opt "content-type" headers in
-          if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-            EzDebug.printf "Reply content:\n%s" body);
+      let> () = Log_lwt.response ~code ~headers ~target body in
       let headers = Headers.of_list headers in
       let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
       let len = String.length body in

@@ -49,7 +49,7 @@ let reply ?(meth=`GET) ?default root path =
         Lwt.bind (read_file file) @@ function
         | None -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
         | Some body ->
-          EzDebug.printf "[%t]\027[0;32m 200 /%s\027[0m - %a" GMTime.pp_now ori Log.pp_content_length (String.length body);
+          Log_lwt.printf "[%t]\027[0;32m 200 /%s\027[0m - %a" GMTime.pp_now ori Log.pp_content_length (String.length body) >>= fun () ->
           Lwt.return { Answer.code = 200; body; headers=["content-type", content_type] }
       else begin match ori, default with
         | "", Some file -> aux file

@@ -105,7 +105,7 @@ module UserStoreInMemory(S : SessionArg with type user_id = string) : sig
   foreign) user. *)
   val create_user :
     ?pwhash:Digest.t ->
-    ?password:string -> ?kind:string -> login:string -> S.user_info -> unit
+    ?password:string -> ?kind:string -> login:string -> S.user_info -> unit Lwt.t
 
   (** Removes user with the given login from the storage *)
   val remove_user : login:string -> unit

@@ -3,11 +3,6 @@ let meth = function
   | `GET | `PUT | `OPTIONS | `POST | `DELETE | `HEAD as m -> Some m
   | _ -> None
 
-let debug ~meth ~target ~headers =
-  Log.debug "[%t] REQUEST: %s %S" GMTime.pp_now meth target;
-  Log.debugf ~v:1 @@ fun () ->
-  List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
-
 let mk_uri ~meth ~target ~header =
   match target with
   | "*" ->

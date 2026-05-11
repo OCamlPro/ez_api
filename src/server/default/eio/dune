@@ -4,8 +4,8 @@
  (optional)
  (implements ezServerEio)
  (modules ezServerEio)
- (libraries ezServerEioUtils
+ (libraries file_eio log_eio
   (select ezServerEio.ml from
-   (wsHttpunEio httpunaf httpun-eio file_eio -> ezServerEio.httpun.ml)
-   (cohttp_common cohttp-eio wsCohttpEio file_eio -> ezServerEio.cohttp.ml)
+   (wsHttpunEio httpunaf httpun-eio -> ezServerEio.httpun.ml)
+   (cohttp_common cohttp-eio wsCohttpEio -> ezServerEio.cohttp.ml)
    (-> ezServerEio.dummy.ml))))

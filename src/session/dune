@@ -16,7 +16,7 @@
  (optional)
  (wrapped false)
  (modules ezCookieServer ezSessionServer)
- (libraries ezSession ezAPIServerUtils
+ (libraries ezSession ezAPIServerUtils log_lwt
   (select ezCookieServer.ml from
    (cohttp -> ezCookieServer.cohttp.ml)
    (-> ezCookieServer.dummy.ml))))

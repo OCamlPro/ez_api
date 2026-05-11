@@ -1,4 +1,4 @@
-open Lwt
+open Lwt.Infix
 
 let () =
   Lwt.async_exception_hook := (fun exn -> EzDebug.printf "Exception %s" (Printexc.to_string exn))
@@ -20,7 +20,7 @@ let create_server ?(name="HTTPUN") ?addr server_port server_kind handler =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ EzAPI.Doc.nservices ();
   ignore @@ EzAPI.Doc.all_services_registered ();
-  EzDebug.printf "[%t] Running %s LWT server on %s:%d" GMTime.pp_now name (Option.value ~default:"localhost" addr) server_port;
+  Log_lwt.printf "[%t] Running %s LWT server on %s:%d" GMTime.pp_now name (Option.value ~default:"localhost" addr) server_port >>= fun () ->
   let addr = match addr with
     | None -> Unix.inet_addr_loopback
     | Some s -> Unix.inet_addr_of_string s in

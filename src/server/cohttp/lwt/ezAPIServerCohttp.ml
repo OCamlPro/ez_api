@@ -38,23 +38,21 @@ let file = File.reply
 let dispatch ?allow_origin ?catch ?footer s io req body =
   let time = GMTime.time () in
   register_ip req io time ;
-  Cohttp_common.debug req;
+  Cohttp_common.debug ~request:Log_lwt.request req >>= fun () ->
   let headers = Cohttp_common.headers req in
   let version = Cohttp_common.version req in
-  let path_str, path, content_type, r =
+  let target, path, content_type, r =
     Req.request ?version ~headers ~time (Request.uri req) in
   let meth = Cohttp_common.meth req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = WsCohttpLwt.ws req in
-  Log.debugf ~v:2 (fun () ->
-      if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-        EzDebug.printf "Request content:\n%s" body);
+  Log_lwt.request_content ?content_type body >>= fun () ->
   Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body)
     (fun exn ->
-       EzDebug.printf "In %s: exception %s" path_str @@ Printexc.to_string exn;
+       Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn >>= fun () ->
        match catch with
        | None ->  Lwt.return (`http (Answer.server_error exn))
-       | Some c -> c path_str exn >|= fun a -> `http a)
+       | Some c -> c target exn >|= fun a -> `http a)
   >>= function
   | `ws (Ok ra) -> Lwt.return ra
   | `ws (Error _) ->
@@ -63,14 +61,7 @@ let dispatch ?allow_origin ?catch ?footer s io req body =
     `Response (r, b)
   | `http {Answer.code; body; headers} ->
     let status = Code.status_of_code code in
-    Log.debug ~v:(if code >= 200 && code < 300 then 1 else 0) "Reply computed to %S: %d" path_str code;
-    Log.debugf ~v:4 (fun () ->
-        List.iter (fun (name, value) -> EzDebug.printf "  %s: %s" name value) headers
-      );
-    Log.debugf ~v:3 (fun () ->
-        let content_type = List.assoc_opt "content-type" headers in
-        if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-          EzDebug.printf "Reply content:\n%s" body);
+    Log_lwt.response ~code ~target ~headers body >>= fun () ->
     let headers = Header.of_list headers in
     let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
@@ -84,7 +75,7 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> EzDebug.printf "Server Error: %s" (Printexc.to_string exn) in
-  EzDebug.printf "[%t] Running COHTTP LWT server on localhost:%d" GMTime.pp_now server_port;
+  Log_lwt.printf "[%t] Running COHTTP LWT server on localhost:%d" GMTime.pp_now server_port >>= fun () ->
   Server.create
     ~on_exn
     ~mode:(`TCP (`Port server_port))

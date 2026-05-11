@@ -4,3 +4,10 @@
  (optional)
  (modules directory ezServerEioUtils)
  (libraries server_utils eio))
+
+(library
+ (name log_eio)
+ (package ez_api)
+ (optional)
+ (modules log_eio)
+ (libraries server_utils))
