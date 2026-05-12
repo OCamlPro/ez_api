@@ -19,5 +19,5 @@
  (libraries
   (select file_server.ml from
    (ezAPIServerEio eio_main -> file_server.eio.ml)
-   (ezAPIServer -> file_server.lwt.ml)
+   (ezAPIServer lwt.unix -> file_server.lwt.ml)
    (-> file_server.dummy.ml))))

@@ -8,15 +8,33 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Ezjs_min
+open Js_of_ocaml
+open Js
 
-type nonrec options = {
-  meth : string option; [@key "method"]
-  headers : ((string * string) list [@assoc]) option;
-} [@@deriving jsoo]
+type options = {
+  meth: string option;
+  headers: (string * string) list option;
+}
+
+class type options_jsoo = object
+  method method_ : js_string t optdef readonly_prop
+  method headers : js_string t Jstable.t optdef readonly_prop
+end
+
+let options_to_jsoo o : options_jsoo t =
+  let headers = match o.headers with
+    | None -> undefined
+    | Some l ->
+      let t = Jstable.create () in
+      List.iter (fun (k, v) -> Jstable.add t (string k) (string v)) l;
+      def t in
+  object%js
+    val method_ = Optdef.option @@ Option.map string o.meth
+    val headers = headers
+  end
 
 class type message = object
-  method headers : js_string t Table.t readonly_prop
+  method headers : js_string t Jstable.t readonly_prop
   method httpVersion : js_string t readonly_prop
   method method_ : js_string t opt readonly_prop
   method statusCode : int readonly_prop
@@ -63,7 +81,7 @@ let handle ?msg ~url f (m : message t) =
 let get ?(protocol=http) ?options ?msg url f =
   let meth = Option.bind options (fun o -> o.meth) in
   Verbose.request ?msg ?meth url;
-  let o = optdef options_to_jsoo options in
+  let o = Optdef.option @@ Option.map options_to_jsoo options in
   let req = protocol##get (string url) o (def @@ wrap_callback (handle ?msg ~url f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
       f (Error (e##.code, Some (to_string e##.message)))));
@@ -72,7 +90,7 @@ let get ?(protocol=http) ?options ?msg url f =
 let post ?(protocol=http) ?options ?msg url ~content f =
   let meth = Option.bind options (fun o -> o.meth) in
   Verbose.request ?msg ?meth ~content url;
-  let o = optdef options_to_jsoo options in
+  let o = Optdef.option @@ Option.map options_to_jsoo options in
   let req = protocol##request (string url) o (def @@ wrap_callback (handle ?msg ~url f)) in
   req##on_error (string "error") (wrap_callback (fun (e : err t) ->
       f (Error (e##.code, Some (to_string e##.message)))));

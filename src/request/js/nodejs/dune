@@ -3,6 +3,6 @@
  (package ez_api)
  (optional)
  (modules nodejs_common)
- (preprocess (pps ppx_deriving_jsoo))
+ (preprocess (pps js_of_ocaml-ppx))
  (libraries verbose ezAPIJS)
  (modes byte))

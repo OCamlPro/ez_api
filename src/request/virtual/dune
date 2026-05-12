@@ -51,6 +51,6 @@
  (optional)
  (modules ezReqEio)
  (virtual_modules ezReqEio)
- (default_implementation ezCohttpEio)
+ (default_implementation ezReqEio_default)
  (libraries ezReqEioS)
 )
