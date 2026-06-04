@@ -1,7 +1,7 @@
 open Lwt.Infix
 
 let not_found path =
-  Log_lwt.printf "[%t]\027[0;31m 404 /%s\027[0m" GMTime.pp_now path >>= fun () ->
+  Log_lwt.printf "[%t]\027[0;31m 404 /%s\027[0m@." GMTime.pp_now path >>= fun () ->
   Lwt.return { Answer.code = 404; body = ""; headers=[] }
 
 let read_file =
@@ -49,7 +49,7 @@ let reply ?(meth=`GET) ?default root path =
         Lwt.bind (read_file file) @@ function
         | None -> Lwt.return { Answer.code = 404; body = ""; headers=[] }
         | Some body ->
-          Log_lwt.printf "[%t]\027[0;32m 200 /%s\027[0m - %a" GMTime.pp_now ori Log.pp_content_length (String.length body) >>= fun () ->
+          Log_lwt.printf "[%t]\027[0;32m 200 /%s\027[0m - %a@." GMTime.pp_now ori Log.pp_content_length (String.length body) >>= fun () ->
           Lwt.return { Answer.code = 200; body; headers=["content-type", content_type] }
       else begin match ori, default with
         | "", Some file -> aux file

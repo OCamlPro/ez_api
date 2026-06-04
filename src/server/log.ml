@@ -71,26 +71,26 @@ module M(S: S) : M with type 'a t = 'a S.t = struct
 
   let headers headers =
     debugf ~v:4 @@ fun () ->
-    iter (fun (name, value) -> S.printf "  %s: %s" name value) headers
+    iter (fun (name, value) -> S.printf "  %s: %s@." name value) headers
 
   let request ~meth ~headers:l target =
-    S.bind (debug "[%t] %s %s" GMTime.pp_now meth target) @@ fun () ->
+    S.bind (debug "[%t] %s %s@." GMTime.pp_now meth target) @@ fun () ->
     headers l
 
   let request_content ?content_type body =
     debugf ~v:2 @@ fun () ->
     if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-      S.printf "Request content:\n%s" body
+      S.printf "Request content:\n%s@." body
     else S.return ()
 
   let response ~code ~headers:l ~target body =
     S.bind (debugf ~v:(if code >= 200 && code < 300 then 1 else 0) (fun () ->
         let color = if code >= 200 && code < 300 then 32 else 31 in
-        S.printf "[%t]\027[0;%dm %d %s\027[0m" GMTime.pp_now color code target)) @@ fun () ->
+        S.printf "[%t]\027[0;%dm %d %s\027[0m@." GMTime.pp_now color code target)) @@ fun () ->
     S.bind (headers l) @@ fun () ->
     debugf ~v:3 @@ fun () ->
     let content_type = List.assoc_opt "content-type" l in
     if body <> "" && (content_type = Some "application/json" || content_type = Some "text/plain") then
-      S.printf "Reply content:\n%s" body
+      S.printf "Reply content:\n%s@." body
     else S.return ()
 end

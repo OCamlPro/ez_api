@@ -32,7 +32,7 @@ let set_verbose i =
 
 let log ?(meth="GET") url = function
   | None -> if !v <> 0 then Format.eprintf "[ez_api] %s %s@." meth url
-  | Some msg -> Format.eprintf "[>%s %s %s]" msg meth url
+  | Some msg -> Format.eprintf "[>%s %s %s]@." msg meth url
 
 let request ?msg ?meth ?content ?(headers=[]) url =
   log ?meth url msg;
