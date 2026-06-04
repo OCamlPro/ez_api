@@ -3,7 +3,7 @@
  (public_name ez_api.server_cohttp)
  (optional)
  (modules ezAPIServerCohttp)
- (libraries cohttp_common wsCohttpLwt cohttp-lwt-unix file_lwt log_lwt))
+ (libraries cohttp_common wsCohttpLwt cohttp-lwt-unix file_lwt log_lwt ezLwtSys_unix))
 
 (library
  (name ezServerCohttp)
