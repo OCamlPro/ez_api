@@ -89,7 +89,7 @@ let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   let error_handler = error_handler ?footer in
   let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~fs ~sw) ~error_handler ~sw in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
-  Format.eprintf "[%t] Running HTTPUN EIO server on %s:%d" GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
+  Format.eprintf "[%t] Running HTTPUN EIO server on %s:%d@." GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
   let addr = match addr with
     | None -> Eio.Net.Ipaddr.V4.loopback

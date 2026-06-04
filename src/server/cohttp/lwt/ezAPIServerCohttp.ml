@@ -76,7 +76,7 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
-  Log_lwt.printf "[%t] Running COHTTP LWT server on localhost:%d" GMTime.pp_now server_port >>= fun () ->
+  Log_lwt.printf "[%t] Running COHTTP LWT server on localhost:%d@." GMTime.pp_now server_port >>= fun () ->
   Server.create
     ~on_exn
     ~mode:(`TCP (`Port server_port))
