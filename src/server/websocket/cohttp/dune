@@ -10,7 +10,7 @@
  (package ez_api)
  (optional)
  (modules wsCohttpLwt)
- (libraries ezAPIServerUtils wsCohttp))
+ (libraries ezAPIServerUtils))
 
 (library
  (name wsCohttpEio)
