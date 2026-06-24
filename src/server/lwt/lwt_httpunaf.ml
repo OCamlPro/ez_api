@@ -22,7 +22,7 @@ let create_server ?(name="HTTPUN") ?addr server_port server_kind handler =
   ignore @@ EzAPI.Doc.all_services_registered ();
   Log_lwt.printf "[%t] Running %s LWT server on %s:%d@." GMTime.pp_now name (Option.value ~default:"localhost" addr) server_port >>= fun () ->
   let addr = match addr with
-    | None -> Unix.inet_addr_loopback
+    | None -> Unix.inet_addr_any
     | Some s -> Unix.inet_addr_of_string s in
   let listen_address = Unix.(ADDR_INET (addr, server_port)) in
   Lwt_io.establish_server_with_client_socket listen_address (handler s) >>= fun s ->

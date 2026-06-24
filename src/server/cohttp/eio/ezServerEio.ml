@@ -45,7 +45,7 @@ let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   Format.eprintf "[%t] Running COHTTP EIO server on %s:%d@." GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
   let addr = match addr with
-    | None -> Eio.Net.Ipaddr.V4.loopback
+    | None -> Eio.Net.Ipaddr.V4.any
     | Some s -> Eio_unix.Net.Ipaddr.of_unix (Unix.inet_addr_of_string s) in
   let socket = Eio.Net.listen ~reuse_addr:true ~backlog:128 ~sw net
       (`Tcp (addr, server_port)) in
