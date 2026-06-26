@@ -45,12 +45,12 @@ let request ?msg ?meth ?content ?(headers=[]) url =
   let kind = Option.map (fun m -> `meth m) meth in
   log ?kind url msg;
   (if !v land 4 <> 0 then
-     Format.printf "[ez_api] headers\n  %s@." @@
+     Format.eprintf "[ez_api] headers\n  %s@." @@
      String.concat "\n  " @@ List.map (fun (k, v) -> k ^ " : " ^ v) headers);
   if !v land 2 <> 0 then match content with
-    | Some s when s <> "" -> Format.printf "[ez_api] sent:\n%s@." s
+    | Some s when s <> "" -> Format.eprintf "[ez_api] sent:\n%s@." s
     | _ -> ()
 
 let response ?msg ~code ~content url =
   log ~kind:(`code code) url msg;
-  if !v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content
+  if !v land 1 <> 0 && content <> "" then Format.eprintf "[ez_api] received:\n%s@." content
