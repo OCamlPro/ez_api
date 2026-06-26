@@ -45,7 +45,7 @@ let connect ?msg ?protocols ?error ~react url =
          Lwt.return @@ catch (fun () -> socket##close_withCode code) in
        let action = {send; close} in
        socket##.onmessage := Dom.handler @@ (fun e ->
-           Verbose.log ~meth:"RECV" url msg;
+           Verbose.log ~kind:(`meth "RECV") url msg;
            let s = Js.to_string e##.data in
            Lwt.async (fun () ->
                react action s >|= function

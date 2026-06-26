@@ -37,7 +37,7 @@ let connect ?msg ?protocols ?error ~net:_ ~sw ~react url =
       catch (fun () -> socket##close_withCode code) in
     let action = {send; close} in
     socket##.onmessage := Dom.handler @@ (fun e ->
-        Verbose.log ~meth:"RECV" url msg;
+        Verbose.log ~kind:(`meth "RECV") url msg;
         let s = Js.to_string e##.data in
         Eio.Fiber.fork ~sw (fun () ->
             Result.iter_error (fun e -> match error with

@@ -74,7 +74,7 @@ let connect ?msg ?protocols ?error ~react url =
   let rec conn () =
     catch (fun () ->
         read con >>= fun fr ->
-        Verbose.log ~meth:(Opcode.to_string fr.opcode) url msg;
+        Verbose.log ~kind:(`meth Opcode.to_string fr.opcode) url msg;
         aux_react react action con fr) >>= function
     | Ok `Open -> conn ()
     | Ok `Closed -> Lwt.return_ok ()
