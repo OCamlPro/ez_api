@@ -34,7 +34,7 @@ let log ?(kind=`meth "GET") url msg =
   let s = match kind with
     | `meth meth -> Format.sprintf "%s %s" meth url
     | `code code ->
-      let color = if code >= 200 && code < 300 then 31 else 42 in
+      let color = if code >= 200 && code < 300 then 32 else 31 in
       let cstart, cend = EzAPI.apply_ansi_color color in
       Format.sprintf "%s%d %s%s" cstart code url cend in
   match msg with
