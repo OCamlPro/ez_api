@@ -36,7 +36,7 @@ let log ?(kind=`meth "GET") url msg =
     | `code code ->
       let color = if code >= 200 && code < 300 then 31 else 42 in
       let cstart, cend = EzAPI.apply_ansi_color color in
-      Format.sprintf "%s%d%s" cstart code cend in
+      Format.sprintf "%s%d %s%s" cstart code url cend in
   match msg with
   | None -> if !v <> 0 then Format.eprintf "[ez_api] %s@." s
   | Some msg -> Format.eprintf "[>%s %s]@." msg s
