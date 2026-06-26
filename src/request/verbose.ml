@@ -44,5 +44,8 @@ let request ?msg ?meth ?content ?(headers=[]) url =
     | _ -> ()
 
 let response ?msg ~code ~content url =
-  log ~meth:("RECV " ^ string_of_int code) url msg;
+  let color = if code >= 200 && code < 300 then 31 else 42 in
+  let cstart, cend = EzAPI.apply_ansi_color color in
+  let meth = Format.sprintf "%sRECV %d%s" cstart code cend in
+  log ~meth url msg;
   if !v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content

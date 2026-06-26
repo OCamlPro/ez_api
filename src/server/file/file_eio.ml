@@ -1,5 +1,6 @@
 let not_found path =
-  Log_eio.printf "[%t]\027[0;31m 404 /%s\027[0m@." GMTime.pp_now path;
+  let cstart, cend = EzAPI.apply_ansi_color 31 in
+  Log_eio.printf "[%t]%s 404 /%s%s@." GMTime.pp_now cstart path cend;
   { Answer.code = 404; body = ""; headers=[] }
 
 let reply ~fs ?(meth=`GET) ?default root path =
@@ -18,7 +19,8 @@ let reply ~fs ?(meth=`GET) ?default root path =
     | _ ->
       if Sys.file_exists file && not (Sys.is_directory file) then
         let body = Eio.Path.(load (fs / file)) in
-        Log_eio.printf "[%t]\027[0;32m 200 /%s\027[0m - %a@." GMTime.pp_now ori Log.pp_content_length (String.length body);
+        let cstart, cend = EzAPI.apply_ansi_color 32 in
+        Log_eio.printf "[%t]%s 200 /%s%s - %a@." GMTime.pp_now cstart ori cend Log.pp_content_length (String.length body);
         { Answer.code = 200; body; headers=["content-type", content_type] }
       else begin match ori, default with
         | "", Some file -> aux file

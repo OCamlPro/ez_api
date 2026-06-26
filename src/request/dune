@@ -1,7 +1,8 @@
 (library
  (name verbose)
  (public_name ez_api.request_verbose)
- (modules verbose))
+ (modules verbose)
+ (libraries ezAPI))
 
 (library
  (name ezRequest_common)

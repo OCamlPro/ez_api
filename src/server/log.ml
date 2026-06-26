@@ -84,9 +84,11 @@ module M(S: S) : M with type 'a t = 'a S.t = struct
     else S.return ()
 
   let response ~code ~headers:l ~target body =
+
     S.bind (debugf ~v:(if code >= 200 && code < 300 then 1 else 0) (fun () ->
         let color = if code >= 200 && code < 300 then 32 else 31 in
-        S.printf "[%t]\027[0;%dm %d %s\027[0m@." GMTime.pp_now color code target)) @@ fun () ->
+        let cstart, cend = EzAPI.apply_ansi_color color in
+        S.printf "[%t]%s %d %s%s@." GMTime.pp_now cstart code target cend)) @@ fun () ->
     S.bind (headers l) @@ fun () ->
     debugf ~v:3 @@ fun () ->
     let content_type = List.assoc_opt "content-type" l in
