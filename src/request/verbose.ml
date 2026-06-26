@@ -30,12 +30,20 @@ let set_verbose i =
   v := i;
   !callback i
 
-let log ?(meth="GET") url = function
-  | None -> if !v <> 0 then Format.eprintf "[ez_api] %s %s@." meth url
-  | Some msg -> Format.eprintf "[>%s %s %s]@." msg meth url
+let log ?(kind=`meth "GET") url msg =
+  let s = match kind with
+    | `meth meth -> Format.sprintf "%s %s" meth url
+    | `code code ->
+      let color = if code >= 200 && code < 300 then 31 else 42 in
+      let cstart, cend = EzAPI.apply_ansi_color color in
+      Format.sprintf "%s%d%s" cstart code cend in
+  match msg with
+  | None -> if !v <> 0 then Format.eprintf "[ez_api] %s@." s
+  | Some msg -> Format.eprintf "[>%s %s]@." msg s
 
 let request ?msg ?meth ?content ?(headers=[]) url =
-  log ?meth url msg;
+  let kind = Option.map (fun m -> `meth m) meth in
+  log ?kind url msg;
   (if !v land 4 <> 0 then
      Format.printf "[ez_api] headers\n  %s@." @@
      String.concat "\n  " @@ List.map (fun (k, v) -> k ^ " : " ^ v) headers);
@@ -44,8 +52,5 @@ let request ?msg ?meth ?content ?(headers=[]) url =
     | _ -> ()
 
 let response ?msg ~code ~content url =
-  let color = if code >= 200 && code < 300 then 31 else 42 in
-  let cstart, cend = EzAPI.apply_ansi_color color in
-  let meth = Format.sprintf "%sRECV %d%s" cstart code cend in
-  log ~meth url msg;
+  log ~kind:(`code code) url msg;
   if !v land 1 <> 0 && content <> "" then Format.printf "[ez_api] received:\n%s@." content
