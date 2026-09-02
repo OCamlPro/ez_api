@@ -23,6 +23,8 @@
  (depopts
   lwt
   geoip
+  js_of_ocaml
+  js_of_ocaml-ppx
   js_of_ocaml-lwt
   cohttp
   cohttp-lwt
@@ -51,6 +53,8 @@
   websocket
  )
  (conflicts
+  (js_of_ocaml (< 6.0.0))
+  (js_of_ocaml-ppx (< 6.0.0))
   (js_of_ocaml-lwt (< 6.0.0))
   (cohttp-lwt-unix (< 5.0.0))
   (cohttp-lwt-jsoo (< 5.0.0))
