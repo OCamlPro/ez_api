@@ -51,6 +51,7 @@
   tls-eio
   eio-ssl
   websocket
+  eio_main
  )
  (conflicts
   (js_of_ocaml (< 6.0.0))
