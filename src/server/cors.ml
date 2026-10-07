@@ -40,12 +40,21 @@ let of_list l =
 
 type allow_kind = [ `all | `origin | `default | `custom of string list ]
 
+let vary_origin headers =
+  match List.assoc_opt "vary" headers with
+  | Some v when List.mem "origin" (List.map (fun s -> String.lowercase_ascii (String.trim s)) (String.split_on_char ',' v)) -> headers
+  | Some v -> List.remove_assoc "vary" headers @ [ "vary", v ^ ", Origin" ]
+  | None -> headers @ [ "vary", "Origin" ]
+
+let reflect_origin headers o =
+  vary_origin @@ List.remove_assoc allow_origin_name headers @ [ allow_origin_name, o ]
+
 let merge_headers_allow_origin ?origin headers kind =
   match kind with
   | `none -> headers
-  | `origin -> (match origin with None -> headers | Some o -> headers @ [ allow_origin_name, String.concat "," o ])
+  | `origin -> (match origin with None -> headers | Some o -> reflect_origin headers o)
   | `all | `default -> List.remove_assoc allow_origin_name headers @ [ allow_origin_name, "*" ]
-  | `custom l -> match List.assoc_opt allow_origin_name headers with
-    | None -> headers @ [ allow_origin_name, String.concat "," l ]
-    | Some "*" -> (List.remove_assoc allow_origin_name headers) @ [ allow_origin_name, String.concat "," l ]
-    | Some v -> (List.remove_assoc allow_origin_name headers) @ [ allow_origin_name, String.concat "," (v :: l) ]
+  | `custom l -> match List.assoc_opt allow_origin_name headers, origin with
+    | Some v, _ when v <> "*" -> headers
+    | _, Some o when List.mem o l -> reflect_origin headers o
+    | _ -> vary_origin @@ List.remove_assoc allow_origin_name headers

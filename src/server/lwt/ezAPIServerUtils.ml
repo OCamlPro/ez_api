@@ -138,8 +138,8 @@ let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file ~(printf: ('a,
   a >|= function
   | `ws ra -> `ws ra
   | `http a ->
-    let origin = match allow_origin with
-      | `origin -> StringMap.find_opt "origin" r.Req.req_headers
+    let origin = match allow_origin, StringMap.find_opt "origin" r.Req.req_headers with
+      | (`origin | `custom _), Some (o :: _) -> Some o
       | _ -> None in
     let headers =
       Cors.merge_headers_allow_origin ?origin a.Answer.headers allow_origin @
