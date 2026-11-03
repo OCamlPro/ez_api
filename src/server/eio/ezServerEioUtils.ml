@@ -28,6 +28,12 @@ type server = {
   server_kind : server_kind;
 }
 
+(** Domains *)
+
+let additional_domains ?domains env =
+  let default = max 0 (Stdlib.Domain.recommended_domain_count () - 1) in
+  Eio.Stdenv.domain_mgr env, max 0 (Option.value ~default domains)
+
 (** Utils *)
 
 let return ?code ?headers x = Answer.return ?code ?headers x

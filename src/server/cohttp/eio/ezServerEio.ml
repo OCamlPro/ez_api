@@ -34,7 +34,7 @@ let dispatch ?allow_origin ?catch ?footer ~fs s req body =
     let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
     `Response (Cohttp_eio.Server.respond_string ~headers ~status ~body ())
 
-let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
+let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port server_kind =
   let s = { server_port; server_kind } in
   let net = Eio.Stdenv.net env in
   let fs = Eio.Stdenv.fs env in
@@ -43,7 +43,7 @@ let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
     dispatch ?allow_origin ?catch ?footer ~fs s req body in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
   Format.eprintf "[%t] Running COHTTP EIO server on %s:%d@." GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
-  let additional_domains = Eio.Stdenv.domain_mgr env, Stdlib.Domain.recommended_domain_count () in
+  let additional_domains = additional_domains ?domains env in
   let addr = match addr with
     | None -> Eio.Net.Ipaddr.V4.any
     | Some s -> Eio_unix.Net.Ipaddr.of_unix (Unix.inet_addr_of_string s) in
@@ -52,7 +52,7 @@ let create ?catch ?allow_origin ?footer ?addr ~env ~sw server_port server_kind =
   let server = Cohttp_eio.Server.make_response_action ~callback () in
   Cohttp_eio.Server.run ~on_error ~additional_domains socket server
 
-let run ?catch ?allow_origin ?footer ?addr ~env ~sw servers =
+let run ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw servers =
   Eio.Fiber.all @@ List.map (fun (port, kind) -> fun () ->
-      create ?catch ?allow_origin ?footer ?addr ~env ~sw port kind)
+      create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw port kind)
     servers
