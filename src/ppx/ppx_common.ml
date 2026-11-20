@@ -745,6 +745,8 @@ type server_options = {
   dir: expression;
   catch: expression;
   allow_origin: expression;
+  trusted_proxies: expression;
+  filter: expression;
   servers: expression list;
   env: expression option;
   sw: expression option;
@@ -752,7 +754,8 @@ type server_options = {
 
 let dft_server_options ~loc port = {
   port; dir = evar ~loc "ppx_dir"; catch = [%expr None];
-  allow_origin = [%expr None]; servers=[]; env=None; sw=None
+  allow_origin = [%expr None]; trusted_proxies = [%expr None]; filter = [%expr None];
+  servers=[]; env=None; sw=None
 }
 
 let server_options ?(options=dft_server_options) e =
@@ -766,13 +769,15 @@ let server_options ?(options=dft_server_options) e =
         | "dir" -> { acc with dir = e }
         | "catch" -> { acc with catch = [%expr Some [%e e]] }
         | "origin" -> { acc with allow_origin = [%expr Some [%e e]] }
+        | "trusted_proxies" -> { acc with trusted_proxies = [%expr Some [%e e]] }
+        | "filter" -> { acc with filter = [%expr Some [%e e]] }
         | "servers" ->
           begin match get_list_expr e with
             | None -> acc
             | Some servers -> {acc with servers}
           end
         | "env" -> { acc with env = Some e }
-        | "sw" -> { acc with env = Some e }
+        | "sw" -> { acc with sw = Some e }
         | _ ->
           Format.eprintf "server option %S not understood@." s;
           acc) (options ~loc (eint ~loc 8080)) l
@@ -787,9 +792,12 @@ let server_aux ?options e =
     | l, _, _ -> elist ~loc l in
   match options.env, options.sw with
   | Some env, Some sw -> [%expr
-    EzServerEio.run ?catch:[%e options.catch] ?allow_origin:[%e options.allow_origin] ~env:[%e env] ~sw:[%e sw] [%e l]]
+    EzServerEio.run ?catch:[%e options.catch] ?allow_origin:[%e options.allow_origin]
+      ?trusted_proxies:[%e options.trusted_proxies] ?filter:[%e options.filter]
+      ~env:[%e env] ~sw:[%e sw] [%e l]]
   | _ -> [%expr
-    EzAPIServer.server ?catch:[%e options.catch] ?allow_origin:[%e options.allow_origin] [%e l]]
+    EzAPIServer.server ?catch:[%e options.catch] ?allow_origin:[%e options.allow_origin]
+      ?trusted_proxies:[%e options.trusted_proxies] ?filter:[%e options.filter] [%e l]]
 
 let server ~loc p =
   match p, !async_backend with

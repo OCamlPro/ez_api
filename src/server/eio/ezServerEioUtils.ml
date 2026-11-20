@@ -93,12 +93,15 @@ let register_ws service ?onclose ?step ~react ~bg dir =
       (Directory.conflict_to_string conflict);
     raise (Conflict (steps, conflict))
 
-let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file s r path body =
+let handle ?meth ?content_type ?ws ?(allow_origin=`default) ?filter ~file s r path body =
   let r, body =
     if content_type = Some Url.content_type then
       Req.add_params r (Url.decode_args body), ""
     else r, body in
-  let a = match s with
+  let filtered = match filter with None -> None | Some f -> f r in
+  let a = match filtered with
+    | Some a -> `http a
+    | None -> match s with
     | Root (root, default) -> `http (file ?meth ?default root path)
     | API dir ->
       match Directory.lookup ?meth ?content_type dir r path with

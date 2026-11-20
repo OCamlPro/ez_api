@@ -31,10 +31,10 @@ let create_server ?(name="HTTPUN") ?addr server_port server_kind handler =
 
 let shutdown () = Lwt_list.iter_s (fun (_, s) -> Lwt_io.shutdown_server s) !servers
 
-let server ?name ?catch ?allow_origin ?footer ?addr handler servers =
+let server ?name ?catch ?allow_origin ?footer ?addr ?trusted_proxies ?filter handler servers =
   let waiter = fst @@ Lwt.wait () in
   Lwt.join (List.map (fun (port, kind) ->
       let handler s sockaddr fd =
-        handler ?catch ?allow_origin ?footer s sockaddr fd in
+        handler ?catch ?allow_origin ?footer ?trusted_proxies ?filter s sockaddr fd in
       create_server ?name ?addr port kind handler) servers) >>= fun () ->
   waiter

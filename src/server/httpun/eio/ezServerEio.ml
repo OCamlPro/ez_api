@@ -31,13 +31,13 @@ let read_body body =
   Body.Reader.schedule_read body ~on_eof ~on_read;
   Eio.Promise.await w
 
-let request_handler ?allow_origin ?catch ?footer ~fs ~sw s addr { Gluten.reqd; upgrade; _ } =
+let request_handler ?allow_origin ?catch ?footer ?trusted_proxies ?filter ~fs ~sw s addr { Gluten.reqd; upgrade; _ } =
   let req = Reqd.request reqd in
   let time = GMTime.time () in
   let headers = headers_from_httpun req in
   let version = version_from_httpun req in
   let target, path, content_type, r =
-    Req.request ~version ~headers ~time ?peer:(peer addr) (mk_uri req) in
+    Req.request ~version ~headers ~time ?trusted_proxies ?peer:(peer addr) (mk_uri req) in
   let meth = meth_from_httpun req in
   debug_httpun req;
   Eio.Fiber.fork ~sw @@ fun () ->
@@ -47,7 +47,7 @@ let request_handler ?allow_origin ?catch ?footer ~fs ~sw s addr { Gluten.reqd; u
   let r =
     try
       let file = File_eio.reply ~fs in
-      handle ?meth ?content_type ?allow_origin ~ws ~file s.server_kind r path body
+      handle ?meth ?content_type ?allow_origin ?filter ~ws ~file s.server_kind r path body
     with exn ->
       Format.eprintf "In %s: exception %s" target @@ Printexc.to_string exn;
       match catch with
@@ -80,12 +80,12 @@ let error_handler ?footer _sockaddr ?request:_ error start =
   end;
   Body.Writer.flush response_body (function `Written -> Body.Writer.close response_body | _ -> ())
 
-let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port server_kind =
+let create ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw server_port server_kind =
   let s = { server_port; server_kind } in
   let net = Eio.Stdenv.net env in
   let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
-  let request_handler ~sw addr reqd = request_handler ?allow_origin ?catch ?footer ~sw s addr reqd in
+  let request_handler ~sw addr reqd = request_handler ?allow_origin ?catch ?footer ?trusted_proxies ?filter ~sw s addr reqd in
   let error_handler = error_handler ?footer in
   let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~fs ~sw) ~error_handler ~sw in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
@@ -99,7 +99,7 @@ let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port serv
   Eio.Net.run_server socket ~additional_domains ~on_error @@ fun socket peer_addr ->
   Eio.Switch.run @@ fun sw -> handler ~sw peer_addr socket
 
-let run ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw servers =
+let run ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw servers =
   Eio.Fiber.all @@ List.map (fun (port, kind) -> fun () ->
-      create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw port kind)
+      create ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw port kind)
     servers

@@ -98,12 +98,15 @@ module Legacy = struct
 
 end
 
-let handle ?meth ?content_type ?ws ?(allow_origin=`default) ~file ~(printf: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a) s r path body =
+let handle ?meth ?content_type ?ws ?(allow_origin=`default) ?filter ~file ~(printf: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a) s r path body =
   let r, body =
     if content_type = Some Url.content_type then
       Req.add_params r (Url.decode_args body), ""
     else r, body in
-  let a = match s with
+  let filtered = match filter with None -> Lwt.return_none | Some f -> f r in
+  let a = filtered >>= function
+    | Some a -> Lwt.return (`http a)
+    | None -> match s with
     | Root (root, default) ->
       file ?meth ?default root path >>= fun a ->
       Lwt.return (`http a)

@@ -32,8 +32,6 @@ let dummy = {
   req_ip = None;
 }
 
-let trusted_proxy : (string -> bool) ref = ref (fun _ -> false)
-
 let normalize_ip s =
   let s = String.lowercase_ascii (String.trim s) in
   let prefix = "::ffff:" in
@@ -42,7 +40,9 @@ let normalize_ip s =
      && String.contains s '.' then String.sub s lp (String.length s - lp)
   else s
 
-let client_ip ?(trusted_proxy= !trusted_proxy) ~headers = function
+let trusted_proxies : (string -> bool) ref = ref (fun _ -> false)
+
+let client_ip ?(trusted_proxies= !trusted_proxies) ~headers = function
   | None -> None
   | Some peer ->
     let forwarded = match StringMap.find_opt "x-forwarded-for" headers with
@@ -52,7 +52,7 @@ let client_ip ?(trusted_proxy= !trusted_proxy) ~headers = function
         List.concat_map (String.split_on_char ',') l in
     let rec aux current = function
       | [] -> current
-      | next :: rest -> if trusted_proxy current then aux next rest else current in
+      | next :: rest -> if trusted_proxies current then aux next rest else current in
     Some (aux peer (List.rev forwarded))
 
 let add_params req params =
@@ -64,12 +64,12 @@ let add_params req params =
       ) req.req_params params in
   { req with req_params }
 
-let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) ?peer uri =
+let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) ?trusted_proxies ?peer uri =
   let path_str = Url.decode (Uri.path uri) in
   let path = List.filter (fun s -> s <> "") @@ String.split_on_char '/' path_str in
   let req_id = Uuidm.v4_gen (Random.get_state ()) () in
   let req_peer = Option.map normalize_ip peer in
-  let req_ip = client_ip ~headers req_peer in
+  let req_ip = client_ip ?trusted_proxies ~headers req_peer in
   let req = { req_params = StringMap.empty; req_headers = headers;
               req_version = version; req_time = time; req_id; req_peer; req_ip } in
   let content_type = match StringMap.find_opt "content-type" headers with

@@ -40,14 +40,14 @@ let debug_httpaf req =
 
 let file = File_lwt.reply
 
-let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
+let connection_handler ?catch ?allow_origin ?footer ?trusted_proxies ?filter s sockaddr fd =
   let request_handler sockaddr reqd =
     let req = Reqd.request reqd in
     let time = GMTime.time () in
     let headers = headers_from_httpaf req in
     let version = version_from_httpaf req in
     let target, path, content_type, r =
-      Req.request ~version ~headers ~time ?peer:(Httpunaf.peer sockaddr) (mk_uri req) in
+      Req.request ~version ~headers ~time ?trusted_proxies ?peer:(Httpunaf.peer sockaddr) (mk_uri req) in
     Httpunaf.register_ip time r;
     let meth = meth_from_httpaf req in
     Lwt.async @@ fun () ->
@@ -56,7 +56,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     let ws = WsHttpaf.ws reqd fd in
     Log_lwt.request_content ?content_type body >>= fun () ->
     Lwt.catch
-      (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+      (fun () -> handle ~ws ?meth ?content_type ?allow_origin ?filter ~file ~printf:Log_lwt.printf
           s.server_kind r path body)
       (fun exn ->
          Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn >>= fun () ->
@@ -104,5 +104,5 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
 
 let shutdown = Lwt_httpunaf.shutdown
 
-let server ?catch ?allow_origin ?footer ?addr servers =
-  Lwt_httpunaf.server ~name:"HTTPAF" ?catch ?allow_origin ?footer ?addr connection_handler servers
+let server ?catch ?allow_origin ?footer ?addr ?trusted_proxies ?filter servers =
+  Lwt_httpunaf.server ~name:"HTTPAF" ?catch ?allow_origin ?footer ?addr ?trusted_proxies ?filter connection_handler servers

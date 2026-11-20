@@ -40,7 +40,7 @@ let debug_httpun req =
 
 let file = File_lwt.reply
 
-let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
+let connection_handler ?catch ?allow_origin ?footer ?trusted_proxies ?filter s sockaddr fd =
 
   let request_handler sockaddr { Gluten.reqd; upgrade; _ } =
     let req = Reqd.request reqd in
@@ -48,7 +48,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     let headers = headers_from_httpun req in
     let version = version_from_httpun req in
     let target, path, content_type, r =
-      Req.request ~version ~headers ~time ?peer:(Httpunaf.peer sockaddr) (mk_uri req) in
+      Req.request ~version ~headers ~time ?trusted_proxies ?peer:(Httpunaf.peer sockaddr) (mk_uri req) in
     Httpunaf.register_ip time r;
     let meth = meth_from_httpun req in
     Lwt.async @@ fun () ->
@@ -57,7 +57,7 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
     let ws = WsHttpunLwt.ws reqd upgrade in
     let> () = Log_lwt.request_content ?content_type body in
     let> res = Lwt.catch
-        (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+        (fun () -> handle ~ws ?meth ?content_type ?allow_origin ?filter ~file ~printf:Log_lwt.printf
             s.server_kind r path body)
         (fun exn ->
            let> () = Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn in
@@ -98,5 +98,5 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
 
 let shutdown = Lwt_httpunaf.shutdown
 
-let server ?catch ?allow_origin ?footer ?addr servers =
-  Lwt_httpunaf.server ?catch ?allow_origin ?footer ?addr connection_handler servers
+let server ?catch ?allow_origin ?footer ?addr ?trusted_proxies ?filter servers =
+  Lwt_httpunaf.server ?catch ?allow_origin ?footer ?addr ?trusted_proxies ?filter connection_handler servers

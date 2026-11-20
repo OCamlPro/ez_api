@@ -2,13 +2,13 @@ open EzAPI
 open EzServerEioUtils
 open Cohttp
 
-let dispatch ?allow_origin ?catch ?footer ~fs s addr req body =
+let dispatch ?allow_origin ?catch ?footer ?trusted_proxies ?filter ~fs s addr req body =
   let time = GMTime.time () in
   Cohttp_common.debug ~request:Log_eio.request req;
   let headers = Cohttp_common.headers req in
   let version = Cohttp_common.version req in
   let target, path, content_type, r =
-    Req.request ?version ~headers ~time ?peer:(peer addr) (Request.uri req) in
+    Req.request ?version ~headers ~time ?trusted_proxies ?peer:(peer addr) (Request.uri req) in
   let meth = Cohttp_common.meth req in
   let body = Eio.Buf_read.(parse_exn take_all) body ~max_size:max_int in
   let ws = WsCohttpEio.ws req in
@@ -16,7 +16,7 @@ let dispatch ?allow_origin ?catch ?footer ~fs s addr req body =
   let a =
     try
       let file = File_eio.reply ~fs in
-      handle ~ws ?meth ?content_type ?allow_origin ~file s.server_kind r path body
+      handle ~ws ?meth ?content_type ?allow_origin ?filter ~file s.server_kind r path body
     with exn ->
       Format.eprintf "In %s: exception %s" target @@ Printexc.to_string exn;
       match catch with
@@ -34,13 +34,13 @@ let dispatch ?allow_origin ?catch ?footer ~fs s addr req body =
     let body = Option.fold ~none:body ~some:(fun f -> body ^ f) footer in
     `Response (Cohttp_eio.Server.respond_string ~headers ~status ~body ())
 
-let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port server_kind =
+let create ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw server_port server_kind =
   let s = { server_port; server_kind } in
   let net = Eio.Stdenv.net env in
   let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
   let callback ((_sw, addr), _id) req body =
-    dispatch ?allow_origin ?catch ?footer ~fs s addr req body in
+    dispatch ?allow_origin ?catch ?footer ?trusted_proxies ?filter ~fs s addr req body in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
   Format.eprintf "[%t] Running COHTTP EIO server on %s:%d@." GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = additional_domains ?domains env in
@@ -52,7 +52,7 @@ let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port serv
   let server = Cohttp_eio.Server.make_response_action ~callback () in
   Cohttp_eio.Server.run ~on_error ~additional_domains socket server
 
-let run ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw servers =
+let run ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw servers =
   Eio.Fiber.all @@ List.map (fun (port, kind) -> fun () ->
-      create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw port kind)
+      create ?catch ?allow_origin ?footer ?addr ?domains ?trusted_proxies ?filter ~env ~sw port kind)
     servers

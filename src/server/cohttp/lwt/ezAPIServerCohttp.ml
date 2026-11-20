@@ -30,19 +30,19 @@ let peer io =
 
 let file = File.reply
 
-let dispatch ?allow_origin ?catch ?footer s io req body =
+let dispatch ?allow_origin ?catch ?footer ?trusted_proxies ?filter s io req body =
   let time = GMTime.time () in
   Cohttp_common.debug ~request:Log_lwt.request req >>= fun () ->
   let headers = Cohttp_common.headers req in
   let version = Cohttp_common.version req in
   let target, path, content_type, r =
-    Req.request ?version ~headers ~time ?peer:(peer io) (Request.uri req) in
+    Req.request ?version ~headers ~time ?trusted_proxies ?peer:(peer io) (Request.uri req) in
   Option.iter (Ip.register time) r.Req.req_ip;
   let meth = Cohttp_common.meth req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = WsCohttpLwt.ws req in
   Log_lwt.request_content ?content_type body >>= fun () ->
-  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ~file ~printf:Log_lwt.printf
+  Lwt.catch (fun () -> handle ~ws ?meth ?content_type ?allow_origin ?filter ~file ~printf:Log_lwt.printf
                 s.server_kind r path body)
     (fun exn ->
        Log_lwt.printf "In %s: exception %s" target @@ Printexc.to_string exn >>= fun () ->
@@ -63,11 +63,11 @@ let dispatch ?allow_origin ?catch ?footer s io req body =
     Server.respond_string ~headers ~status ~body () >|= fun (r, b) ->
     `Response (r, b)
 
-let create_server ?catch ?allow_origin ?footer server_port server_kind =
+let create_server ?catch ?allow_origin ?footer ?trusted_proxies ?filter server_port server_kind =
   let s = { server_port; server_kind } in
   Timings.init (GMTime.time ()) @@ Doc.nservices ();
   ignore @@ Doc.all_services_registered ();
-  let callback conn req body = dispatch ?allow_origin ?catch ?footer s (fst conn) req body in
+  let callback conn req body = dispatch ?allow_origin ?catch ?footer ?trusted_proxies ?filter s (fst conn) req body in
   let on_exn = function
     | Unix.Unix_error (Unix.EPIPE, _, _) -> ()
     | exn -> Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
@@ -79,6 +79,6 @@ let create_server ?catch ?allow_origin ?footer server_port server_kind =
 
 let shutdown () = Lwt.return_unit
 
-let server ?catch ?allow_origin ?footer ?addr:_ servers =
+let server ?catch ?allow_origin ?footer ?addr:_ ?trusted_proxies ?filter servers =
   Lwt.join (List.map (fun (port,kind) ->
-      create_server ?catch ?allow_origin ?footer port kind) servers)
+      create_server ?catch ?allow_origin ?footer ?trusted_proxies ?filter port kind) servers)
