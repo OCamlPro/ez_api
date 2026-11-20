@@ -2,13 +2,13 @@ open EzAPI
 open EzServerEioUtils
 open Cohttp
 
-let dispatch ?allow_origin ?catch ?footer ~fs s req body =
+let dispatch ?allow_origin ?catch ?footer ~fs s addr req body =
   let time = GMTime.time () in
   Cohttp_common.debug ~request:Log_eio.request req;
   let headers = Cohttp_common.headers req in
   let version = Cohttp_common.version req in
   let target, path, content_type, r =
-    Req.request ?version ~headers ~time (Request.uri req) in
+    Req.request ?version ~headers ~time ?peer:(peer addr) (Request.uri req) in
   let meth = Cohttp_common.meth req in
   let body = Eio.Buf_read.(parse_exn take_all) body ~max_size:max_int in
   let ws = WsCohttpEio.ws req in
@@ -39,8 +39,8 @@ let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port serv
   let net = Eio.Stdenv.net env in
   let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
-  let callback _conn req body =
-    dispatch ?allow_origin ?catch ?footer ~fs s req body in
+  let callback ((_sw, addr), _id) req body =
+    dispatch ?allow_origin ?catch ?footer ~fs s addr req body in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
   Format.eprintf "[%t] Running COHTTP EIO server on %s:%d@." GMTime.pp_now (Option.value ~default:"localhost" addr) server_port ;
   let additional_domains = additional_domains ?domains env in

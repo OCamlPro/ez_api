@@ -42,10 +42,8 @@ let mk_uri ~meth ~target ~header =
         uri
     end
 
-let register_ip ~header time = function
-  | Unix.ADDR_INET (iaddr, _port) ->
-    let ip = match header "x-forwarded-for" with
-      | None -> Unix.string_of_inet_addr iaddr
-      | Some ip -> ip in
-    Ip.register time ip
-  | Unix.ADDR_UNIX _ -> ()
+let peer = function
+  | Unix.ADDR_INET (iaddr, _port) -> Some (Unix.string_of_inet_addr iaddr)
+  | Unix.ADDR_UNIX _ -> None
+
+let register_ip time r = Option.iter (Ip.register time) r.EzAPI.Req.req_ip

@@ -3,7 +3,7 @@
  (public_name ez_api.server_eio_utils)
  (optional)
  (modules directory ezServerEioUtils)
- (libraries server_utils eio))
+ (libraries server_utils eio eio.unix))
 
 (library
  (name log_eio)

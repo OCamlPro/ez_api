@@ -18,31 +18,26 @@ module File = File_lwt
 
 let set_debug () = Cohttp_lwt_unix.Debug.activate_debug ()
 
-let register_ip req io time =
+let peer io =
   let open Conduit_lwt_unix in match io with
   | TCP tcp ->
     begin match Lwt_unix.getpeername tcp.fd with
-      | Lwt_unix.ADDR_INET (ip,_port) ->
-        let ip = Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip) in
-        let ip =
-          match Header.get (Request.headers req) "x-forwarded-for" with
-          | None -> ip
-          | Some ip -> ip in
-        Ip.register time ip
-      | Lwt_unix.ADDR_UNIX _path -> ()
+      | Lwt_unix.ADDR_INET (ip,_port) -> Some (Ipaddr.to_string (Ipaddr_unix.of_inet_addr ip))
+      | Lwt_unix.ADDR_UNIX _path -> None
+      | exception _ -> None
     end
-  | _ -> ()
+  | _ -> None
 
 let file = File.reply
 
 let dispatch ?allow_origin ?catch ?footer s io req body =
   let time = GMTime.time () in
-  register_ip req io time ;
   Cohttp_common.debug ~request:Log_lwt.request req >>= fun () ->
   let headers = Cohttp_common.headers req in
   let version = Cohttp_common.version req in
   let target, path, content_type, r =
-    Req.request ?version ~headers ~time (Request.uri req) in
+    Req.request ?version ~headers ~time ?peer:(peer io) (Request.uri req) in
+  Option.iter (Ip.register time) r.Req.req_ip;
   let meth = Cohttp_common.meth req in
   Cohttp_lwt.Body.to_string body >>= fun body ->
   let ws = WsCohttpLwt.ws req in

@@ -28,6 +28,10 @@ type server = {
   server_kind : server_kind;
 }
 
+let peer : Eio.Net.Sockaddr.stream -> string option = function
+  | `Tcp (ip, _port) -> Some (Unix.string_of_inet_addr (Eio_unix.Net.Ipaddr.to_unix ip))
+  | `Unix _ -> None
+
 (** Domains *)
 
 let additional_domains ?domains env =

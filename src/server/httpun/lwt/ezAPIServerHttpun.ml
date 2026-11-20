@@ -38,8 +38,6 @@ let debug_httpun req =
   let headers = Headers.to_list req.Request.headers in
   Log_lwt.request ~meth ~headers req.Request.target
 
-let register_ip req time addr = Httpunaf.register_ip ~header:(Headers.get req.Request.headers) time addr
-
 let file = File_lwt.reply
 
 let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
@@ -47,11 +45,11 @@ let connection_handler ?catch ?allow_origin ?footer s sockaddr fd =
   let request_handler sockaddr { Gluten.reqd; upgrade; _ } =
     let req = Reqd.request reqd in
     let time = GMTime.time () in
-    register_ip req time sockaddr;
     let headers = headers_from_httpun req in
     let version = version_from_httpun req in
     let target, path, content_type, r =
-      Req.request ~version ~headers ~time (mk_uri req) in
+      Req.request ~version ~headers ~time ?peer:(Httpunaf.peer sockaddr) (mk_uri req) in
+    Httpunaf.register_ip time r;
     let meth = meth_from_httpun req in
     Lwt.async @@ fun () ->
     let> () = debug_httpun req in

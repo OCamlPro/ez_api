@@ -17,7 +17,9 @@ type t = {
   req_time : float;
   req_headers : string list StringMap.t;
   req_params : string list StringMap.t;
-  req_id : Uuidm.t
+  req_id : Uuidm.t;
+  req_peer : string option;
+  req_ip : string option;
 }
 
 let dummy = {
@@ -25,8 +27,33 @@ let dummy = {
   req_time = 0.;
   req_headers = StringMap.empty;
   req_params = StringMap.empty;
-  req_id = Uuidm.nil
+  req_id = Uuidm.nil;
+  req_peer = None;
+  req_ip = None;
 }
+
+let trusted_proxy : (string -> bool) ref = ref (fun _ -> false)
+
+let normalize_ip s =
+  let s = String.lowercase_ascii (String.trim s) in
+  let prefix = "::ffff:" in
+  let lp = String.length prefix in
+  if String.length s > lp && String.sub s 0 lp = prefix
+     && String.contains s '.' then String.sub s lp (String.length s - lp)
+  else s
+
+let client_ip ?(trusted_proxy= !trusted_proxy) ~headers = function
+  | None -> None
+  | Some peer ->
+    let forwarded = match StringMap.find_opt "x-forwarded-for" headers with
+      | None -> []
+      | Some l ->
+        List.filter (fun s -> s <> "") @@ List.map normalize_ip @@
+        List.concat_map (String.split_on_char ',') l in
+    let rec aux current = function
+      | [] -> current
+      | next :: rest -> if trusted_proxy current then aux next rest else current in
+    Some (aux peer (List.rev forwarded))
 
 let add_params req params =
   let req_params =
@@ -37,12 +64,14 @@ let add_params req params =
       ) req.req_params params in
   { req with req_params }
 
-let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) uri =
+let request ?(version=`HTTP_1_1) ?(headers=StringMap.empty) ?(time=0.) ?peer uri =
   let path_str = Url.decode (Uri.path uri) in
   let path = List.filter (fun s -> s <> "") @@ String.split_on_char '/' path_str in
   let req_id = Uuidm.v4_gen (Random.get_state ()) () in
+  let req_peer = Option.map normalize_ip peer in
+  let req_ip = client_ip ~headers req_peer in
   let req = { req_params = StringMap.empty; req_headers = headers;
-              req_version = version; req_time = time; req_id } in
+              req_version = version; req_time = time; req_id; req_peer; req_ip } in
   let content_type = match StringMap.find_opt "content-type" headers with
     | Some (c :: _) -> Some c
     | _ -> None in

@@ -31,13 +31,13 @@ let read_body body =
   Body.Reader.schedule_read body ~on_eof ~on_read;
   Eio.Promise.await w
 
-let request_handler ?allow_origin ?catch ?footer ~fs ~sw s { Gluten.reqd; upgrade; _ } =
+let request_handler ?allow_origin ?catch ?footer ~fs ~sw s addr { Gluten.reqd; upgrade; _ } =
   let req = Reqd.request reqd in
   let time = GMTime.time () in
   let headers = headers_from_httpun req in
   let version = version_from_httpun req in
   let target, path, content_type, r =
-    Req.request ~version ~headers ~time (mk_uri req) in
+    Req.request ~version ~headers ~time ?peer:(peer addr) (mk_uri req) in
   let meth = meth_from_httpun req in
   debug_httpun req;
   Eio.Fiber.fork ~sw @@ fun () ->
@@ -85,7 +85,7 @@ let create ?catch ?allow_origin ?footer ?addr ?domains ~env ~sw server_port serv
   let net = Eio.Stdenv.net env in
   let fs = Eio.Stdenv.fs env in
   ignore @@ Doc.all_services_registered ();
-  let request_handler ~sw _addr reqd = request_handler ?allow_origin ?catch ?footer ~sw s reqd in
+  let request_handler ~sw addr reqd = request_handler ?allow_origin ?catch ?footer ~sw s addr reqd in
   let error_handler = error_handler ?footer in
   let handler ~sw = Server.create_connection_handler ~request_handler:(request_handler ~fs ~sw) ~error_handler ~sw in
   let on_error exn = Format.eprintf "Server Error: %s" (Printexc.to_string exn) in
