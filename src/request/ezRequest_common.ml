@@ -34,6 +34,6 @@ let handle_input: type i.
     pos ~content ~content_type @@ forge api service arg params
   | Json enc ->
     let content, content_type =
-      if url_encode then Url.encode_obj enc input, Mime.(to_string url_encoded)
+      if url_encode then Url.encode_obj ~url:true enc input, Mime.(to_string url_encoded)
       else EzEncoding.construct enc input, Mime.(to_string json) in
     pos ~content ~content_type @@ forge api service arg params
